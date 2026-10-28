@@ -10,11 +10,20 @@ export interface PanelSection {
   onChange?: (path: string, last: boolean) => void
 }
 
+/** Live values drawn as scrolling graphs at the top of the panel. */
+export interface PanelGraphs {
+  title: string
+  /** An object whose properties (usually getters) are read every frame. */
+  source: Record<string, number>
+  min: number
+  max: number
+}
+
 /**
  * The tuning panel, built from the settings objects themselves: every number
  * gets a slider and every on/off value a checkbox, grouped like the file.
  */
-export function createTuningPanel(sections: PanelSection[]) {
+export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs) {
   const pane = new Pane({ title: 'Tuning   ( ` hides this )' })
   const wrapper = pane.element.parentElement as HTMLElement
   wrapper.style.width = '320px'
@@ -50,6 +59,20 @@ export function createTuningPanel(sections: PanelSection[]) {
     pane.refresh()
   })
 
+  if (graphs) {
+    const folder = pane.addFolder({ title: graphs.title })
+    for (const key of Object.keys(graphs.source)) {
+      folder.addBinding(graphs.source, key, {
+        readonly: true,
+        view: 'graph',
+        min: graphs.min,
+        max: graphs.max,
+        interval: 16,
+        bufferSize: 200, // about 3 seconds of history
+      })
+    }
+  }
+
   for (const section of sections) {
     const folders = new Map<string, FolderApi>([['', pane.addFolder({ title: section.title, expanded: false })]])
     const folderFor = (path: string): FolderApi => {
@@ -76,8 +99,10 @@ export function createTuningPanel(sections: PanelSection[]) {
   }
 
   return {
-    toggle() {
+    /** Shows or hides the panel. Returns true if it is now showing. */
+    toggle(): boolean {
       pane.hidden = !pane.hidden
+      return !pane.hidden
     },
   }
 }

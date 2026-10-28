@@ -1,0 +1,175 @@
+import { beforeAll, describe, expect, it } from 'vitest'
+import { currentBike } from '../src/config'
+import { Bike } from '../src/physics/bike'
+import { initPhysics, PhysicsWorld } from '../src/physics/world'
+import type { PlacedRamp } from '../src/terrain/generate'
+import { createHeightfield, sampleCoord, type Heightfield } from '../src/terrain/heightfield'
+
+const DT = 1 / 120
+const DEG = Math.PI / 180
+
+beforeAll(async () => {
+  await initPhysics()
+})
+
+/** 200 m of ground shaped by a height formula, samples 2 m apart. */
+function ground(height: (x: number, z: number) => number): Heightfield {
+  const field = createHeightfield(200, 2)
+  const n = field.samples
+  for (let iz = 0; iz < n; iz++) {
+    for (let ix = 0; ix < n; ix++) {
+      field.heights[iz * n + ix] = height(sampleCoord(field, ix), sampleCoord(field, iz))
+    }
+  }
+  return field
+}
+
+const flat = () => ground(() => 0)
+/** Downhill toward +x at 10 degrees. */
+const slope = () => ground((x) => -x * Math.tan(10 * DEG))
+
+function setup(field: Heightfield, ramps: PlacedRamp[] = []) {
+  const physics = new PhysicsWorld()
+  physics.setGround(field, ramps)
+  const bike = new Bike(physics, structuredClone(currentBike()))
+  const run = (seconds: number) => {
+    for (let t = 0; t < seconds - 1e-9; t += DT) {
+      bike.update(DT)
+      physics.step(DT, 9.81)
+      bike.record()
+    }
+  }
+  return { physics, bike, run }
+}
+
+/** Rolls the bike sideways by `degrees` (positive = right side down) around its forward axis. */
+function tilt(bike: Bike, degrees: number) {
+  const r = bike.body.rotation()
+  const half = (-degrees * DEG) / 2
+  // roll about the body's own forward axis (-z) = q * rotation about z
+  const [qx, qy, qz, qw] = [r.x, r.y, r.z, r.w]
+  const [sx, sw] = [Math.sin(half), Math.cos(half)]
+  bike.body.setRotation(
+    { x: qx * sw + qy * sx, y: qy * sw - qx * sx, z: qz * sw + qw * sx, w: qw * sw - qz * sx },
+    true,
+  )
+}
+
+describe('physics ground', () => {
+  it('matches the terrain heights', () => {
+    // different slopes along x and z, so mixing the two up would show
+    const physics = new PhysicsWorld()
+    physics.setGround(ground((x, z) => x * 0.1 + z * 0.3), [])
+    expect(physics.groundHeightAt(30, -50)).toBeCloseTo(3 - 15, 2)
+    expect(physics.groundHeightAt(-70, 20)).toBeCloseTo(-7 + 6, 2)
+  })
+
+  it('makes ramps solid', () => {
+    const physics = new PhysicsWorld()
+    const def = { x: 0, z: 0, heading: 0, width: 4, height: 2, lipAngle: 25, deckLength: 3, backAngle: 30 }
+    physics.setGround(flat(), [{ def, baseY: 0 }])
+    expect(physics.groundHeightAt(0, -1.5)).toBeCloseTo(2, 3) // on the deck
+    expect(physics.groundHeightAt(5, -1.5)).toBeCloseTo(0, 3) // beside the ramp
+  })
+})
+
+describe('bike', () => {
+  it('settles on its suspension after a drop, upright and still', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0, 0.5)
+    run(3)
+    expect(bike.speed).toBeLessThan(0.05)
+    for (const wheel of bike.wheels) {
+      expect(wheel.onGround).toBe(true)
+      expect(wheel.compressionRatio).toBeGreaterThan(0.2) // sag: sits into its travel...
+      expect(wheel.compressionRatio).toBeLessThan(0.4) // ...without bottoming out
+    }
+    expect(Math.abs(bike.roll)).toBeLessThan(1 * DEG)
+    expect(Math.abs(bike.pitch)).toBeLessThan(1 * DEG)
+  })
+
+  it('stops bouncing soon after landing', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0, 0.5)
+    run(1.5)
+    const early = bike.body.translation().y
+    run(1.5)
+    expect(Math.abs(bike.body.translation().y - early)).toBeLessThan(0.01)
+  })
+
+  it('lands a big drop with a thud instead of bouncing back up', () => {
+    // 6 m onto flat ground uses up all the suspension travel
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0)
+    run(2)
+    const rest = bike.body.translation().y
+    bike.placeOnGround(0, 0, 0, 6)
+    let highestAfterLanding = -Infinity
+    let landed = false
+    for (let t = 0; t < 4; t += 0.05) {
+      run(0.05)
+      if (bike.wheels.some((wheel) => wheel.bottomedOut)) landed = true
+      if (landed) highestAfterLanding = Math.max(highestAfterLanding, bike.body.translation().y)
+    }
+    expect(landed).toBe(true)
+    expect(highestAfterLanding - rest).toBeLessThan(0.15)
+  })
+
+  it('reads lean as positive when the right side goes down', () => {
+    const { bike } = setup(flat())
+    bike.placeOnGround(0, 0, 0)
+    tilt(bike, 15)
+    expect(bike.roll).toBeCloseTo(15 * DEG, 3)
+  })
+
+  it('pulls itself back upright when tipped over', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0)
+    tilt(bike, 15)
+    run(2)
+    expect(Math.abs(bike.roll)).toBeLessThan(1 * DEG)
+  })
+
+  it('rolls downhill when pointed downhill', () => {
+    const { bike, run } = setup(slope())
+    bike.placeOnGround(0, 0, 90) // heading 90 rides toward +x, down the slope
+    run(3)
+    expect(bike.forwardSpeed).toBeGreaterThan(3)
+    expect(bike.body.translation().x).toBeGreaterThan(3)
+  })
+
+  it('holds its line across a slope instead of sliding down it', () => {
+    const { bike, run } = setup(slope())
+    bike.placeOnGround(0, 0, 0) // facing across the slope
+    run(3)
+    expect(Math.abs(bike.body.translation().x)).toBeLessThan(0.5)
+  })
+
+  it('reset puts it back upright on the spot, standing still', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(10, -5, 45)
+    run(0.5)
+    tilt(bike, 40)
+    bike.body.setLinvel({ x: 3, y: 0, z: 0 }, true)
+    run(0.2)
+    const { x, z } = bike.body.translation()
+    bike.resetUpright()
+    expect(bike.speed).toBe(0)
+    expect(Math.abs(bike.roll)).toBeLessThan(0.1 * DEG)
+    expect(bike.body.translation().x).toBeCloseTo(x, 2)
+    expect(bike.body.translation().z).toBeCloseTo(z, 2)
+    run(2)
+    expect(bike.wheels.every((wheel) => wheel.onGround)).toBe(true)
+  })
+
+  it('times how long it has been in the air', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0, 3) // a 3 m drop takes about 0.78 s
+    run(0.5)
+    expect(bike.airtime).toBeCloseTo(0.5, 1)
+    run(1.5)
+    expect(bike.airtime).toBe(0)
+    expect(bike.lastAirtime).toBeGreaterThan(0.6)
+    expect(bike.lastAirtime).toBeLessThan(0.9)
+  })
+})

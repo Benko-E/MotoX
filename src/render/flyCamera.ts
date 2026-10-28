@@ -68,6 +68,16 @@ export class FlyCamera {
     if (this.position.y < floor) this.position.y = floor
   }
 
+  /** A point `distance` metres ahead of the camera, level with it. */
+  pointAhead(distance: number): THREE.Vector3 {
+    return this.position.clone().add(new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)).multiplyScalar(distance))
+  }
+
+  /** The compass heading the camera faces, degrees (0 = toward -z, 90 = toward +x). */
+  get heading(): number {
+    return (-this.yaw * 180) / Math.PI
+  }
+
   /** Moves the real camera, blended `alpha` of the way from the previous step to the latest. */
   apply(camera: THREE.PerspectiveCamera, alpha: number): void {
     camera.position.lerpVectors(this.previous, this.position, alpha)

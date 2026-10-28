@@ -77,4 +77,6 @@ export interface MapDef {
   }
   lips: LipDef[]
   ramps: RampDef[]
+  /** Where the bike starts. */
+  spawn: { x: number; z: number; heading: number }
 }

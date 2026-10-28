@@ -8,8 +8,6 @@ export interface SceneView {
   renderer: THREE.WebGLRenderer
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
-  /** Placeholder the size of a dirt bike, for scale. Replaced by the bike in step 3. */
-  scaleBox: THREE.Mesh
   /** Keeps the sun's shadows centred on what the camera is looking at. */
   focusShadows(at: THREE.Vector3): void
   render(): void
@@ -45,13 +43,6 @@ export function createScene(container: HTMLElement, config: Config): SceneView {
   sun.shadow.bias = -0.0005
   scene.add(sun, sun.target)
 
-  const scaleBox = new THREE.Mesh(
-    new THREE.BoxGeometry(0.8, 1.2, 2.1),
-    new THREE.MeshStandardMaterial({ color: 0xd8432b }),
-  )
-  scaleBox.castShadow = true
-  scene.add(scaleBox)
-
   function fitToWindow() {
     const width = container.clientWidth
     const height = container.clientHeight
@@ -66,7 +57,6 @@ export function createScene(container: HTMLElement, config: Config): SceneView {
     renderer,
     scene,
     camera,
-    scaleBox,
     focusShadows(at) {
       sun.target.position.copy(at)
       sun.position.copy(at).add(sunOffset)

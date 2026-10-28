@@ -36,4 +36,7 @@ export const freeride: MapDef = {
     // tabletop: clear the long deck and land on the back slope
     { x: -40, z: 45, heading: 270, width: 8, height: 2.5, lipAngle: 26, deckLength: 18, backAngle: 20 },
   ],
+
+  /** In the middle of the flat area, facing the ramps. */
+  spawn: { x: 20, z: 0, heading: 270 },
 }

@@ -15,6 +15,7 @@ function testMap(overrides: Partial<MapDef> = {}): MapDef {
     edge: { start: 50, rise: 0 },
     lips: [],
     ramps: [],
+    spawn: { x: 0, z: 0, heading: 0 },
     ...overrides,
   }
 }
