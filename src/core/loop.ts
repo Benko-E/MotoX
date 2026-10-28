@@ -19,30 +19,28 @@ export interface FixedStepOptions {
 }
 
 export class FixedStepLoop {
-  private readonly dt: number
-  private readonly maxSteps: number
-  private readonly step: (dt: number) => void
+  /** Read live every frame, so changing the step rate applies at once. */
+  private readonly options: FixedStepOptions
   private bank = 0
 
   constructor(options: FixedStepOptions) {
-    this.dt = 1 / options.stepHz
-    this.maxSteps = options.maxStepsPerFrame
-    this.step = options.step
+    this.options = options
   }
 
   advance(frameSeconds: number): void {
+    const dt = this.dt
     this.bank += frameSeconds
     // Adding up frame times like 1/144 leaves rounding crumbs, so a bank a
     // hair short of a full step still pays for one.
-    const almostOneStep = this.dt * (1 - 1e-6)
+    const almostOneStep = dt * (1 - 1e-6)
     let steps = 0
     while (this.bank >= almostOneStep) {
-      if (steps === this.maxSteps) {
-        this.bank %= this.dt
+      if (steps === this.options.maxStepsPerFrame) {
+        this.bank %= dt
         break
       }
-      this.step(this.dt)
-      this.bank -= this.dt
+      this.options.step(dt)
+      this.bank -= dt
       steps++
     }
   }
@@ -50,5 +48,9 @@ export class FixedStepLoop {
   /** How far we are toward the next step, 0 to 1. Used to blend the drawing. */
   get alpha(): number {
     return Math.min(Math.max(this.bank / this.dt, 0), 1)
+  }
+
+  private get dt(): number {
+    return 1 / Math.max(this.options.stepHz, 1)
   }
 }

@@ -1,17 +1,21 @@
 import * as THREE from 'three'
 import type { Config } from '../config'
 
-/** Size of the world in metres. The map in step 2 will use the same size. */
-const WORLD_SIZE = 1000
+/** How far around the camera the sun draws shadows, metres. */
+const SHADOW_REACH = 60
 
 export interface SceneView {
   renderer: THREE.WebGLRenderer
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
+  /** Placeholder the size of a dirt bike, for scale. Replaced by the bike in step 3. */
+  scaleBox: THREE.Mesh
+  /** Keeps the sun's shadows centred on what the camera is looking at. */
+  focusShadows(at: THREE.Vector3): void
   render(): void
 }
 
-/** Sets up the renderer, sky, light and a flat ground plane. */
+/** Sets up the renderer, sky, fog and light. The ground is added separately. */
 export function createScene(container: HTMLElement, config: Config): SceneView {
   const renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -23,46 +27,30 @@ export function createScene(container: HTMLElement, config: Config): SceneView {
   const sky = new THREE.Color(0x9cc3e6)
   const scene = new THREE.Scene()
   scene.background = sky
-  // Fully fogged before the ground's edge (500 m from the middle).
-  scene.fog = new THREE.Fog(sky, 120, 450)
+  scene.fog = new THREE.Fog(sky, 200, 480)
 
   const camera = new THREE.PerspectiveCamera(config.camera.fov, 1, 0.1, 2000)
-  camera.position.set(5, 2.2, 7)
-  camera.lookAt(0, 0.6, 0)
 
-  scene.add(new THREE.HemisphereLight(0xdfefff, 0x6b5338, 1.2))
-  const sun = new THREE.DirectionalLight(0xfff2dd, 2.2)
-  sun.position.set(30, 50, 20)
+  // A fairly low sun and a soft sky light, so the hills' shapes show.
+  scene.add(new THREE.HemisphereLight(0xdfefff, 0x6b5338, 0.8))
+  const sunOffset = new THREE.Vector3(45, 35, 25)
+  const sun = new THREE.DirectionalLight(0xfff2dd, 2.8)
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048)
-  const reach = 20
-  sun.shadow.camera.left = -reach
-  sun.shadow.camera.right = reach
-  sun.shadow.camera.top = reach
-  sun.shadow.camera.bottom = -reach
-  scene.add(sun)
+  sun.shadow.camera.left = -SHADOW_REACH
+  sun.shadow.camera.right = SHADOW_REACH
+  sun.shadow.camera.top = SHADOW_REACH
+  sun.shadow.camera.bottom = -SHADOW_REACH
+  sun.shadow.camera.far = 200
+  sun.shadow.bias = -0.0005
+  scene.add(sun, sun.target)
 
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE),
-    new THREE.MeshStandardMaterial({ color: 0x9a7b52, roughness: 1 }),
-  )
-  ground.rotation.x = -Math.PI / 2
-  ground.receiveShadow = true
-  scene.add(ground)
-
-  // 10 m grid squares, so distance and speed are easy to read.
-  const grid = new THREE.GridHelper(WORLD_SIZE, WORLD_SIZE / 10, 0x5c4630, 0x7d6343)
-  grid.position.y = 0.01
-  scene.add(grid)
-
-  // A box the size of a dirt bike, for scale. Replaced by the bike in step 3.
-  const bikeSized = new THREE.Mesh(
+  const scaleBox = new THREE.Mesh(
     new THREE.BoxGeometry(0.8, 1.2, 2.1),
     new THREE.MeshStandardMaterial({ color: 0xd8432b }),
   )
-  bikeSized.position.y = 0.6
-  bikeSized.castShadow = true
-  scene.add(bikeSized)
+  scaleBox.castShadow = true
+  scene.add(scaleBox)
 
   function fitToWindow() {
     const width = container.clientWidth
@@ -78,6 +66,17 @@ export function createScene(container: HTMLElement, config: Config): SceneView {
     renderer,
     scene,
     camera,
-    render: () => renderer.render(scene, camera),
+    scaleBox,
+    focusShadows(at) {
+      sun.target.position.copy(at)
+      sun.position.copy(at).add(sunOffset)
+    },
+    render() {
+      if (camera.fov !== config.camera.fov) {
+        camera.fov = config.camera.fov
+        camera.updateProjectionMatrix()
+      }
+      renderer.render(scene, camera)
+    },
   }
 }

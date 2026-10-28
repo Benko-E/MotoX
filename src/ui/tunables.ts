@@ -1,0 +1,67 @@
+/**
+ * The tuning panel's logic, kept apart from the panel itself so it can be
+ * tested: which values get sliders, how far each slider goes, and which
+ * values changed since the game loaded.
+ */
+
+/** Slider ranges by path: [min, max, step?]. A `*` matches any list position. */
+export type Ranges = Record<string, [number, number, number?]>
+
+export interface Tunable {
+  /** Dotted path from the root, e.g. "hills.height" or "lips.2.heading". */
+  path: string
+  /** The object holding the value, and its key there. Writing owner[key] changes the live setting. */
+  owner: Record<string, unknown>
+  key: string
+}
+
+/** How far a slider goes. Without an entry in `ranges`: 0 to 4x the file value. */
+export function rangeFor(path: string, value: number, ranges: Ranges) {
+  const wildcard = path.replace(/\.\d+(?=\.|$)/g, '.*')
+  const listed = ranges[path] ?? ranges[wildcard]
+  let min: number
+  let max: number
+  if (listed) [min, max] = listed
+  else if (value > 0) [min, max] = [0, value * 4]
+  else if (value < 0) [min, max] = [value * 4, -value * 4]
+  else [min, max] = [0, 1]
+  const step = listed?.[2] ?? 10 ** Math.floor(Math.log10((max - min) / 100))
+  return { min, max, step }
+}
+
+/** Every number and on/off switch under `root`, in file order. Text (like key names) is skipped. */
+export function collectTunables(root: object, prefix = ''): Tunable[] {
+  const found: Tunable[] = []
+  const owner = root as Record<string, unknown>
+  for (const [key, value] of Object.entries(owner)) {
+    const path = prefix ? `${prefix}.${key}` : key
+    if (typeof value === 'number' || typeof value === 'boolean') found.push({ path, owner, key })
+    else if (value !== null && typeof value === 'object') found.push(...collectTunables(value, path))
+  }
+  return found
+}
+
+/**
+ * Only the values in `current` that differ from `defaults`, in the same
+ * shape. Lists keep their positions, with null for entries that didn't
+ * change. Returns undefined when nothing changed.
+ */
+export function changedValues(defaults: unknown, current: unknown): unknown {
+  if (Array.isArray(defaults) && Array.isArray(current)) {
+    const entries = current.map((value, i) => changedValues(defaults[i], value) ?? null)
+    return entries.some((entry) => entry !== null) ? entries : undefined
+  }
+  if (isPlainObject(defaults) && isPlainObject(current)) {
+    const changed: Record<string, unknown> = {}
+    for (const key of Object.keys(current)) {
+      const diff = changedValues(defaults[key], current[key])
+      if (diff !== undefined) changed[key] = diff
+    }
+    return Object.keys(changed).length > 0 ? changed : undefined
+  }
+  return Object.is(defaults, current) ? undefined : current
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}

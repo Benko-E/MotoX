@@ -41,6 +41,15 @@ describe('FixedStepLoop', () => {
     expect(loop.alpha).toBeCloseTo(0.5, 6)
   })
 
+  it('picks up a new step rate at once, so the tuning panel can change it', () => {
+    let steps = 0
+    const options = { stepHz: 120, maxStepsPerFrame: 8, step: () => steps++ }
+    const loop = new FixedStepLoop(options)
+    options.stepHz = 60
+    for (let i = 0; i < 60; i++) loop.advance(1 / 60)
+    expect(steps).toBe(60)
+  })
+
   it('after a long stall runs at most maxStepsPerFrame and drops the backlog', () => {
     let steps = 0
     const loop = new FixedStepLoop({ stepHz: 120, maxStepsPerFrame: 8, step: () => steps++ })
