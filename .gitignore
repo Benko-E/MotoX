@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.vite/
+
+# Licensed art packs go here and never get committed (see vite.config.ts)
+art-source/
