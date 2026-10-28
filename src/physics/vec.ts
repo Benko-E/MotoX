@@ -33,6 +33,13 @@ export function rotate(q: Quat, v: Vec3): Vec3 {
   return add(add(v, scale(t, q.w)), cross(axis, t))
 }
 
+/** `v` turned `angle` radians about the unit-length `axis` (right-hand rule). */
+export function rotateAround(v: Vec3, axis: Vec3, angle: number): Vec3 {
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  return add(add(scale(v, cos), scale(cross(axis, v), sin)), scale(axis, dot(axis, v) * (1 - cos)))
+}
+
 /** A rotation of `angle` radians about the vertical axis. */
 export function yawRotation(angle: number): Quat {
   return { x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) }

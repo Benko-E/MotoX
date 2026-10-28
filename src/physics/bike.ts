@@ -1,6 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import type { BikeStats, WheelStats } from '../config'
-import { add, cross, dot, normalize, rotate, scale, sub, vec, yawRotation, type Quat, type Vec3 } from './vec'
+import { maxSteerAngle } from './steering'
+import { add, cross, dot, normalize, rotate, rotateAround, scale, sub, vec, yawRotation, type Quat, type Vec3 } from './vec'
 import type { PhysicsWorld } from './world'
 
 /**
@@ -20,10 +21,17 @@ import type { PhysicsWorld } from './world'
  * - suspension pushes straight out of the ground (along the surface normal)
  *   at the wheel centre, so on a side slope the tyres must grip to hold the
  *   bike, and a wheel hitting the edge of a step gets pushed back
+ * - those pushes act on the bike's centre line, so leaning never tips or
+ *   twists it by itself (arcade: the upright helper decides the lean)
  * - sideways tyre grip pushes at the height of the centre of mass, so grip
  *   alone never tips the bike over (arcade: the upright helper decides lean)
- * - rolling resistance (and later engine and brakes) pushes at the tyre's
- *   contact point, so braking dives the nose and throttle lifts it
+ * - rolling resistance, brakes and the engine push at the tyre's contact
+ *   point, so braking dives the nose and throttle lifts it
+ * - each tyre has one grip budget shared by pushing along and sideways;
+ *   sideways hold comes first, so braking or throttle in a turn is weaker
+ *   instead of making the bike spin
+ * - steering turns the front tyre's direction; the bike then follows it
+ *   because the tyres don't like sliding sideways
  */
 
 /** The frame and engine as a solid box, half sizes in metres. */
@@ -33,6 +41,8 @@ const PLACE_CLEARANCE = 0.05
 /** Wheels are swept from this far above the top of their travel, so a wheel
  * pushed past the end of its travel (bottomed out) can still tell by how much. */
 const SWEEP_ABOVE = 0.5
+/** kg per m³ at sea level. */
+const AIR_DENSITY = 1.2
 const UP = vec(0, 1, 0)
 const FORWARD = vec(0, 0, -1)
 const RIGHT = vec(1, 0, 0)
@@ -72,6 +82,15 @@ export class Bike {
   /** Where the bike was one physics step ago and is now, for smooth drawing. */
   previous: Pose
   current: Pose
+
+  /** Set these before each update: throttle and brake 0 to 1, steer -1 (left) to 1 (right). */
+  readonly controls = { throttle: 0, brake: 0, steer: 0 }
+  /** How far the front wheel is turned, degrees (positive = right). */
+  steerAngle = 0
+  /** The most it may turn at the current speed, degrees. */
+  maxSteer = 0
+  /** The lean the upright helper is aiming for, radians (positive = right). */
+  targetLean = 0
 
   private massKey = ''
 
@@ -147,7 +166,7 @@ export class Bike {
     const position = body.translation()
     const centerOfMass = body.worldCom()
     const mass = this.stats.mass.bike + this.stats.mass.rider
-    const { tyres } = this.stats
+    const { tyres, engine, brakes } = this.stats
 
     // Every push this step is worked out from how the bike moved at the start
     // of the step, then all are applied together as steady forces for the
@@ -157,6 +176,12 @@ export class Bike {
     const angvel = body.angvel()
     const velocityAt = (point: Vec3) => add(linvel, cross(angvel, sub(point, centerOfMass)))
     const pushes: Array<[Vec3, Vec3]> = []
+
+    const speedAlong = dot(linvel, forward)
+    this.maxSteer = maxSteerAngle(this.stats.steering, speedAlong)
+    this.steerAngle = clamp(this.controls.steer, -1, 1) * this.maxSteer
+    const throttle = clamp(this.controls.throttle, 0, 1)
+    const brake = clamp(this.controls.brake, 0, 1)
 
     let grounded = 0
     this.wheels.forEach((wheel, i) => {
@@ -194,6 +219,13 @@ export class Bike {
       const contact = hit.witness1
       const normal = hit.normal1
       const wheelCenter = add(top, scale(down, wheel.extension))
+      // Pushes act on the bike's centre line: when it leans, the tyre touches
+      // the ground off to the side, and pushing there would tip the bike
+      // further over or twist it. Height and fore/aft position stay as they
+      // are, so braking still dives the nose and throttle still lifts it.
+      const groundForward = normalize(sub(forward, scale(normal, dot(forward, normal))))
+      const groundSide = normalize(cross(groundForward, normal))
+      const onCenterLine = (point: Vec3) => sub(point, scale(groundSide, dot(sub(point, centerOfMass), groundSide)))
 
       // Past the end of the travel: stop this wheel's share of the bike dead
       // within this step (only the part the spring and damper don't already
@@ -206,34 +238,63 @@ export class Bike {
         stop += Math.max(0, ((mass / 2) * intoGround) / dt - (spring + damper))
       }
       wheel.load = Math.max(0, spring + damper + stop)
-      pushes.push([scale(normal, wheel.load), wheelCenter])
+      pushes.push([scale(normal, wheel.load), onCenterLine(wheelCenter)])
 
-      // Tyre: grip against sliding sideways, and a little rolling resistance.
-      const rollDirection = normalize(sub(forward, scale(normal, dot(forward, normal))))
+      // The way the tyre rolls: along the ground, and at the front turned by the steering.
+      let rollDirection = groundForward
+      if (i === 0) rollDirection = rotateAround(rollDirection, normal, (-this.steerAngle * Math.PI) / 180)
       const side = normalize(cross(rollDirection, normal))
-      const velocity = velocityAt(contact)
+      // Rolling speed is how fast the wheel hub moves along the ground. Sliding
+      // is measured where the sideways grip pushes (centre line, at the height
+      // of the centre of mass): measuring at the contact patch would mistake
+      // the bike rolling upright, which swings the patch sideways, for a slide.
+      const patch = onCenterLine(contact)
+      const gripPoint = add(patch, scale(normal, dot(sub(centerOfMass, patch), normal)))
+      const rolling = dot(velocityAt(onCenterLine(wheelCenter)), rollDirection)
+      const sliding = dot(velocityAt(gripPoint), side)
       const massShare = mass / 2
-      // The force that would stop the sideways slide within this step, limited by grip.
-      const maxGrip = tyres.grip * wheel.load
-      const sideways = clamp((-dot(velocity, side) * massShare * tyres.lateralResponse) / dt, -maxGrip, maxGrip)
-      const gripPoint = add(contact, scale(up, dot(sub(centerOfMass, contact), up)))
-      pushes.push([scale(side, sideways), gripPoint])
 
-      const rolling = dot(velocity, rollDirection)
-      const resistance = Math.min((Math.abs(rolling) * massShare) / dt, tyres.rollingResistance * wheel.load)
-      pushes.push([scale(rollDirection, -Math.sign(rolling) * resistance), contact])
+      // Along the tyre. Everything that slows it (rolling resistance, brakes,
+      // engine braking) can at most stop it within this step, so a braked bike
+      // stands still instead of rocking back and forth. Then the engine drives
+      // the rear wheel: its full push off the line, less as speed rises.
+      const brakeShare = i === 0 ? brakes.frontShare : 1 - brakes.frontShare
+      const engineBraking = i === 1 ? engine.engineBraking * (1 - throttle) * Math.min(Math.abs(rolling) / 5, 1) : 0
+      const slowing = tyres.rollingResistance * wheel.load + brake * brakes.force * brakeShare + engineBraking
+      let lengthways = -Math.sign(rolling) * Math.min((Math.abs(rolling) * massShare) / dt, slowing)
+      if (i === 1) lengthways += throttle * Math.min(engine.maxForce, engine.power / Math.max(Math.abs(rolling), 1))
+
+      // Grip: one budget for pushing along and sideways together. Sideways
+      // comes first: it tries to stop the slide within this step. Brakes and
+      // throttle get what is left (like ABS and traction control), so a tyre
+      // never loses its hold sideways and swings the bike round.
+      const maxGrip = tyres.grip * wheel.load
+      const sideways = clamp((-sliding * massShare * tyres.lateralResponse) / dt, -maxGrip, maxGrip)
+      const lengthGrip = Math.sqrt(Math.max(maxGrip ** 2 - sideways ** 2, 0))
+      lengthways = clamp(lengthways, -lengthGrip, lengthGrip)
+      pushes.push([scale(side, sideways), gripPoint])
+      pushes.push([scale(rollDirection, lengthways), patch])
       wheel.spin += (rolling * dt) / stats.radius
     })
+
+    // Air resistance grows with the square of speed; with engine power it sets the top speed.
+    const airSpeed = Math.hypot(linvel.x, linvel.y, linvel.z)
+    pushes.push([scale(linvel, -0.5 * AIR_DENSITY * this.stats.drag * airSpeed), centerOfMass])
 
     body.resetForces(true)
     body.resetTorques(true)
     for (const [force, point] of pushes) body.addForceAtPoint(force, point, true)
 
-    // Upright helper: a spring and damper on the sideways lean.
+    // Upright helper: a spring and damper on the sideways lean. On the ground
+    // it leans the bike into turns as far as a real bike leans for how hard it
+    // is turning (the sideways pull is speed times turn rate).
     const { upright } = this.stats
+    const maxLean = (upright.maxTurnLean * Math.PI) / 180
+    const pull = (speedAlong * angvel.y) / this.physics.gravity
+    this.targetLean = grounded > 0 ? clamp(-Math.atan(pull), -maxLean, maxLean) : 0
     const strength = grounded > 0 ? 1 : upright.airStrength
     const leanRate = dot(angvel, forward)
-    const torque = (upright.stiffness * (0 - this.roll) - upright.damping * leanRate) * strength
+    const torque = (upright.stiffness * (this.targetLean - this.roll) - upright.damping * leanRate) * strength
     body.addTorque(scale(forward, torque), true)
 
     if (grounded === 0) this.airtime += dt

@@ -57,6 +57,22 @@ export class BikeView {
     scene.add(this.root)
   }
 
+  /** Where the bike is drawn this frame (between physics steps). */
+  get position(): THREE.Vector3 {
+    return this.root.position
+  }
+
+  /** The compass heading the bike is drawn facing, degrees (0 = toward -z, 90 = toward +x). */
+  get heading(): number {
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.root.quaternion)
+    if (Math.abs(forward.y) > 0.9) {
+      // pointing nearly straight up or down: read it off the bike's right side
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.root.quaternion)
+      return (Math.atan2(right.z, right.x) * 180) / Math.PI
+    }
+    return (Math.atan2(forward.x, -forward.z) * 180) / Math.PI
+  }
+
   /** Draws the bike `alpha` of the way from the previous physics step to the latest. */
   update(alpha: number): void {
     const { previous, current, stats, wheels } = this.bike

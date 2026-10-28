@@ -73,6 +73,44 @@ export const config = {
         rollingResistance: 0.015,
       },
 
+      engine: {
+        /** The strongest push the rear wheel gets, newtons. This is the punch
+         * off the line. Above about 1250, plain throttle lifts the front wheel
+         * and flips the bike over backward. */
+        maxForce: 1100,
+        /** Engine power at the rear wheel, watts. Decides how hard it still
+         * pulls at speed, and with `drag`, the top speed. */
+        power: 14000,
+        /** How strongly letting go of the throttle slows the bike, newtons. */
+        engineBraking: 250,
+      },
+
+      brakes: {
+        /** Total braking force at full brake, newtons. Past about 1250 the
+         * rear wheel starts lifting (a stoppie). */
+        force: 1150,
+        /** Share of the braking done by the front wheel, 0 to 1. The front
+         * brake is what makes the fork dive. */
+        frontShare: 0.65,
+      },
+
+      /** Air resistance of bike and rider (drag area, m²). With engine power
+       * this sets the top speed. */
+      drag: 0.55,
+
+      /** How far the front wheel can turn. Full steering at standstill, and
+       * less the faster you go, so turns get wider with speed. */
+      steering: {
+        /** Most the front wheel turns when standing still, degrees. */
+        maxAngle: 35,
+        /** At this speed you only get half of maxAngle, metres per second
+         * (multiply by 3.6 for km/h). */
+        halfAngleSpeed: 4.5,
+        /** How quickly steering fades above that speed. 2 keeps the sideways
+         * pull of a full turn about the same at every higher speed. */
+        falloff: 2,
+      },
+
       /** The invisible helper that keeps the bike from falling over sideways.
        * Real bikes balance by steering; this does it for you. */
       upright: {
@@ -82,6 +120,9 @@ export const config = {
         damping: 400,
         /** Its strength in the air, compared to on the ground (0 to 1). */
         airStrength: 0.5,
+        /** Most the bike leans into a turn, degrees. It leans as much as a
+         * real bike would for how fast it is turning, up to this. */
+        maxTurnLean: 45,
       },
     },
   },
@@ -89,6 +130,26 @@ export const config = {
   camera: {
     /** Field of view in degrees. Wider feels faster but distorts the edges. */
     fov: 65,
+  },
+
+  /** The camera that follows the bike. */
+  chaseCamera: {
+    /** How far behind the bike, metres. */
+    distance: 5.5,
+    /** Extra distance per metre per second of speed, so speed feels faster. */
+    distancePerSpeed: 0.03,
+    /** How high above the bike, metres. */
+    height: 2.0,
+    /** The point it looks at, metres above the bike. */
+    lookHeight: 0.9,
+    /** Seconds it takes to swing round behind the bike after it turns. Lower
+     * is snappier, higher is smoother. */
+    turnLag: 0.3,
+    /** Seconds it takes to follow the bike up and down. Higher keeps jumps
+     * and bumps from shaking the view. */
+    heightLag: 0.25,
+    /** Seconds it takes to catch up with the bike's position. */
+    positionLag: 0.08,
   },
 
   /** The free-fly camera, for looking around the map. */
@@ -107,6 +168,12 @@ export const config = {
      * key's position, so they work the same on any keyboard layout. */
     bindings: {
       togglePanel: ['Backquote'],
+      throttle: ['KeyW'],
+      brake: ['KeyS'],
+      steerLeft: ['KeyA'],
+      steerRight: ['KeyD'],
+      /** Switch between the chase camera and the free-fly camera. */
+      toggleCamera: ['KeyC'],
       flyForward: ['KeyW'],
       flyBack: ['KeyS'],
       flyLeft: ['KeyA'],
@@ -122,6 +189,9 @@ export const config = {
     /** Keys are on/off, so these ease in and out. riseTime: seconds from 0
      * to full while held. fallTime: seconds back to 0 after letting go. */
     axes: {
+      throttle: { positive: 'throttle', riseTime: 0.15, fallTime: 0.1 },
+      brake: { positive: 'brake', riseTime: 0.1, fallTime: 0.08 },
+      steer: { negative: 'steerLeft', positive: 'steerRight', riseTime: 0.25, fallTime: 0.18 },
       flyMove: { negative: 'flyBack', positive: 'flyForward', riseTime: 0.3, fallTime: 0.25 },
       flyStrafe: { negative: 'flyLeft', positive: 'flyRight', riseTime: 0.3, fallTime: 0.25 },
       flyLift: { negative: 'flyDown', positive: 'flyUp', riseTime: 0.3, fallTime: 0.25 },
@@ -138,9 +208,13 @@ export function currentBike(settings: Config = config): BikeStats {
   return settings.bikes[settings.currentBike as keyof Config['bikes']]
 }
 
-/** Slider ranges for values where "0 to 4x the file value" doesn't fit. */
+/** Slider ranges for values where "0 to 4x the file value" doesn't fit.
+ * A * matches any name in that place (any bike, any list entry). */
 export const configRanges: Ranges = {
   'physics.stepHz': [30, 240, 1],
   'physics.maxStepsPerFrame': [1, 20, 1],
   'camera.fov': [30, 110, 1],
+  'bikes.*.brakes.frontShare': [0, 1, 0.01],
+  'bikes.*.upright.maxTurnLean': [0, 70, 1],
+  'bikes.*.steering.maxAngle': [0, 60, 0.5],
 }

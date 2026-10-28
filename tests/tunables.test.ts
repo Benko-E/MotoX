@@ -17,6 +17,12 @@ describe('rangeFor', () => {
     expect(rangeFor('lips.3.heading', 45, ranges)).toEqual({ min: 0, max: 360, step: 1 })
   })
 
+  it('lets * stand for any name too, such as any bike', () => {
+    const ranges = { 'bikes.*.brakes.frontShare': [0, 1, 0.01] as [number, number, number] }
+    expect(rangeFor('bikes.dirt250.brakes.frontShare', 0.65, ranges)).toEqual({ min: 0, max: 1, step: 0.01 })
+    expect(rangeFor('bikes.dirt250.brakes.force', 1150, ranges)).toMatchObject({ min: 0, max: 4600 })
+  })
+
   it('picks a step that gives the slider at least 100 positions', () => {
     const { min, max, step } = rangeFor('a', 0.25, {})
     expect((max - min) / step).toBeGreaterThanOrEqual(100)

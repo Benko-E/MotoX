@@ -17,8 +17,7 @@ export interface Tunable {
 
 /** How far a slider goes. Without an entry in `ranges`: 0 to 4x the file value. */
 export function rangeFor(path: string, value: number, ranges: Ranges) {
-  const wildcard = path.replace(/\.\d+(?=\.|$)/g, '.*')
-  const listed = ranges[path] ?? ranges[wildcard]
+  const listed = ranges[path] ?? Object.entries(ranges).find(([pattern]) => matches(pattern, path))?.[1]
   let min: number
   let max: number
   if (listed) [min, max] = listed
@@ -60,6 +59,13 @@ export function changedValues(defaults: unknown, current: unknown): unknown {
     return Object.keys(changed).length > 0 ? changed : undefined
   }
   return Object.is(defaults, current) ? undefined : current
+}
+
+/** Whether a dotted path fits a pattern in which `*` stands for any one name or list position. */
+function matches(pattern: string, path: string): boolean {
+  const want = pattern.split('.')
+  const have = path.split('.')
+  return want.length === have.length && want.every((part, i) => part === '*' || part === have[i])
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

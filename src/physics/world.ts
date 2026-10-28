@@ -14,6 +14,8 @@ export async function initPhysics(): Promise<void> {
 /** The physics world: the ground and ramps as solid shapes, plus whatever moves on them. */
 export class PhysicsWorld {
   readonly world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+  /** Gravity used in the latest step, m/s². */
+  gravity = 9.81
   private ground: RAPIER.Collider[] = []
 
   /** Replaces the ground and ramps, e.g. after the map changed. */
@@ -60,6 +62,7 @@ export class PhysicsWorld {
   /** Advances everything by `dt` seconds. */
   step(dt: number, gravity: number): void {
     this.world.timestep = dt
+    this.gravity = gravity
     this.world.gravity = { x: 0, y: -gravity, z: 0 }
     this.world.step()
   }

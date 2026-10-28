@@ -1,59 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { currentBike } from '../src/config'
-import { Bike } from '../src/physics/bike'
 import { initPhysics, PhysicsWorld } from '../src/physics/world'
-import type { PlacedRamp } from '../src/terrain/generate'
-import { createHeightfield, sampleCoord, type Heightfield } from '../src/terrain/heightfield'
-
-const DT = 1 / 120
-const DEG = Math.PI / 180
+import { DEG, flat, ground, setup, slope, tilt } from './physicsSetup'
 
 beforeAll(async () => {
   await initPhysics()
 })
-
-/** 200 m of ground shaped by a height formula, samples 2 m apart. */
-function ground(height: (x: number, z: number) => number): Heightfield {
-  const field = createHeightfield(200, 2)
-  const n = field.samples
-  for (let iz = 0; iz < n; iz++) {
-    for (let ix = 0; ix < n; ix++) {
-      field.heights[iz * n + ix] = height(sampleCoord(field, ix), sampleCoord(field, iz))
-    }
-  }
-  return field
-}
-
-const flat = () => ground(() => 0)
-/** Downhill toward +x at 10 degrees. */
-const slope = () => ground((x) => -x * Math.tan(10 * DEG))
-
-function setup(field: Heightfield, ramps: PlacedRamp[] = []) {
-  const physics = new PhysicsWorld()
-  physics.setGround(field, ramps)
-  const bike = new Bike(physics, structuredClone(currentBike()))
-  const run = (seconds: number) => {
-    for (let t = 0; t < seconds - 1e-9; t += DT) {
-      bike.update(DT)
-      physics.step(DT, 9.81)
-      bike.record()
-    }
-  }
-  return { physics, bike, run }
-}
-
-/** Rolls the bike sideways by `degrees` (positive = right side down) around its forward axis. */
-function tilt(bike: Bike, degrees: number) {
-  const r = bike.body.rotation()
-  const half = (-degrees * DEG) / 2
-  // roll about the body's own forward axis (-z) = q * rotation about z
-  const [qx, qy, qz, qw] = [r.x, r.y, r.z, r.w]
-  const [sx, sw] = [Math.sin(half), Math.cos(half)]
-  bike.body.setRotation(
-    { x: qx * sw + qy * sx, y: qy * sw - qx * sx, z: qz * sw + qw * sx, w: qw * sw - qz * sx },
-    true,
-  )
-}
 
 describe('physics ground', () => {
   it('matches the terrain heights', () => {
