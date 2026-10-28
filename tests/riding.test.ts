@@ -62,6 +62,43 @@ describe('riding', () => {
     expect(frontLifted).toBe(false)
   })
 
+  it('keeps the front down at full throttle up a steep hill', () => {
+    const { bike, run } = setup(ground((x) => -x * Math.tan(15 * DEG))) // uphill toward -x
+    bike.placeOnGround(80, 0, 270)
+    run(0.5)
+    bike.controls.throttle = 1
+    let frontLifted = false
+    run(4, () => {
+      if (!bike.wheels[0].onGround) frontLifted = true
+    })
+    expect(frontLifted).toBe(false)
+  })
+
+  it('keeps weight on the front wheel at full throttle, so it can still steer', () => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 250, 0)
+    run(1)
+    const resting = bike.wheels[0].load
+    bike.controls.throttle = 1
+    let least = Infinity
+    run(0.3)
+    run(3, () => {
+      least = Math.min(least, bike.wheels[0].load)
+    })
+    expect(least).toBeGreaterThan(resting * 0.5)
+  })
+
+  it('still turns hard with the throttle held', () => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 0, 0)
+    run(8, () => cruise(bike, 40 / 3.6))
+    bike.controls.steer = 1
+    bike.controls.throttle = 1
+    bike.controls.brake = 0
+    run(1)
+    expect(bike.forwardSpeed / Math.abs(bike.body.angvel().y)).toBeLessThan(25)
+  })
+
   it('levels off at a top speed', () => {
     const { bike, run } = setup(flat(600))
     bike.placeOnGround(0, 0, 0)
@@ -123,6 +160,21 @@ describe('riding', () => {
     expect(fast / slow).toBeGreaterThan(4)
   })
 
+  it('turns tight at 40 km/h and still in a wide arc at 80 km/h', () => {
+    const radiusAt = (kmh: number) => {
+      const { bike, run } = setup(flat(600))
+      bike.placeOnGround(0, 0, 0)
+      run(10, () => cruise(bike, kmh / 3.6))
+      bike.controls.steer = 1
+      run(1, () => cruise(bike, kmh / 3.6))
+      return bike.forwardSpeed / Math.abs(bike.body.angvel().y)
+    }
+    expect(radiusAt(40)).toBeLessThan(10)
+    const at80 = radiusAt(80)
+    expect(at80).toBeGreaterThan(15)
+    expect(at80).toBeLessThan(35)
+  })
+
   it('steering left turns left and leans the bike into the turn', () => {
     const { bike, run } = setup(flat(600))
     bike.placeOnGround(0, 0, 0)
@@ -180,6 +232,44 @@ describe('riding', () => {
     expect(mostLean).toBeLessThan(50 * DEG) // never past the turn's own lean
     expect(Math.abs(bike.roll)).toBeLessThan(3 * DEG) // and upright once stopped
     expect(bike.wheels.every((wheel) => wheel.onGround)).toBe(true)
+  })
+
+  it('a bike stood on its tail just topples over and lies still: no wild spinning, no bouncing up', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0)
+    run(0.5)
+    const half = (80 * DEG) / 2 // nose up 80 degrees, like a wheelie gone too far
+    bike.body.setRotation({ x: Math.sin(half), y: 0, z: 0, w: Math.cos(half) }, true)
+    bike.body.setTranslation({ x: 0, y: 1.5, z: 0 }, true)
+    let fastestSpin = 0
+    let highest = 0
+    run(4, () => {
+      fastestSpin = Math.max(fastestSpin, Math.abs(bike.body.angvel().y))
+      highest = Math.max(highest, bike.body.translation().y)
+    })
+    const { x, y, z } = bike.body.angvel()
+    expect(fastestSpin).toBeLessThan(300 * DEG) // the bug spun it at 667 degrees a second
+    expect(Math.hypot(x, y, z)).toBeLessThan(0.3) // and it comes to rest
+    expect(highest).toBeLessThan(1.55) // never thrown up higher than it started
+  })
+
+  it('a wheelie gone too far does not get twisted round by the upright helper', () => {
+    // nose up 75 degrees and tipped 25 degrees sideways, sitting on the rear wheel
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0)
+    run(0.5)
+    const [p, r] = [(75 * DEG) / 2, (-25 * DEG) / 2]
+    // pitch about x first, then roll about the bike's own forward axis
+    bike.body.setRotation(
+      { x: Math.sin(p) * Math.cos(r), y: -Math.sin(p) * Math.sin(r), z: Math.cos(p) * Math.sin(r), w: Math.cos(p) * Math.cos(r) },
+      true,
+    )
+    bike.body.setTranslation({ x: 0, y: 1.1, z: 0 }, true)
+    let fastestSpin = 0
+    run(0.5, () => {
+      fastestSpin = Math.max(fastestSpin, Math.abs(bike.body.angvel().y))
+    })
+    expect(fastestSpin).toBeLessThan(90 * DEG)
   })
 
   it('carries its speed over a crest and takes off instead of sticking to the ground', () => {

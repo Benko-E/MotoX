@@ -53,10 +53,15 @@ export class PhysicsWorld {
 
   /** Height of whatever solid is below (x, z), ignoring `exclude`. Null if nothing. */
   groundHeightAt(x: number, z: number, exclude?: RAPIER.RigidBody): number | null {
+    // A tiny falling ball rather than a ray: a ray exactly on a line between
+    // two of the ground's triangles can slip through without hitting either.
     const top = 10_000
-    const ray = new RAPIER.Ray({ x, y: top, z }, { x: 0, y: -1, z: 0 })
-    const hit = this.world.castRay(ray, 2 * top, true, undefined, undefined, undefined, exclude)
-    return hit ? top - hit.timeOfImpact : null
+    const radius = 0.01
+    const hit = this.world.castShape(
+      { x, y: top, z }, { x: 0, y: 0, z: 0, w: 1 }, { x: 0, y: -1, z: 0 }, new RAPIER.Ball(radius),
+      0, 2 * top, true, undefined, undefined, undefined, exclude,
+    )
+    return hit ? top - hit.time_of_impact - radius : null
   }
 
   /** Advances everything by `dt` seconds. */

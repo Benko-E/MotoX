@@ -63,9 +63,10 @@ export const config = {
       bottomOut: { stiffness: 40000 },
 
       tyres: {
-        /** Sideways grip compared to the bike's weight. 1 = it can take a
-         * sideways push as big as its weight before sliding. */
-        grip: 1.1,
+        /** Grip compared to the bike's weight. 1 = it can take a push as big
+         * as its weight before sliding. This also sets how tight you can turn
+         * at speed: more grip, tighter turns. */
+        grip: 1.5,
         /** How firmly the tyres stop sideways sliding, 0 to 1. Low feels like
          * ice, 1 is instant. */
         lateralResponse: 0.6,
@@ -75,9 +76,13 @@ export const config = {
 
       engine: {
         /** The strongest push the rear wheel gets, newtons. This is the punch
-         * off the line. Above about 1250, plain throttle lifts the front wheel
-         * and flips the bike over backward. */
+         * off the line. */
         maxForce: 1100,
+        /** How much the throttle lifts the front wheel, 0 to 1. 1 is like a
+         * real bike (hard throttle wheelies, and the front goes so light it
+         * can hardly steer). Lower keeps weight on the front; leaning back
+         * will still pull wheelies. */
+        wheelieTendency: 0.35,
         /** Engine power at the rear wheel, watts. Decides how hard it still
          * pulls at speed, and with `drag`, the top speed. */
         power: 14000,
@@ -102,10 +107,10 @@ export const config = {
        * less the faster you go, so turns get wider with speed. */
       steering: {
         /** Most the front wheel turns when standing still, degrees. */
-        maxAngle: 35,
+        maxAngle: 32,
         /** At this speed you only get half of maxAngle, metres per second
          * (multiply by 3.6 for km/h). */
-        halfAngleSpeed: 4.5,
+        halfAngleSpeed: 7.5,
         /** How quickly steering fades above that speed. 2 keeps the sideways
          * pull of a full turn about the same at every higher speed. */
         falloff: 2,
@@ -122,7 +127,7 @@ export const config = {
         airStrength: 0.5,
         /** Most the bike leans into a turn, degrees. It leans as much as a
          * real bike would for how fast it is turning, up to this. */
-        maxTurnLean: 45,
+        maxTurnLean: 55,
       },
     },
   },
@@ -215,6 +220,7 @@ export const configRanges: Ranges = {
   'physics.maxStepsPerFrame': [1, 20, 1],
   'camera.fov': [30, 110, 1],
   'bikes.*.brakes.frontShare': [0, 1, 0.01],
+  'bikes.*.engine.wheelieTendency': [0, 1, 0.01],
   'bikes.*.upright.maxTurnLean': [0, 70, 1],
   'bikes.*.steering.maxAngle': [0, 60, 0.5],
 }

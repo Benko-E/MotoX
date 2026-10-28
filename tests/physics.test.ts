@@ -15,6 +15,13 @@ describe('physics ground', () => {
     expect(physics.groundHeightAt(-70, 20)).toBeCloseTo(-7 + 6, 2)
   })
 
+  it('finds the ground even exactly on a line of the terrain grid', () => {
+    // a ray exactly between two of the ground's triangles used to slip through
+    const physics = new PhysicsWorld()
+    physics.setGround(ground((x) => -x * Math.tan(15 * DEG)), [])
+    expect(physics.groundHeightAt(80.74, -1e-16)).toBeCloseTo(-80.74 * Math.tan(15 * DEG), 1)
+  })
+
   it('makes ramps solid', () => {
     const physics = new PhysicsWorld()
     const def = { x: 0, z: 0, heading: 0, width: 4, height: 2, lipAngle: 25, deckLength: 3, backAngle: 30 }

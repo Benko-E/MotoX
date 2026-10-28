@@ -197,7 +197,9 @@ export class Bike {
 
       const before = wheel.compression
       wheel.previousExtension = wheel.extension
-      if (!hit) {
+      // All ground and ramp tops face upward. A surface found facing down means
+      // the sweep started under the ground (the bike is upside down): no wheel.
+      if (!hit || hit.normal1.y <= 0) {
         wheel.onGround = wheel.bottomedOut = false
         wheel.extension = stats.travel
         wheel.compression = wheel.compressionRatio = wheel.load = 0
@@ -211,11 +213,6 @@ export class Bike {
       wheel.compressionRatio = Math.min(wheel.compression / stats.travel, 1)
       wheel.bottomedOut = reach < 0
 
-      // Suspension: a spring that gets stiffer toward the end of its travel, plus a damper.
-      const squeezeSpeed = (wheel.compression - before) / dt
-      const inTravel = Math.min(wheel.compression, stats.travel)
-      const spring = stats.spring * inTravel * (1 + stats.progression * (inTravel / stats.travel) ** 2)
-      const damper = squeezeSpeed * (squeezeSpeed > 0 ? stats.bumpDamping : stats.reboundDamping)
       const contact = hit.witness1
       const normal = hit.normal1
       const wheelCenter = add(top, scale(down, wheel.extension))
@@ -226,19 +223,32 @@ export class Bike {
       const groundForward = normalize(sub(forward, scale(normal, dot(forward, normal))))
       const groundSide = normalize(cross(groundForward, normal))
       const onCenterLine = (point: Vec3) => sub(point, scale(groundSide, dot(sub(point, centerOfMass), groundSide)))
+      const pushAt = onCenterLine(wheelCenter)
 
-      // Past the end of the travel: stop this wheel's share of the bike dead
+      // Suspension: a spring that gets stiffer toward the end of its travel,
+      // plus a damper going by how fast it squeezed since the last step.
+      const squeezeSpeed = (wheel.compression - before) / dt
+      const inTravel = Math.min(wheel.compression, stats.travel)
+      const spring = stats.spring * inTravel * (1 + stats.progression * (inTravel / stats.travel) ** 2)
+      const damper = squeezeSpeed * (squeezeSpeed > 0 ? stats.bumpDamping : stats.reboundDamping)
+
+      // Past the end of the travel: stop the wheel heading into the ground dead
       // within this step (only the part the spring and damper don't already
-      // do), then ease the wheel back out. Uses how fast the bike is really
-      // heading into the ground right now, so it can never throw it back up.
+      // do), then ease it back out. Uses how fast it is really heading in right
+      // now, and how much of the bike a push there actually moves (the bike can
+      // also turn about its centre of mass), so it can never throw it back up.
       const past = Math.max(-reach, 0)
       let stop = this.stats.bottomOut.stiffness * past
       if (past > 0) {
-        const intoGround = -dot(velocityAt(wheelCenter), normal)
-        stop += Math.max(0, ((mass / 2) * intoGround) / dt - (spring + damper))
+        const intoGround = -dot(velocityAt(pushAt), normal)
+        const moved = this.massMovedAt(pushAt, normal, centerOfMass, rotation, mass)
+        stop += Math.max(0, (moved * intoGround) / dt - (spring + damper))
       }
-      wheel.load = Math.max(0, spring + damper + stop)
-      pushes.push([scale(normal, wheel.load), onCenterLine(wheelCenter)])
+      // A wheel is only a wheel while the bike is roughly upright on the ground:
+      // lying on its side or standing on its tail, the frame takes over.
+      const asWheel = clamp((dot(up, normal) - 0.34) / (0.5 - 0.34), 0, 1) // full up to 60°, none past 70°
+      wheel.load = Math.max(0, spring + damper + stop) * asWheel
+      pushes.push([scale(normal, wheel.load), pushAt])
 
       // The way the tyre rolls: along the ground, and at the front turned by the steering.
       let rollDirection = groundForward
@@ -268,12 +278,23 @@ export class Bike {
       // comes first: it tries to stop the slide within this step. Brakes and
       // throttle get what is left (like ABS and traction control), so a tyre
       // never loses its hold sideways and swings the bike round.
-      const maxGrip = tyres.grip * wheel.load
+      // A tyre only grips on its tread: it fades out when the bike lies far
+      // over (past 60° to the ground) or points up or down (past 45° to it),
+      // instead of pushing in made-up directions and spinning the bike round.
+      const onTread =
+        clamp((dot(up, normal) - 0.26) / (0.5 - 0.26), 0, 1) *
+        clamp((0.9 - Math.abs(dot(forward, normal))) / (0.9 - 0.7), 0, 1)
+      const maxGrip = tyres.grip * wheel.load * onTread
       const sideways = clamp((-sliding * massShare * tyres.lateralResponse) / dt, -maxGrip, maxGrip)
       const lengthGrip = Math.sqrt(Math.max(maxGrip ** 2 - sideways ** 2, 0))
       lengthways = clamp(lengthways, -lengthGrip, lengthGrip)
       pushes.push([scale(side, sideways), gripPoint])
-      pushes.push([scale(rollDirection, lengthways), patch])
+      // The engine's push lifts the front less than a real bike's would: it
+      // acts partway up toward the centre of mass (wheelieTendency 1 = at the
+      // ground like a real bike, 0 = at the centre of mass, no lift at all).
+      const driving = i === 1 && throttle > 0 && lengthways > 0
+      const lift = driving ? (1 - clamp(engine.wheelieTendency, 0, 1)) * dot(sub(gripPoint, patch), normal) : 0
+      pushes.push([scale(rollDirection, lengthways), add(patch, scale(normal, lift))])
       wheel.spin += (rolling * dt) / stats.radius
     })
 
@@ -292,10 +313,16 @@ export class Bike {
     const maxLean = (upright.maxTurnLean * Math.PI) / 180
     const pull = (speedAlong * angvel.y) / this.physics.gravity
     this.targetLean = grounded > 0 ? clamp(-Math.atan(pull), -maxLean, maxLean) : 0
-    const strength = grounded > 0 ? 1 : upright.airStrength
-    const leanRate = dot(angvel, forward)
+    // It works about the level part of the bike's forward direction, and fades
+    // out as the bike points up or down (a wheelie past 60°, a nose dive), where
+    // "leaning sideways" stops meaning anything: pushing then would just spin it.
+    const level = normalize(vec(forward.x, 0, forward.z))
+    const steepness = Math.abs(forward.y)
+    const fade = clamp((0.87 - steepness) / (0.87 - 0.5), 0, 1) // full below 30°, none past 60°
+    const strength = (grounded > 0 ? 1 : upright.airStrength) * fade
+    const leanRate = dot(angvel, level)
     const torque = (upright.stiffness * (this.targetLean - this.roll) - upright.damping * leanRate) * strength
-    body.addTorque(scale(forward, torque), true)
+    body.addTorque(scale(level, torque), true)
 
     if (grounded === 0) this.airtime += dt
     else if (this.airtime > 0) {
@@ -352,6 +379,19 @@ export class Bike {
     const p = this.body.translation()
     const r = this.body.rotation()
     return { position: vec(p.x, p.y, p.z), rotation: { x: r.x, y: r.y, z: r.z, w: r.w } }
+  }
+
+  /**
+   * How much mass a push along `direction` at `point` moves, kg. Less than the
+   * whole bike's, because part of the push turns the bike instead.
+   */
+  private massMovedAt(point: Vec3, direction: Vec3, centerOfMass: Vec3, rotation: Quat, mass: number): number {
+    const { inertia } = this.stats
+    const twist = cross(sub(point, centerOfMass), direction)
+    // in the bike's own frame, where its inertia is pitch (x), yaw (y), roll (z)
+    const local = rotate({ x: -rotation.x, y: -rotation.y, z: -rotation.z, w: rotation.w }, twist)
+    const turning = local.x ** 2 / inertia.pitch + local.y ** 2 / inertia.yaw + local.z ** 2 / inertia.roll
+    return 1 / (1 / mass + turning)
   }
 
   /** Sets mass, balance point and inertia from the stats, when they changed. */

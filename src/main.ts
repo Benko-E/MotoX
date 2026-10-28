@@ -212,7 +212,7 @@ function readout(): string[] {
         'R   bike upright again   B   drop the bike from 6 m',
       ]
   return [
-    'Moto · step 4',
+    'Moto · step 4 (handling fix 1)',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
