@@ -133,6 +133,8 @@ export class CrashWatcher {
       if (noseUp < -settings.worstLandingAngle) return 'landed nose first'
       if (noseUp > settings.worstLandingAngle) return 'landed tail first'
       if (Math.abs(bike.slide) * 3.6 > settings.worstSidewaysLanding) return 'landed sideways too fast'
+      // spun round too far, or not far enough
+      if (bike.touchdown && -bike.touchdown.along * 3.6 > settings.worstBackwardsLanding) return 'landed backwards'
     }
 
     // Lying over sideways against the ground it's on. Only sideways: tipping

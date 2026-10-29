@@ -62,6 +62,8 @@ const SLIDE_MARGIN = 10
 /** How quickly the drawn front wheel turns out when you steer with it off the ground, and how
  * quickly it changes over between riding and free as it lifts or lands, seconds. */
 const FRONT_WHEEL_SWING = 0.08
+/** On the back wheel alone (a wheelie, or leaving a kicker's lip), how slowly the turn fades, seconds. */
+const BACK_WHEEL_TURN_FADE = 0.3
 
 export interface Pose {
   position: Vec3
@@ -113,9 +115,9 @@ export class Bike {
   /** Crashed: the controls do nothing and the bike tumbles to a stop. */
   crashed = false
   /** How the bike touched down after a jump in the latest step: how far nose up (positive)
-   * or down it was to the ground, radians, and the rear wheel's sideways speed, m/s. Null in
-   * every other step. */
-  touchdown: { angle: number; sideways: number } | null = null
+   * or down it was to the ground, radians, the rear wheel's sideways speed and its speed
+   * along the way the bike points (negative = rolling backwards), m/s. Null in every other step. */
+  touchdown: { angle: number; sideways: number; along: number } | null = null
   /** How far into a powerslide, 0 (not at all) to 1 (fully). */
   powersliding = 0
   /** How far the rear is swung out in a powerslide, radians (positive = nose left of the way it's going). */
@@ -131,6 +133,9 @@ export class Bike {
   private freeSteer = 0
   /** Leaned at all since leaving the ground: from then on letting go holds the bike's angle. */
   private airLeaned = false
+  /** In the air: the spin it took off with, and the gentle turn steering adds, radians per second about the vertical. */
+  private airSpin = 0
+  private airSteer = 0
   /** After a sloppy landing: how sloppy it was, and the seconds the wobble lasts and has left. */
   private wobbleShare = 0
   private wobbleTime = 0
@@ -341,7 +346,9 @@ export class Bike {
       const toRear = stats.build.wheelbase / 2 + stats.weight.forward
       const slideNow = dot(linvel, side) + dot(angvel, n) * toRear
       // touching down after a jump: remember how, for judging the landing
-      if (this.airtime >= MIN_JUMP) this.touchdown = { angle: Math.asin(clamp(dot(forward, n), -1, 1)), sideways: slideNow }
+      if (this.airtime >= MIN_JUMP) {
+        this.touchdown = { angle: Math.asin(clamp(dot(forward, n), -1, 1)), sideways: slideNow, along: speedAhead }
+      }
 
       // with the front wheel up in a wheelie there's less to steer with
       const frontUp = !this.wheels[0].onGround && this.wheels[1].onGround
@@ -424,7 +431,11 @@ export class Bike {
       const wantedTurnRate = (-steering * speedAlong * traction) / this.turnRadius
       const turnNow = dot(angvel, n)
       const travelTurnNow = turnNow - this.slideRate
-      const travelTurn = travelTurnNow + (wantedTurnRate - travelTurnNow) * ease(dt, turning.steeringResponse) * onWheels
+      // On the back wheel alone the bike can hardly steer, but it doesn't stop
+      // turning dead either: it fades over BACK_WHEEL_TURN_FADE (so a turn at a
+      // kicker's lip, where the front wheel leaves first, carries into the air).
+      const turnResponse = frontUp ? Math.max(turning.steeringResponse, BACK_WHEEL_TURN_FADE) : turning.steeringResponse
+      const travelTurn = travelTurnNow + (wantedTurnRate - travelTurnNow) * ease(dt, turnResponse) * onWheels
       this.slideRate = ((slideTo - railAngle) * ease(dt, SLIDE_FOLLOW) * onWheels) / dt
       const newTurn = travelTurn + this.slideRate
       newAngvel = add(angvel, scale(n, newTurn - turnNow))
@@ -496,14 +507,31 @@ export class Bike {
       }
     } else {
       // ---- In the air ----
-      // Steering turns the bike slowly about the vertical, if airTurn allows it.
+      // Turning about the vertical, two parts:
+      // - the spin the bike took off with (turning hard at the lip) carries
+      //   on: steering the same way keeps it and spins it up by airSpinUp,
+      //   steering against it stops it over airSpinStop, letting go leaves it
+      // - steering on top turns the bike gently (airTurn), and stops when you
+      //   let go. From a straight take-off that's all there is: no easy 180.
       const { turning } = stats
-      if (steer !== 0) {
-        const wanted = -steer * turning.airTurn * DEG
-        const turnNow = dot(angvel, UP)
-        const newTurn = turnNow + (wanted - turnNow) * ease(dt, turning.steeringResponse)
-        newAngvel = add(angvel, scale(UP, newTurn - turnNow))
+      const turnNow = dot(angvel, UP)
+      if (this.airtime === 0) {
+        // just took off
+        this.airSpin = turnNow
+        this.airSteer = 0
       }
+      const gentle = -steer * turning.airTurn * DEG
+      this.airSteer += (gentle - this.airSteer) * ease(dt, turning.steeringResponse)
+      if (steer !== 0 && this.airSpin !== 0) {
+        if (this.airSpin * gentle > 0) this.airSpin += Math.sign(this.airSpin) * turning.airSpinUp * DEG * Math.abs(steer) * dt
+        else this.airSpin += (0 - this.airSpin) * ease(dt, turning.airSpinStop)
+      }
+      // the same way, the faster of the two; against each other, they add up
+      const turn =
+        this.airSpin * this.airSteer >= 0
+          ? Math.abs(this.airSpin) >= Math.abs(this.airSteer) ? this.airSpin : this.airSteer
+          : this.airSpin + this.airSteer
+      newAngvel = add(angvel, scale(UP, turn - turnNow))
       // Leaning spins the bike nose up (back) or nose down (forward), and
       // letting go stops the spin, holding the angle it got to. Until you
       // lean at all it keeps whatever spin it took off with (a ramp's lip

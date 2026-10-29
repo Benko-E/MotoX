@@ -44,6 +44,10 @@ export const config = {
       leanResponse: 0.15,
       /** How fast you can turn in the air at full steer, degrees per second. 0 = not at all. */
       airTurn: 45,
+      /** A spin you took off with (turning hard at the lip) carries on in the air. Holding the steering the same way spins it up by this much, degrees per second, each second. */
+      airSpinUp: 20,
+      /** Seconds it takes to stop a spin in the air by steering against it. */
+      airSpinStop: 0.4,
       /** Front wheel off the ground (jumps, wheelies): it turns all the way while you steer, and this is how many seconds it takes to swing back to straight after you let go. */
       frontWheelReturn: 0.5,
     },
@@ -152,6 +156,8 @@ export const config = {
     worstLandingAngle: 90,
     /** Landing with this much sideways speed or more flings you over, km/h. Below it you slide and ride on. */
     worstSidewaysLanding: 80,
+    /** Landing rolling backwards faster than this is a crash, km/h (a spin in the air gone round too far, or not far enough). */
+    worstBackwardsLanding: 20,
   },
 
   /** The camera behind the bike. */
@@ -302,6 +308,8 @@ export const configRanges: Ranges = {
   'bike.turning.maxLean': [0, 60, 1],
   'bike.turning.leanResponse': [0, 0.6, 0.01],
   'bike.turning.airTurn': [0, 180, 1],
+  'bike.turning.airSpinUp': [0, 200, 1],
+  'bike.turning.airSpinStop': [0.05, 3, 0.05],
   'bike.turning.frontWheelReturn': [0.05, 2, 0.05],
   'bike.suspension.frontTravel': [0.1, 0.5, 0.01],
   'bike.suspension.rearTravel': [0.1, 0.5, 0.01],
@@ -335,6 +343,7 @@ export const configRanges: Ranges = {
   'crashes.resetDelay': [0.2, 5, 0.1],
   'crashes.worstLandingAngle': [10, 90, 1],
   'crashes.worstSidewaysLanding': [5, 150, 1],
+  'crashes.worstBackwardsLanding': [0, 150, 1],
   'jumps.landing.sloppySideways': [0, 150, 1],
   'jumps.landing.sloppyAngle': [0, 90, 1],
   'jumps.landing.speedLoss': [0, 100, 1],
