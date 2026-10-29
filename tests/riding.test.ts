@@ -269,6 +269,94 @@ describe('air and landings', () => {
     expect(bike.wheels.every((wheel) => wheel.onGround)).toBe(true)
   })
 
+  /**
+   * The third tuning session: jump, turn the bike 90 degrees in the air and
+   * land across the way you were going. With throttle and steer held it
+   * didn't slide at all, it shot off the way it pointed: a 9 g change of
+   * direction. Here the bike travels toward -z at 15 m/s but points toward +x.
+   */
+  const landSideways = (holdKeys: boolean) => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 200, 90, 1.5)
+    bike.body.setLinvel({ x: 0, y: 0, z: -15 }, true)
+    let landedAt = -1
+    let time = 0
+    const samples: { t: number; across: number; along: number }[] = []
+    run(1.5, () => {
+      if (landedAt < 0 && bike.wheels.some((wheel) => wheel.onGround)) landedAt = time
+      if (landedAt >= 0 && holdKeys) {
+        bike.controls.throttle = 1
+        bike.controls.steer = 1
+      }
+      const v = bike.body.linvel()
+      if (landedAt >= 0) samples.push({ t: time - landedAt, across: -v.z, along: v.x })
+      time += 1 / 120
+    })
+    return (t: number) => samples.find((sample) => sample.t >= t)!
+  }
+
+  it('landing sideways with throttle and steer held slides, it does not shoot off the way it points', () => {
+    const after = landSideways(true)(0.3)
+    // still sliding on across the landing: grip 1.2 takes off about 3.5 m/s in 0.3 s
+    expect(after.across).toBeGreaterThan(9)
+    // and the rear can't push it the way it points yet
+    expect(after.along).toBeLessThan(3)
+  })
+
+  it('while sliding, a crooked landing never bends the way you travel harder than grip allows, however you steer', () => {
+    // 45 degrees off: plenty of forward speed to steer with, and a real slide.
+    // Once the bike is lined up again (steering toward the way it's going does
+    // that quickly) it's back to normal turning, which may be much harder.
+    const hardestWhileSliding = (steer: number) => {
+      const { bike, run } = setup(flat(600))
+      bike.placeOnGround(0, 200, 45, 1.5) // points between -z and +x
+      bike.body.setLinvel({ x: 0, y: 0, z: -15 }, true) // travels toward -z
+      let landed = false
+      let before = { x: 0, z: -15 }
+      let hardest = 0
+      run(1.5, () => {
+        const v = bike.body.linvel()
+        if (bike.wheels.some((wheel) => wheel.onGround)) landed = true
+        const slip = Math.atan2(Math.abs(bike.slide), Math.abs(bike.forwardSpeed))
+        if (landed) bike.controls.steer = steer
+        if (landed && slip > 25 * DEG) {
+          // sideways change of the horizontal travel, in g
+          const across = Math.abs(v.x * before.z - v.z * before.x) / Math.hypot(before.x, before.z)
+          hardest = Math.max(hardest, across / (1 / 120) / 9.81)
+        }
+        before = { x: v.x, z: v.z }
+      })
+      return hardest
+    }
+    for (const steer of [-1, 0, 1]) expect(hardestWhileSliding(steer)).toBeLessThan(config.bike.turning.grip * 1.3)
+  })
+
+  it('the bike lines up again after a crooked landing without a sudden snap at the end', () => {
+    // as the slide fades the rails come back gradually: no single-step jerk
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 200, 45, 1.5)
+    bike.body.setLinvel({ x: 0, y: 0, z: -15 }, true)
+    let landed = false
+    let before = { x: 0, z: -15 }
+    let hardest = 0
+    run(2, () => {
+      const v = bike.body.linvel()
+      if (bike.wheels.some((wheel) => wheel.onGround)) landed = true
+      if (landed) {
+        const across = Math.abs(v.x * before.z - v.z * before.x) / Math.hypot(before.x, before.z)
+        hardest = Math.max(hardest, across / (1 / 120) / 9.81)
+      }
+      before = { x: v.x, z: v.z }
+    })
+    expect(hardest).toBeLessThan(config.bike.turning.grip * 1.5) // no steering, so nothing harder than grip
+  })
+
+  it('a sideways landing slides about the same whether you hold the keys or not', () => {
+    const held = landSideways(true)(0.3)
+    const letGo = landSideways(false)(0.3)
+    expect(Math.abs(held.across - letGo.across)).toBeLessThan(1.5)
+  })
+
   it('a bike stood on its tail just topples over and lies still: no wild spinning, no bouncing up', () => {
     const { bike, run } = setup(flat())
     bike.placeOnGround(0, 0, 0)

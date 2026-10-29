@@ -284,7 +284,14 @@ export class Bike {
 
       // Speeding up and slowing down. Brakes and coasting can at most bring the
       // bike to a stop (allowing for the slope it is on), never push it backward.
-      const drive = this.wheels[1].onGround ? throttle * driveAcceleration(speed, speedAhead) : 0
+      // The tyres can only push the way the bike is actually going: while it
+      // slides sideways (a crooked landing) the rear wheel mostly spins and the
+      // front can't turn much, and both come back as the bike straightens out
+      // (nothing at all side-on). Without a slide this is 1 and changes nothing.
+      const toRear = stats.build.wheelbase / 2 + stats.weight.forward
+      const slideNow = dot(linvel, side) + dot(angvel, n) * toRear
+      const traction = Math.cos(Math.atan2(Math.abs(slideNow), Math.abs(speedAhead))) ** 2
+      const drive = this.wheels[1].onGround ? throttle * driveAcceleration(speed, speedAhead) * traction : 0
       const braking = brake * brakeDeceleration(speed)
       const coasting = (1 - throttle) * coastDeceleration(speed)
       const nextSpeed = speedAhead + (drive - gravity * dot(UP, ahead)) * dt
@@ -310,7 +317,8 @@ export class Bike {
       this.turnRadius = turnRadiusAt(turning, speed, speedAhead)
       // with the front wheel up in a wheelie there's less to steer with
       const steering = steer * (this.wheels[0].onGround ? 1 : clamp(rider.wheelieSteering, 0, 1))
-      const wantedTurnRate = (-steering * speedAhead) / this.turnRadius
+      // sliding tyres can't turn hard either: steering bites again as the bike straightens out
+      const wantedTurnRate = (-steering * speedAhead * traction) / this.turnRadius
       const turnNow = dot(angvel, n)
       const newTurn = turnNow + (wantedTurnRate - turnNow) * ease(dt, turning.steeringResponse) * onWheels
       newAngvel = add(angvel, scale(n, newTurn - turnNow))
@@ -319,20 +327,30 @@ export class Bike {
       // so the middle of the bike moves sideways just as much as turning about
       // the rear wheel needs, and no more. The turn always gets the pull it
       // needs; grip limits how hard any other sideways slide is caught.
-      // The speed along the bike turns with the bike (so a turn never adds or
-      // loses speed), lined up with where the bike will point at the end of
-      // this step, since it keeps turning during the step.
-      const toRear = stats.build.wheelbase / 2 + stats.weight.forward
+      // Where the bike would be going if it were on rails: its speed along it
+      // turned with the bike (so a turn never adds or loses speed), lined up
+      // with where it will point at the end of this step, plus the sideways
+      // swing that turning about the rear wheel needs.
       const aheadAfter = rotateAround(ahead, n, newTurn * dt)
       const sideAfter = rotateAround(side, n, newTurn * dt)
-      const wantedSideways = -newTurn * toRear
-      const sideways = dot(linvel, side) // the slide, if any, carries on into the step
-      // (the turn's needs: the pull of going round, plus swinging the middle
-      // across when the turn tightens or opens up)
-      const maxPull = (turning.grip * gravity + Math.abs(speedAhead * newTurn)) * dt + Math.abs(newTurn - turnNow) * toRear
-      const sidewaysAfter = sideways + clamp(wantedSideways - sideways, -maxPull, maxPull)
-      const carried = add(add(scale(aheadAfter, speedAhead), scale(sideAfter, sidewaysAfter)), scale(n, dot(linvel, n)))
-      newLinvel = add(linvel, scale(sub(carried, linvel), onWheels))
+      const onRailsVelocity = add(
+        add(scale(aheadAfter, speedAhead), scale(sideAfter, -newTurn * toRear)),
+        scale(n, dot(linvel, n)),
+      )
+      // How hard the travel may change toward that. Riding normally the bike is
+      // on rails: the turn always gets what it needs, however tight. Sliding (a
+      // crooked landing), the tyres have one grip budget for everything, so the
+      // way you travel bends no harder than `grip`, whatever you steer; steering
+      // then mostly swings the bike's nose. The rails come back smoothly as the
+      // slide straightens out (fully under 8° of slide, not at all past 25°).
+      const slip = Math.atan2(Math.abs(slideNow), Math.abs(speedAhead))
+      const onRails = 1 - smoothstep((slip - 8 * DEG) / ((25 - 8) * DEG))
+      const turnNeeds = Math.abs(speedAhead * newTurn) * dt + Math.abs(newTurn - turnNow) * toRear
+      const allowed = turning.grip * gravity * dt + onRails * turnNeeds
+      const change = sub(onRailsVelocity, linvel)
+      const needed = Math.hypot(change.x, change.y, change.z)
+      const share = needed > allowed ? allowed / needed : 1
+      newLinvel = add(linvel, scale(change, share * onWheels))
 
       // Leaning into the turn, for the drawing: as far as the turn pulls sideways, up to maxLean.
       const leanWanted = clamp(-Math.atan((speedAhead * newTurn) / gravity), -turning.maxLean * DEG, turning.maxLean * DEG)
@@ -515,6 +533,12 @@ export class Bike {
       true,
     )
   }
+}
+
+/** 0 below 0, 1 above 1, and a smooth S-curve in between. */
+function smoothstep(t: number): number {
+  const c = clamp(t, 0, 1)
+  return c * c * (3 - 2 * c)
 }
 
 /** How much of the way to go this step, for following something with a lag of `seconds`. */
