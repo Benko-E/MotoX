@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat'
-import type { BikeStats } from '../config'
+import type { BikeBody, BikeStats } from '../config'
 import {
   brakeDeceleration,
   coastDeceleration,
@@ -101,6 +101,8 @@ export class Bike {
     private readonly physics: PhysicsWorld,
     /** Read live every step, so the tuning panel applies at once. */
     readonly stats: BikeStats,
+    /** How the physics engine treats the bike's body (rarely changed). */
+    readonly bodySettings: BikeBody,
   ) {
     this.body = physics.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true).setCanSleep(false),
@@ -266,7 +268,6 @@ export class Bike {
     let newAngvel = angvel
     const right = rotate(rotation, RIGHT)
     const { rider } = stats
-    let leanTorque = 0
 
     if (grounded > 0) {
       // ---- Riding on the ground ----
@@ -293,9 +294,16 @@ export class Bike {
       const against = -Math.sign(nextSpeed)
       pushes.push([scale(ahead, mass * (drive * onWheels)), centerOfMass])
       pushes.push([scale(ahead, mass * against * slowing * (1 - brakeShare) * onWheels), centerOfMass])
-      // Braking acts lower down, so it dips the nose (noseDive 1 = at the ground, like a real bike).
+      // Braking acts lower down, so it dips the nose (noseDive 1 = at the ground,
+      // like a real bike), but never so low that it could tip the bike over the
+      // front wheel: plain braking never flips it, however strong the brakes.
+      // (Stoppies are for leaning forward.)
       const comHeight = dot(sub(centerOfMass, contact), n)
-      const brakePoint = sub(centerOfMass, scale(n, comHeight * clamp(stats.weight.noseDive, 0, 1)))
+      const braking_ = slowing * brakeShare
+      const toFrontAxle = stats.build.wheelbase / 2 - stats.weight.forward
+      const safeDepth = braking_ > 0 ? (0.8 * gravity * toFrontAxle) / braking_ : comHeight
+      const brakeDepth = Math.min(comHeight * clamp(stats.weight.noseDive, 0, 1), safeDepth)
+      const brakePoint = sub(centerOfMass, scale(n, brakeDepth))
       pushes.push([scale(ahead, mass * against * slowing * brakeShare * onWheels), brakePoint])
 
       // Turning: exactly the turn the settings ask for at this speed.
@@ -331,28 +339,30 @@ export class Bike {
       this.lean += (leanWanted - this.lean) * ease(dt, turning.leanResponse)
       this.steerAngle = (steer * Math.atan(stats.build.wheelbase / turnRadiusAt(turning, speed, speedAhead))) / DEG
 
-      // Leaning back with the throttle open lifts the front into a wheelie;
-      // leaning forward with the brake on lifts the rear into a stoppie. Each
-      // eases the bike toward its angle (measured from the ground) and holds it
-      // there, so it can't loop over. Let go and gravity brings it back down.
+      // Leaning tips the bike toward an angle, measured from the ground, and
+      // holds it there, so it can never loop over:
+      // - lean back: a few degrees back (weight shift); with the throttle open,
+      //   up into a wheelie
+      // - lean forward: a few degrees forward; with the brake on, up into a stoppie
+      // Let go and gravity brings it back down.
       const noseUp = Math.asin(clamp(dot(forward, n), -1, 1))
+      const shift = rider.weightShiftAngle * DEG
       let liftTo = 0
       let lifting = 0
       if (lean < 0 && this.wheels[1].onGround) {
-        liftTo = -lean * throttle * rider.wheelieAngle * DEG
+        liftTo = -lean * (throttle * rider.wheelieAngle * DEG + (1 - throttle) * shift)
         lifting = -lean
       } else if (lean > 0 && this.wheels[0].onGround) {
-        liftTo = -lean * brake * rider.stoppieAngle * DEG
+        liftTo = -lean * (brake * rider.stoppieAngle * DEG + (1 - brake) * shift)
         lifting = lean
       }
       // nothing to do with both wheels down and no lift asked for
       if (lifting > 0 && (Math.abs(liftTo) > 0.5 * DEG || Math.abs(noseUp) > 0.5 * DEG)) {
         const wantedRate = clamp((liftTo - noseUp) / Math.max(rider.liftResponse, 0.05), -3, 3)
         const rateNow = dot(newAngvel, right)
-        newAngvel = add(newAngvel, scale(right, (wantedRate - rateNow) * ease(dt, 0.04) * lifting))
+        // held firmly, so gravity can't drag the wheelie down below its angle
+        newAngvel = add(newAngvel, scale(right, (wantedRate - rateNow) * ease(dt, 0.01) * lifting))
       }
-      // Moving your body forward or back squashes the front or rear suspension a little.
-      leanTorque = -lean * rider.weightShift * onWheels
     } else {
       // ---- In the air ----
       // Steering turns the bike slowly about the vertical, if airTurn allows it.
@@ -380,7 +390,7 @@ export class Bike {
     // where "tipping sideways" stops meaning anything and pushing would just
     // spin it, and when the bike has already fallen over (past 70°), where
     // pushing would lever it up off the ground.
-    const { upright } = stats.build
+    const { upright } = this.bodySettings
     const level = normalize(vec(forward.x, 0, forward.z))
     const pointing = clamp((0.87 - Math.abs(forward.y)) / (0.87 - 0.5), 0, 1) // full below 30°, none past 60°
     const fallen = clamp((Math.abs(this.roll) - 70 * DEG) / ((50 - 70) * DEG), 0, 1) // full below 50°, none past 70°
@@ -393,7 +403,6 @@ export class Bike {
     body.resetTorques(true)
     for (const [force, point] of pushes) body.addForceAtPoint(force, point, true)
     body.addTorque(scale(level, uprightTorque), true)
-    body.addTorque(scale(right, leanTorque), true)
 
     if (grounded === 0) this.airtime += dt
     else if (this.airtime > 0) {
@@ -483,7 +492,7 @@ export class Bike {
    * whole bike's, because part of the push turns the bike instead.
    */
   private massMovedAt(point: Vec3, direction: Vec3, centerOfMass: Vec3, rotation: Quat, mass: number): number {
-    const { inertia } = this.stats.build
+    const { inertia } = this.bodySettings
     const twist = cross(sub(point, centerOfMass), direction)
     // in the bike's own frame, where its inertia is pitch (x), yaw (y), roll (z)
     const local = rotate({ x: -rotation.x, y: -rotation.y, z: -rotation.z, w: rotation.w }, twist)
@@ -494,7 +503,7 @@ export class Bike {
   /** Sets mass, balance point and inertia from the stats, when they changed. */
   private applyMass(): void {
     const { weight } = this.stats
-    const { inertia } = this.stats.build
+    const { inertia } = this.bodySettings
     const key = JSON.stringify([weight, inertia])
     if (key === this.massKey) return
     this.massKey = key

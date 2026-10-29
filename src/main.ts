@@ -35,7 +35,7 @@ const terrainView = new TerrainView(view.scene, view.renderer)
 let terrain = generateTerrain(map)
 const groundAt = (x: number, z: number) => heightAt(terrain.field, x, z)
 
-const bike = new Bike(physics, config.bike)
+const bike = new Bike(physics, config.bike, config.advanced.bikeBody)
 const bikeView = new BikeView(view.scene, bike)
 
 function rebuildTerrain() {

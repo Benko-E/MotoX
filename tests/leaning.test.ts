@@ -110,7 +110,37 @@ describe('leaning on the ground', () => {
       deepest = Math.min(deepest, bike.pitch / DEG)
     })
     expect(rearLifted).toBe(false)
-    expect(deepest).toBeGreaterThan(-2) // a stoppie needs the brake too
+    expect(deepest).toBeGreaterThan(-(rider.weightShiftAngle + 1.5)) // a stoppie needs the brake too
+  })
+
+  it('leaning back without throttle only tips the bike back a few degrees', () => {
+    const { bike, run } = rolling(40)
+    bike.controls.lean = -1
+    bike.controls.throttle = 0
+    bike.controls.brake = 0
+    let highest = 0
+    run(1.5, () => {
+      highest = Math.max(highest, bike.pitch / DEG)
+    })
+    expect(highest).toBeLessThan(rider.weightShiftAngle + 1.5)
+  })
+
+  it('landing nose-down while still leaning forward does not tip the bike over the front', () => {
+    // the second tuning session: weight shift sent the bike barrelling over the front on landing
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 250, 0, 2)
+    const half = (-15 * DEG) / 2 // nose down 15 degrees
+    bike.body.setRotation({ x: Math.sin(half), y: 0, z: 0, w: Math.cos(half) }, true)
+    bike.body.setLinvel({ x: 0, y: 0, z: -15 }, true)
+    // still leaning forward as it touches down (leaning forward in the air would spin it further)
+    let deepest = 0
+    run(3, () => {
+      if (bike.wheels.some((wheel) => wheel.onGround)) bike.controls.lean = 1
+      deepest = Math.min(deepest, bike.pitch / DEG)
+    })
+    expect(deepest).toBeGreaterThan(-35)
+    expect(bike.wheels.every((wheel) => wheel.onGround)).toBe(true)
+    expect(Math.abs(bike.pitch / DEG)).toBeLessThan(rider.weightShiftAngle + 2)
   })
 
   it('leaning forward with the brake on lifts the rear into a stoppie, no further than stoppieAngle', () => {

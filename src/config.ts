@@ -37,7 +37,7 @@ export const config = {
       /** Seconds the bike takes to start turning once you steer. Lower is snappier. */
       steeringResponse: 0.03,
       /** How hard the tyres catch a sideways slide, as a share of the bike's weight: landing a jump crooked, or riding across a steep slope. Higher straightens you out faster. Turning itself never slides: the turn settings above decide how tight it turns. */
-      grip: 3,
+      grip: 1.2,
       /** How far the bike leans into turns at most, degrees. Only the look: it does not change how the bike turns. */
       maxLean: 40,
       /** Seconds the lean takes to follow the turn. */
@@ -83,15 +83,15 @@ export const config = {
       /** Seconds the air spin takes to build up once you lean. */
       airSpinResponse: 0.12,
       /** Leaning back with the throttle open lifts the front wheel up to this angle, degrees. 0 = no wheelies. */
-      wheelieAngle: 30,
+      wheelieAngle: 40,
       /** Leaning forward with the brake on lifts the rear wheel up to this angle, degrees. 0 = no stoppies. */
       stoppieAngle: 15,
       /** Seconds a wheelie or stoppie takes to reach its angle. Lower pops up faster. */
-      liftResponse: 0.3,
+      liftResponse: 0.18,
       /** How much you can still steer with the front wheel in the air during a wheelie, 0 to 1. */
-      wheelieSteering: 0.3,
-      /** On the ground, how hard leaning shifts the weight onto the front or rear suspension, N·m. Only a little: this is the feel of moving your body, not a wheelie. */
-      weightShift: 300,
+      wheelieSteering: 0,
+      /** On the ground without throttle or brake, how far leaning tips the bike forward or back on its suspension, degrees. The feel of moving your body; wheelies and stoppies have their own angles above. */
+      weightShiftAngle: 4,
     },
 
     /** The bike's build. These rarely need changing. */
@@ -99,13 +99,9 @@ export const config = {
       /** Distance between the two wheels, metres. */
       wheelbase: 1.48,
       /** Front wheel radius, metres. */
-      frontWheel: 0.36,
+      frontWheel: 0.43,
       /** Rear wheel radius, metres. */
-      rearWheel: 0.34,
-      /** How hard the bike is to rotate, kg·m². Higher is lazier. pitch: nose up and down. yaw: turning. roll: tipping sideways. */
-      inertia: { pitch: 70, yaw: 70, roll: 25 },
-      /** The invisible helper that keeps the bike from falling over sideways. stiffness: how hard it pulls upright. damping: how much it calms the wobble. */
-      upright: { stiffness: 6000, damping: 700 },
+      rearWheel: 0.43,
     },
   },
 
@@ -172,8 +168,15 @@ export const config = {
     },
   },
 
-  /** The engine room. Rarely needs touching. */
+  /** The engine room. You shouldn't need these: most of them don't change anything you can feel. */
   advanced: {
+    /** How the physics engine treats the bike's body. Steering, air spin and wheelies set the bike's rotation directly, so you won't feel these. */
+    bikeBody: {
+      /** How hard the bike is to rotate, kg·m². Only shows when nothing else is steering the rotation, like toppling over after a crash. */
+      inertia: { pitch: 70, yaw: 70, roll: 25 },
+      /** The invisible helper that keeps the physics bike from tipping sideways (the lean you see is only drawn). stiffness: how hard it holds it upright. damping: how much it calms the wobble. */
+      upright: { stiffness: 6000, damping: 700 },
+    },
     physics: {
       /** Physics steps per second. The bike moves in slices this small however fast your screen refreshes, so it rides the same on every machine. */
       stepHz: 120,
@@ -194,6 +197,7 @@ export const config = {
 
 export type Config = typeof config
 export type BikeStats = Config['bike']
+export type BikeBody = Config['advanced']['bikeBody']
 
 /** Earth's gravity, m/s². */
 export const EARTH_GRAVITY = 9.81
@@ -229,7 +233,7 @@ export const configRanges: Ranges = {
   'bike.rider.stoppieAngle': [0, 45, 1],
   'bike.rider.liftResponse': [0.05, 1, 0.01],
   'bike.rider.wheelieSteering': [0, 1, 0.01],
-  'bike.rider.weightShift': [0, 2000, 10],
+  'bike.rider.weightShiftAngle': [0, 15, 0.5],
   'bike.build.wheelbase': [1, 2, 0.01],
   'bike.build.frontWheel': [0.2, 0.5, 0.01],
   'bike.build.rearWheel': [0.2, 0.5, 0.01],

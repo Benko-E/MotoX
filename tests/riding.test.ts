@@ -80,6 +80,25 @@ describe('speed', () => {
     expect(bike.speed).toBeLessThan(0.05) // and it stays stopped
   })
 
+  it('never flips over the front under plain braking, however strong the brakes', () => {
+    // the second tuning session: hard braking from 110 km/h flipped the bike over
+    const { bike, run } = setup(flat(600))
+    bike.stats.speed.secondsToStopFrom60 = 0.6
+    bike.stats.weight.noseDive = 1
+    bike.placeOnGround(0, 0, 0)
+    bike.controls.throttle = 1
+    run(15, () => keepOnMap(bike))
+    bike.controls.throttle = 0
+    bike.controls.brake = 1
+    let rearLifted = false
+    run(4, () => {
+      keepOnMap(bike)
+      if (!bike.wheels[1].onGround) rearLifted = true
+    })
+    expect(rearLifted).toBe(false)
+    expect(bike.speed).toBeLessThan(0.1)
+  })
+
   it('slows down by itself at about coastSlowdown when you let go', () => {
     const { bike, run } = setup(flat(600))
     bike.placeOnGround(0, 0, 0)

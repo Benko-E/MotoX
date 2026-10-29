@@ -10,7 +10,7 @@ export const freeride: MapDef = {
   size: 1000,
   cellSize: 2,
 
-  hills: { seed: 1, height: 30, wavelength: 150, octaves: 4, roughness: 0.42 },
+  hills: { seed: 1337, height: 51.5, wavelength: 150, octaves: 4, roughness: 0.42 },
 
   flatArea: { x: 0, z: 0, radius: 120, blend: 60, height: 0 },
 

@@ -31,7 +31,7 @@ export const slope = () => ground((x) => -x * Math.tan(10 * DEG))
 export function setup(field: Heightfield, ramps: PlacedRamp[] = []) {
   const physics = new PhysicsWorld()
   physics.setGround(field, ramps)
-  const bike = new Bike(physics, structuredClone(config.bike))
+  const bike = new Bike(physics, structuredClone(config.bike), structuredClone(config.advanced.bikeBody))
   const run = (seconds: number, each?: () => void) => {
     for (let t = 0; t < seconds - 1e-9; t += DT) {
       each?.()
