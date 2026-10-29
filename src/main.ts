@@ -12,6 +12,7 @@ import { initPhysics, PhysicsWorld } from './physics/world'
 import { BikeView } from './render/bikeView'
 import { GroundEffects } from './render/groundEffects'
 import { HelmetCamera } from './render/helmetCamera'
+import { JumpLanes } from './render/jumpLanes'
 import { nextCameraMode } from './render/cameraViews'
 import { ChaseCamera } from './render/chaseCamera'
 import { FlyCamera } from './render/flyCamera'
@@ -23,6 +24,7 @@ import { Hud } from './hud/hud'
 import { Speedometer } from './hud/speedometer'
 import { HelpTimer } from './ui/helpCard'
 import { readNotes } from './ui/notes'
+import { findJumps, type JumpSpot } from './world/jumpFinder'
 import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
 
 /** With the free-fly camera, B drops the bike this far ahead of the camera. */
@@ -67,10 +69,16 @@ const groundEffects = new GroundEffects(
   () => config.jumps.gravity * EARTH_GRAVITY,
 )
 
+/** The good jumps in the hills, found by reading the ground, and the lanes marking the best ones near you. */
+let jumps: JumpSpot[] = []
+const jumpLanes = new JumpLanes(view.scene, jumps, groundAt, config.jumpGuide)
+
 function rebuildTerrain() {
   terrain = generateTerrain(map)
   terrainView.show(terrain.field, terrain.ramps, map)
   physics.setGround(terrain.field, terrain.ramps)
+  jumps = findJumps(terrain.field)
+  jumpLanes.replace(jumps)
 }
 rebuildTerrain()
 bike.placeOnGround(map.spawn.x, map.spawn.z, map.spawn.heading)
@@ -195,6 +203,7 @@ Object.assign(window, {
   moto: {
     ...{ config, map, view, fly, chase, bike, crashes, physics, input, rebuildTerrain },
     terrain: () => terrain,
+    jumps: () => jumps,
     simulate: (seconds: number, fps?: number) => simulate(seconds, fps),
   },
 })
@@ -215,6 +224,7 @@ function showFrame(frameTime: number) {
   loop.advance(frameTime)
   bikeView.update(loop.alpha, frameTime)
   groundEffects.update(Math.min(frameTime, 0.1))
+  jumpLanes.update(bikeView.position, bikeView.heading, Math.min(frameTime, 0.1))
   hud.update({ speed: bike.speed, topSpeed: config.bike.speed.topSpeed }, frameTime)
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)

@@ -217,6 +217,23 @@ export const config = {
     },
   },
 
+  /**
+   * Marked jumps: the game finds good jumps in the hills by reading the ground,
+   * and lays a lane with arrows up the run-up of the best few near you, ahead
+   * and pointing your way, plus a ring where you'd land. An experiment: it only
+   * reads the map, nothing about riding changes.
+   */
+  jumpGuide: {
+    /** Show the lanes at all. */
+    show: true,
+    /** How many lanes are shown at once, at most. */
+    lanes: 5,
+    /** Only jumps whose run-up starts within this distance of you, metres. */
+    showWithin: 200,
+    /** Only jumps at least this good: about the seconds of air they give, less for cutting across the hill or a hard landing. */
+    minScore: 1.4,
+  },
+
   /** How the tyres mark and throw the dirt. Only looks: nothing here changes the riding. */
   effects: {
     /** Tracks the tyres leave in the dirt. */
@@ -327,6 +344,7 @@ export type CrashSettings = Config['crashes']
 export type LandingSettings = Config['jumps']['landing']
 export type FallingOverSettings = Config['advanced']['fallingOver']
 export type EffectSettings = Config['effects']
+export type JumpGuideSettings = Config['jumpGuide']
 
 /** Earth's gravity, m/s². */
 export const EARTH_GRAVITY = 9.81
@@ -339,6 +357,9 @@ export const configChoices: Choices = {
 
 export const configRanges: Ranges = {
   'hud.size': [0.4, 2.5, 0.05],
+  'jumpGuide.lanes': [1, 20, 1],
+  'jumpGuide.showWithin': [50, 600, 10],
+  'jumpGuide.minScore': [0, 4, 0.05],
   'hud.*.x': [-50, 50, 0.5],
   'hud.*.y': [-50, 50, 0.5],
   'bike.speed.topSpeed': [40, 200, 1],
