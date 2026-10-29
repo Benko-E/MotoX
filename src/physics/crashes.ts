@@ -30,9 +30,9 @@ const RIGHT = vec(1, 0, 0)
 const HEAD_RADIUS = 0.15
 /** Where the rider's head is, in the bike's own space: leaning back, sitting, leaning forward.
  * (The same places the placeholder rider is drawn.) */
-const HEAD_BACK = vec(0, 1.02, 0.34)
-const HEAD_SITTING = vec(0, 0.96, -0.13)
-const HEAD_FORWARD = vec(0, 0.77, -0.52)
+export const HEAD_BACK = vec(0, 0.97, 0.05)
+export const HEAD_SITTING = vec(0, 0.96, -0.13)
+export const HEAD_FORWARD = vec(0, 0.77, -0.52)
 /** Shorter than this in the air isn't a jump whose landing gets judged, seconds. */
 const MIN_AIRTIME = 0.15
 /** Right after being put back up nothing counts as a crash, seconds. */

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Bike } from '../physics/bike'
+import { RiderMotion } from './riderMotion'
 import { RiderView } from './riderView'
 
 /**
@@ -9,6 +10,8 @@ import { RiderView } from './riderView'
  * steering; both are only drawn, the physics bike stays upright. It only reads
  * the physics, so swapping in a real model later can't change the handling.
  */
+/** The middle of the handlebar, from the top of the front suspension (straight above the front axle), metres. */
+export const BARS = new THREE.Vector3(0, 0.42, 0.22)
 /** Spinning up in the dirt flat out, the rear tyre's surface runs this much faster than the ground, m/s. */
 const WHEELSPIN_SURFACE = 12
 const UP = { x: 0, y: 1, z: 0 }
@@ -22,7 +25,11 @@ export class BikeView {
   private readonly model = new THREE.Group()
   /** The front wheel and fork, turned with the steering. */
   private readonly frontEnd = new THREE.Group()
+  /** The handlebar, turned with the steering about its own middle. */
+  private readonly bars = new THREE.Group()
   private readonly rider: RiderView
+  /** What the rider's body is doing: standing, soaking up landings, a foot out. */
+  readonly riderMotion = new RiderMotion()
   /** The rider's lean as drawn: follows the lean input, so the body moves smoothly. */
   private riderLean = 0
   private readonly wheels: THREE.Mesh[] = []
@@ -62,7 +69,12 @@ export class BikeView {
     box(this.model, 0.3, 0.3, 0.9, red, 0, 0, 0) // frame and engine (same size as the physics box)
     box(this.model, 0.26, 0.12, 0.75, dark, 0, 0.2, 0.15) // seat
     box(this.model, 0.24, 0.16, 0.3, red, 0, 0.22, -0.3) // tank
-    box(this.frontEnd, 0.7, 0.04, 0.04, dark, 0, 0.42, 0.1) // handlebar
+    // The handlebar turns about its own middle, like on a real bike, where the
+    // steering head is; the clamp joins it to the tops of the forks.
+    this.bars.position.set(0, BARS.y, BARS.z - half)
+    box(this.bars, 0.7, 0.04, 0.04, dark, 0, 0, 0)
+    this.model.add(this.bars)
+    box(this.model, 0.08, 0.05, BARS.z + 0.04, dark, 0, BARS.y - 0.02, BARS.z / 2 - half) // clamp
     box(this.frontEnd, 0.3, 0.03, 0.35, red, 0, 0.12, -0.05) // front fender
     this.frontEnd.position.z = -half
     this.model.add(this.frontEnd)
@@ -84,7 +96,7 @@ export class BikeView {
       parent.add(leg)
     }
 
-    this.rider = new RiderView(this.model, this.frontEnd)
+    this.rider = new RiderView(this.model, this.bars)
     this.leanPivot.add(this.model)
     this.root.add(this.leanPivot)
     scene.add(this.root)
@@ -150,6 +162,7 @@ export class BikeView {
       leg.position.set(0, (top - drops[i]) / 2, along)
     })
     this.frontEnd.rotation.y = (-this.bike.steerAngle * Math.PI) / 180
+    this.bars.rotation.y = this.frontEnd.rotation.y
 
     // Lean about the line where the tyres touch the ground: through the rear
     // tyre (in a wheelie the only one down), along the ground the way the bike
@@ -171,6 +184,7 @@ export class BikeView {
     this.riderLean += (this.bike.controls.lean - this.riderLean) * (1 - Math.exp(-Math.min(dt, 0.1) / 0.08))
     const squash = (wheels[0].compressionRatio + wheels[1].compressionRatio) / 2
     this.frontEnd.updateMatrixWorld(true)
-    this.rider.update(this.riderLean, squash)
+    this.riderMotion.update(this.bike, Math.min(dt, 0.1))
+    this.rider.update(this.riderLean, squash, this.bike.steerAngle, this.riderMotion)
   }
 }
