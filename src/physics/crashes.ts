@@ -1,11 +1,15 @@
 import RAPIER from '@dimforge/rapier3d-compat'
-import type { CrashSettings, FallingOverSettings } from '../config'
+import type { CrashSettings, FallingOverSettings, LandingSettings } from '../config'
 import type { Bike } from './bike'
 import { add, dot, rotate, vec, type Vec3 } from './vec'
 import type { PhysicsWorld } from './world'
 
 /**
- * Watches the bike for crashes, and puts it back up afterwards.
+ * Watches the bike for crashes, and puts it back up afterwards. It also
+ * judges every landing after a jump: clean keeps all the speed; sloppy (a
+ * bit sideways, or hitting the ground hard, like landing flat from high up)
+ * costs some speed and unsettles the bike for a moment; past the crash limits
+ * it's a crash.
  *
  * A crash is the rider's head touching the ground, a landing that's too far
  * off (nose-first or tail-first beyond `worstLandingAngle` to the slope, or
@@ -45,6 +49,10 @@ export class CrashWatcher {
   count = 0
   /** Seconds until the bike is put back up. */
   timeLeft = 0
+  /** Landings judged so far. */
+  landings = 0
+  /** How the last one went: how sloppy (0 = clean, 1 = as sloppy as it gets) and the speed it cost, km/h. */
+  lastLanding: { sloppiness: number; speedLost: number } | null = null
 
   private airborneFor = 0
   private grace = GRACE
@@ -56,6 +64,7 @@ export class CrashWatcher {
     /** Read live, so the tuning panel applies at once. */
     readonly settings: CrashSettings,
     readonly safety: FallingOverSettings,
+    readonly landing: LandingSettings,
   ) {}
 
   /** Call after every physics step. */
@@ -67,9 +76,13 @@ export class CrashWatcher {
     }
     const anyDown = this.bike.wheels.some((wheel) => wheel.onGround)
     if (this.grace > 0) this.grace -= dt
-    else if (this.settings.enabled) {
-      const reason = this.check(anyDown)
-      if (reason) this.crash(reason)
+    else {
+      if (this.settings.enabled) {
+        const reason = this.check(anyDown)
+        if (reason) this.crash(reason)
+      }
+      const touchdown = this.bike.touchdown
+      if (touchdown && !this.crashed) this.judgeLanding(touchdown.impact, touchdown.sideways)
     }
     this.airborneFor = anyDown ? 0 : this.airborneFor + dt
   }
@@ -93,6 +106,18 @@ export class CrashWatcher {
     this.timeLeft = this.settings.resetDelay
     this.getUpHeading = this.bike.travelHeading
     this.bike.setCrashed(true)
+  }
+
+  /** How sloppy a landing was, from how hard it hit the ground and how fast it went sideways (m/s). */
+  private judgeLanding(impact: number, sideways: number): void {
+    const { landing } = this
+    const sloppiness = Math.max(
+      between(Math.abs(sideways) * 3.6, landing.cleanSideways, this.settings.worstSidewaysLanding),
+      between(impact * 3.6, landing.cleanImpact, landing.worstImpact),
+    )
+    const speedLost = sloppiness > 0 ? this.bike.landSloppily(sloppiness, landing) * 3.6 : 0
+    this.lastLanding = { sloppiness, speedLost }
+    this.landings++
   }
 
   private check(anyDown: boolean): string | null {
@@ -136,6 +161,11 @@ export class CrashWatcher {
     const ground = this.physics.groundHeightAt(middle.x, middle.z, this.bike.body)
     return ground !== null && middle.y - ground < NEAR_GROUND
   }
+}
+
+/** How far `value` is from `clean` (0) to `worst` (1), held between 0 and 1. */
+function between(value: number, clean: number, worst: number): number {
+  return Math.min(Math.max((value - clean) / Math.max(worst - clean, 1e-6), 0), 1)
 }
 
 /** Where the head is in the bike's space for a lean of -1 (back) to 1 (forward). */

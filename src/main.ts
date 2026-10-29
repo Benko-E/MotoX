@@ -33,6 +33,11 @@ const view = createScene(document.getElementById('app')!, config)
 /** The readout of numbers, shown with the tuning panel. */
 const hud = document.getElementById('hud')!
 const banner = document.getElementById('banner')!
+/** A short note after a sloppy landing, and how long it has left on screen, seconds. */
+const landingNote = document.getElementById('landing')!
+const LANDING_NOTE_TIME = 1.5
+let landingNoteLeft = 0
+let landingsSeen = 0
 /** The controls card at the start: up until you press a key, gone a few seconds into riding. */
 const help = document.getElementById('help')!
 const helpTimer = new HelpTimer(6, 1.5)
@@ -44,7 +49,7 @@ let terrain = generateTerrain(map)
 const groundAt = (x: number, z: number) => heightAt(terrain.field, x, z)
 
 const bike = new Bike(physics, config.bike, config.advanced.bikeBody)
-const crashes = new CrashWatcher(physics, bike, config.crashes, config.advanced.fallingOver)
+const crashes = new CrashWatcher(physics, bike, config.crashes, config.advanced.fallingOver, config.jumps.landing)
 const bikeView = new BikeView(view.scene, bike)
 const groundEffects = new GroundEffects(
   view.scene,
@@ -203,6 +208,17 @@ function showFrame(frameTime: number) {
     if (helpTimer.shown === 0) help.style.display = 'none'
   }
   banner.style.display = crashes.crashed ? 'block' : 'none'
+  if (crashes.landings !== landingsSeen) {
+    landingsSeen = crashes.landings
+    const last = crashes.lastLanding
+    if (last && last.sloppiness > 0) {
+      landingNote.innerHTML = `SLOPPY LANDING<small>−${last.speedLost.toFixed(0)} km/h</small>`
+      landingNoteLeft = LANDING_NOTE_TIME
+    }
+  }
+  landingNoteLeft = Math.max(landingNoteLeft - frameTime, 0)
+  landingNote.style.display = landingNoteLeft > 0 ? 'block' : 'none'
+  landingNote.style.opacity = String(Math.min(landingNoteLeft / 0.4, 1)) // fades out over the last 0.4 s
   if (crashes.crashed) {
     banner.innerHTML = `CRASH: ${crashes.reason}<small>back up in ${Math.max(crashes.timeLeft, 0).toFixed(1)} s, or press R</small>`
   }
@@ -232,6 +248,14 @@ function frame(now: number) {
   }
 
   requestAnimationFrame(frame)
+}
+
+/** How the last landing went, for the readout. */
+function landingReadout(): string {
+  const last = crashes.lastLanding
+  if (!last) return 'none yet'
+  if (last.sloppiness === 0) return 'clean'
+  return `sloppy ${(last.sloppiness * 100).toFixed(0)}%   cost ${last.speedLost.toFixed(0)} km/h`
 }
 
 function readout(): string[] {
@@ -273,6 +297,7 @@ function readout(): string[] {
     wheel('front', 0),
     wheel('rear ', 1),
     `airtime   ${air}   last jump ${bike.lastAirtime.toFixed(2)} s   crashes ${crashes.count}`,
+    `landing   ${landingReadout()}`,
     `lean ${degrees(bike.lean)}   pitch ${degrees(bike.pitch)}   rear slide ${bike.slide.toFixed(2)} m/s`,
     '',
     ...keys,

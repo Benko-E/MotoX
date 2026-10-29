@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat'
-import type { BikeBody, BikeStats } from '../config'
+import type { BikeBody, BikeStats, LandingSettings } from '../config'
 import {
   brakeDeceleration,
   coastDeceleration,
@@ -53,6 +53,8 @@ const CRASH_SLOWDOWN = 1.5
 const CRASH_SETTLE = 3
 /** Shorter times in the air don't count as a jump for `lastAirtime`, seconds. */
 const MIN_JUMP = 0.15
+/** At worst, straight after the sloppiest landing, steering and throttle bite this much less. */
+const WOBBLE_GRIP = 0.6
 /** How quickly the rear follows the slide angle steering asks for in a powerslide, seconds. */
 const SLIDE_FOLLOW = 0.05
 /** In a powerslide the rear may wander this far past the slide angle before grip catches it, degrees. */
@@ -110,6 +112,9 @@ export class Bike {
   groundNormal: Vec3 | null = null
   /** Crashed: the controls do nothing and the bike tumbles to a stop. */
   crashed = false
+  /** How the bike touched down after a jump in the latest step: speed straight into the
+   * ground and the rear wheel's sideways speed, m/s. Null in every other step. */
+  touchdown: { impact: number; sideways: number } | null = null
   /** How far into a powerslide, 0 (not at all) to 1 (fully). */
   powersliding = 0
   /** How far the rear is swung out in a powerslide, radians (positive = nose left of the way it's going). */
@@ -125,6 +130,10 @@ export class Bike {
   private freeSteer = 0
   /** Leaned at all since leaving the ground: from then on letting go holds the bike's angle. */
   private airLeaned = false
+  /** After a sloppy landing: how sloppy it was, and the seconds the wobble lasts and has left. */
+  private wobbleShare = 0
+  private wobbleTime = 0
+  private wobbleLeft = 0
 
   constructor(
     private readonly physics: PhysicsWorld,
@@ -172,6 +181,8 @@ export class Bike {
     this.powersliding = this.slideAngle = this.slideRate = 0
     this.frontUpDrawn = this.rideSteer = this.freeSteer = this.steerAngle = 0
     this.airLeaned = false
+    this.touchdown = null
+    this.wobbleLeft = 0
     this.current = this.readPose()
     this.previous = this.current
   }
@@ -216,9 +227,13 @@ export class Bike {
 
     // crashed, the controls do nothing
     const live = this.crashed ? 0 : 1
-    const throttle = clamp(this.controls.throttle, 0, 1) * live
+    // after a sloppy landing the bike is unsettled for a moment: steering and throttle bite less
+    const unsettled = this.wobbleLeft > 0 ? WOBBLE_GRIP * this.wobbleShare * (this.wobbleLeft / this.wobbleTime) : 0
+    this.wobbleLeft = Math.max(this.wobbleLeft - dt, 0)
+    const throttle = clamp(this.controls.throttle, 0, 1) * live * (1 - unsettled)
     const brake = clamp(this.controls.brake, 0, 1) * live
-    const steer = clamp(this.controls.steer, -1, 1) * live
+    const steer = clamp(this.controls.steer, -1, 1) * live * (1 - unsettled)
+    this.touchdown = null
     const lean = clamp(this.controls.lean, -1, 1) * live
 
     // ---- Suspension ----
@@ -324,6 +339,8 @@ export class Bike {
       // How the rear wheel moves: along the bike, and sideways (positive = right).
       const toRear = stats.build.wheelbase / 2 + stats.weight.forward
       const slideNow = dot(linvel, side) + dot(angvel, n) * toRear
+      // touching down after a jump: remember how, for judging the landing
+      if (this.airtime >= MIN_JUMP) this.touchdown = { impact: Math.max(-dot(linvel, n), 0), sideways: slideNow }
 
       // with the front wheel up in a wheelie there's less to steer with
       const frontUp = !this.wheels[0].onGround && this.wheels[1].onGround
@@ -585,6 +602,23 @@ export class Bike {
     const v = this.body.linvel()
     if (Math.hypot(v.x, v.z) < 1) return this.heading
     return Math.atan2(v.x, -v.z) / DEG
+  }
+
+  /**
+   * A sloppy landing, `share` of the way (0 to 1) to the sloppiest: it costs
+   * that share of `speedLoss` of the speed along the ground, and unsettles the
+   * bike for `wobble` seconds. Returns the speed lost, m/s.
+   */
+  landSloppily(share: number, landing: LandingSettings): number {
+    const v = this.body.linvel()
+    const n = this.groundNormal ?? UP
+    const into = dot(v, n)
+    const along = sub(v, scale(n, into))
+    const lost = clamp(landing.speedLoss / 100, 0, 1) * clamp(share, 0, 1)
+    this.body.setLinvel(add(scale(along, 1 - lost), scale(n, into)), true)
+    this.wobbleShare = clamp(share, 0, 1)
+    this.wobbleTime = this.wobbleLeft = Math.max(landing.wobble, 0)
+    return Math.hypot(along.x, along.y, along.z) * lost
   }
 
   /** Starts or ends a crash: dead controls, and the bike slows down and settles quickly. */

@@ -129,6 +129,19 @@ export const config = {
   jumps: {
     /** Gravity compared to Earth. 1 = real; lower makes jumps floatier, higher makes the bike drop like a stone. */
     gravity: 1,
+    /** How landings are judged: a clean one keeps all your speed, a sloppy one costs some, and past the limits under crashes it's a crash. */
+    landing: {
+      /** Landing sideways slower than this is clean, km/h. Faster is sloppy, more and more up to crashes.worstSidewaysLanding, where it's a crash. */
+      cleanSideways: 15,
+      /** Hitting the ground slower than this is clean, km/h straight down into it. Landing on a downslope that matches your jump is soft; landing flat from high up is hard. */
+      cleanImpact: 20,
+      /** Hitting the ground this hard or harder is as sloppy as it gets, km/h straight down into it. Landing hard on its own never crashes you. */
+      worstImpact: 60,
+      /** How much speed the sloppiest landing costs, %. A little sloppy costs a little. */
+      speedLoss: 40,
+      /** Seconds the bike wobbles after a sloppy landing: steering and throttle bite less, and come back over this time. */
+      wobble: 0.5,
+    },
   },
 
   /** What counts as a crash, and getting back up. */
@@ -270,6 +283,7 @@ export type Config = typeof config
 export type BikeStats = Config['bike']
 export type BikeBody = Config['advanced']['bikeBody']
 export type CrashSettings = Config['crashes']
+export type LandingSettings = Config['jumps']['landing']
 export type FallingOverSettings = Config['advanced']['fallingOver']
 export type EffectSettings = Config['effects']
 
@@ -323,6 +337,11 @@ export const configRanges: Ranges = {
   'crashes.resetDelay': [0.2, 5, 0.1],
   'crashes.worstLandingAngle': [10, 90, 1],
   'crashes.worstSidewaysLanding': [5, 150, 1],
+  'jumps.landing.cleanSideways': [0, 100, 1],
+  'jumps.landing.cleanImpact': [0, 80, 1],
+  'jumps.landing.worstImpact': [5, 120, 1],
+  'jumps.landing.speedLoss': [0, 100, 1],
+  'jumps.landing.wobble': [0, 2, 0.05],
   'advanced.fallingOver.sideTip': [30, 90, 1],
   'camera.fov': [30, 110, 1],
   'effects.tyreTracks.lasts': [1, 120, 1],
