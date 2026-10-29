@@ -1,9 +1,9 @@
-# Moto
+# MotoX
 
 A browser motocross game in the spirit of Motocross Madness 1 and 2.
 Milestone 1 is a free-ride sandbox about one thing: making the bike feel good.
 
-**Play:** https://benko-e.github.io/Moto/
+**Play:** https://benko-e.github.io/MotoX/
 
 ## Run it on your own computer
 

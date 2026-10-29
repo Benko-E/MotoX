@@ -17,6 +17,7 @@ import { createScene } from './render/scene'
 import { TerrainView } from './render/terrainView'
 import { generateTerrain } from './terrain/generate'
 import { heightAt } from './terrain/heightfield'
+import { HelpTimer } from './ui/helpCard'
 import { readNotes } from './ui/notes'
 import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
 
@@ -29,8 +30,12 @@ await initPhysics()
 
 const map = freeride
 const view = createScene(document.getElementById('app')!, config)
+/** The readout of numbers, shown with the tuning panel. */
 const hud = document.getElementById('hud')!
 const banner = document.getElementById('banner')!
+/** The controls card at the start: up until you press a key, gone a few seconds into riding. */
+const help = document.getElementById('help')!
+const helpTimer = new HelpTimer(6, 1.5)
 const input = new Input(config.controls, window)
 
 const physics = new PhysicsWorld()
@@ -108,8 +113,11 @@ const panel = createTuningPanel(sections, {
     max: 1,
 })
 input.onPress('togglePanel', () => {
-  // Opening the panel gives the mouse back, so its sliders can be used straight away.
-  if (panel.toggle()) document.exitPointerLock()
+  // The readout of numbers comes and goes with the panel. Opening them gives
+  // the mouse back, so the sliders can be used straight away.
+  const open = panel.toggle()
+  hud.hidden = !open
+  if (open) document.exitPointerLock()
 })
 
 // Keys that act on the bike are handled at the start of the next physics step.
@@ -189,7 +197,11 @@ function showFrame(frameTime: number) {
   view.camera.getWorldDirection(lookPoint).multiplyScalar(20).add(view.camera.position)
   view.focusShadows(lookPoint)
   view.render()
-  hud.textContent = readout().join('\n')
+  if (!hud.hidden) hud.textContent = readout().join('\n')
+  if (help.style.display !== 'none') {
+    help.style.opacity = String(helpTimer.update(frameTime, input.anyHeld))
+    if (helpTimer.shown === 0) help.style.display = 'none'
+  }
   banner.style.display = crashes.crashed ? 'block' : 'none'
   if (crashes.crashed) {
     banner.innerHTML = `CRASH: ${crashes.reason}<small>back up in ${Math.max(crashes.timeLeft, 0).toFixed(1)} s, or press R</small>`
@@ -250,7 +262,7 @@ function readout(): string[] {
         'R   bike upright again   B   drop the bike from 6 m',
       ]
   return [
-    'Moto · step 6 (crashes) + powerslides',
+    'MotoX · readout (` hides it)',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
@@ -264,7 +276,7 @@ function readout(): string[] {
     `lean ${degrees(bike.lean)}   pitch ${degrees(bike.pitch)}   rear slide ${bike.slide.toFixed(2)} m/s`,
     '',
     ...keys,
-    '`   tuning panel (hover a slider to see what it does)',
+    '`   settings and this readout (hover a slider to see what it does)',
   ]
 }
 

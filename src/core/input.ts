@@ -94,6 +94,12 @@ export class Input {
     return codes !== undefined && codes.some((code) => this.heldKeys.has(code))
   }
 
+  /** Whether any key bound to anything is held right now. */
+  get anyHeld(): boolean {
+    for (const code of this.heldKeys) if (this.isBound(code)) return true
+    return false
+  }
+
   /** The eased value of an axis, -1 to 1. */
   axis(name: string): number {
     return this.axisValues.get(name) ?? 0

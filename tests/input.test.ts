@@ -106,6 +106,17 @@ describe('Input', () => {
     expect(input.isDown('throttle')).toBe(false)
   })
 
+  it('knows whether any key it uses is held', () => {
+    const { input, target } = makeInput()
+    expect(input.anyHeld).toBe(false)
+    target.dispatchEvent(key('keydown', 'KeyF')) // not one of ours
+    expect(input.anyHeld).toBe(false)
+    target.dispatchEvent(key('keydown', 'KeyA'))
+    expect(input.anyHeld).toBe(true)
+    target.dispatchEvent(key('keyup', 'KeyA'))
+    expect(input.anyHeld).toBe(false)
+  })
+
   it('stops the browser using a bound key itself, pressed or released', () => {
     // Space would scroll the page, or press a tuning-panel button left focused (on release)
     const { target } = makeInput({ keys: { powerslide: ['Space'] }, easing: {} })
