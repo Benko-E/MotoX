@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { config, configChoices } from '../src/config'
 import { ANCHORS, hudUnit, placeElement } from '../src/hud/layout'
-import { speedReadout } from '../src/hud/speedometer'
+import { dialScale, followNeedle, needleAngle } from '../src/hud/speedometer'
 import { choicesFor } from '../src/ui/tunables'
 
 const FULL_HD = { width: 1920, height: 1080 }
@@ -52,10 +52,25 @@ describe('the HUD settings', () => {
   })
 })
 
-describe('the speedometer', () => {
-  it('shows the speed in whole km/h, and fills its bar toward top speed', () => {
-    expect(speedReadout(55 / 3.6, 110)).toEqual({ kmh: 55, fill: 0.5 })
-    expect(speedReadout(0, 110)).toEqual({ kmh: 0, fill: 0 })
-    expect(speedReadout(130 / 3.6, 110)).toMatchObject({ kmh: 130, fill: 1 }) // past top speed (downhill): full
+describe('the speedometer dial', () => {
+  it('runs from 0 to a little past top speed, a number every 10 km/h', () => {
+    expect(dialScale(110)).toEqual({ max: 120, numbers: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120] })
+    expect(dialScale(95).max).toBe(110)
+  })
+
+  it('the needle points lower left at 0, straight up halfway, lower right at the end of the scale', () => {
+    expect(needleAngle(0, 120)).toBe(-120)
+    expect(needleAngle(60, 120)).toBe(0)
+    expect(needleAngle(120, 120)).toBe(120)
+    expect(needleAngle(200, 120)).toBe(120) // never past the end
+  })
+
+  it('the needle swings smoothly to the speed instead of jumping', () => {
+    const first = followNeedle(-120, 0, 1 / 60)
+    expect(first).toBeGreaterThan(-120)
+    expect(first).toBeLessThan(-60)
+    let needle = -120
+    for (let i = 0; i < 30; i++) needle = followNeedle(needle, 0, 1 / 60)
+    expect(Math.abs(needle)).toBeLessThan(1)
   })
 })

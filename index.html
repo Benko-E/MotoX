@@ -79,33 +79,45 @@
       .hud-slot {
         position: absolute;
       }
-      .hud-speed {
-        transform: skewX(-10deg);
-        text-align: right;
-        text-shadow: 0 0 0.25em rgba(0, 0, 0, 0.6);
+      .hud-speed-dial {
+        display: block;
+        width: 26em;
+        height: 19.5em;
+        filter: drop-shadow(0 0.3em 0.5em rgba(0, 0, 0, 0.45));
+      }
+      .hud-speed-housing {
+        fill: #2e2219;
+        stroke: #6e5a47;
+        stroke-width: 3;
+      }
+      .hud-speed-tick {
+        stroke: #e9e3d6;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+      }
+      .hud-speed-tick.major {
+        stroke-width: 3;
       }
       .hud-speed-number {
-        font-size: 6.5em;
-        line-height: 0.9;
-        letter-spacing: 0.02em;
-        -webkit-text-stroke: 0.04em rgba(0, 0, 0, 0.75);
-        paint-order: stroke fill;
+        fill: #ece6da;
+        font-family: 'Arial Rounded MT Bold', 'Trebuchet MS', Arial, sans-serif;
+        font-weight: bold;
+        font-size: 13px;
+        text-anchor: middle;
       }
       .hud-speed-unit {
-        margin-left: 0.35em;
-        font-size: 1.8em;
-        opacity: 0.85;
+        fill: #b9ae9c;
+        font-family: 'Trebuchet MS', Arial, sans-serif;
+        font-size: 9px;
+        text-anchor: middle;
       }
-      .hud-speed-track {
-        width: 17em;
-        height: 0.9em;
-        margin: 0.5em 0 0 auto;
-        background: rgba(0, 0, 0, 0.45);
-        border: 0.12em solid rgba(255, 255, 255, 0.55);
+      .hud-speed-needle {
+        fill: #e0241b;
       }
-      .hud-speed-bar {
-        height: 100%;
-        background: linear-gradient(90deg, #ffb14a, #ff7a1a 60%, #ff3d1a);
+      .hud-speed-hub {
+        fill: #1b130d;
+        stroke: #5a4a3a;
+        stroke-width: 2;
       }
       #help {
         position: fixed;

@@ -205,15 +205,15 @@ export const config = {
   hud: {
     /** Everything on the HUD bigger or smaller, 1 = normal. */
     size: 1,
-    /** How fast you're going, with a bar filling toward top speed. */
+    /** How fast you're going: a dial with a needle, from 0 to a little past top speed. */
     speed: {
       /** Show it at all. */
       show: true,
       /** Where on the screen it sits. */
-      anchor: 'bottomRight' as Anchor,
+      anchor: 'bottom' as Anchor,
       /** Nudged in from there: across, and up or down, % of the screen height. */
-      x: 3,
-      y: 3,
+      x: 24,
+      y: 1,
     },
   },
 
