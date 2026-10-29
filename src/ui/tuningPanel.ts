@@ -1,11 +1,20 @@
 import { Pane, type ButtonApi, type FolderApi } from 'tweakpane'
+import { humanize, noteFor, type Notes } from './notes'
 import { changedValues, collectTunables, rangeFor, type Ranges } from './tunables'
 
 export interface PanelSection {
   title: string
   /** The live settings object. Sliders write straight into it. */
   target: object
+  /** Where `target` sits in its settings file ("bike"), for looking up ranges and notes. '' for the whole file. */
+  path: string
   ranges: Ranges
+  /** Hover help for each setting, by its full path in the file. */
+  notes: Notes
+  /** Match notes on the setting's last name only (for lists, like a map's jumps). */
+  notesByName?: boolean
+  /** Folders (full paths, like "bike.speed") that start open. Everything else starts closed. */
+  open?: string[]
   /** Called after a value changes. `last` is true once a slider drag ends. */
   onChange?: (path: string, last: boolean) => void
 }
@@ -21,7 +30,8 @@ export interface PanelGraphs {
 
 /**
  * The tuning panel, built from the settings objects themselves: every number
- * gets a slider and every on/off value a checkbox, grouped like the file.
+ * gets a slider and every on/off value a checkbox, grouped like the file, and
+ * hovering any of them shows the explanation written above it in the file.
  */
 export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs) {
   const pane = new Pane({ title: 'Tuning   ( ` hides this )' })
@@ -74,16 +84,23 @@ export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs
   }
 
   for (const section of sections) {
-    const folders = new Map<string, FolderApi>([['', pane.addFolder({ title: section.title, expanded: false })]])
+    const inFile = (path: string) => [section.path, path].filter(Boolean).join('.')
+    const help = (path: string) => noteFor(section.notes, inFile(path), { lastNameOnly: section.notesByName })
+    const isOpen = (path: string) => section.open?.includes(inFile(path)) ?? false
+
+    const top = pane.addFolder({ title: section.title, expanded: isOpen('') })
+    hover(top.element, help(''))
+    const folders = new Map<string, FolderApi>([['', top]])
     const folderFor = (path: string): FolderApi => {
       const existing = folders.get(path)
       if (existing) return existing
       const dot = path.lastIndexOf('.')
       const name = path.slice(dot + 1)
       const folder = folderFor(dot < 0 ? '' : path.slice(0, dot)).addFolder({
-        title: /^\d+$/.test(name) ? `#${Number(name) + 1}` : name,
-        expanded: false,
+        title: /^\d+$/.test(name) ? `#${Number(name) + 1}` : humanize(name),
+        expanded: isOpen(path),
       })
+      hover(folder.element, help(path))
       folders.set(path, folder)
       return folder
     }
@@ -91,10 +108,13 @@ export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs
     for (const { owner, key, path } of collectTunables(section.target)) {
       const dot = path.lastIndexOf('.')
       const value = owner[key]
-      const slider = typeof value === 'number' ? rangeFor(path, value, section.ranges) : {}
-      folderFor(dot < 0 ? '' : path.slice(0, dot))
-        .addBinding(owner, key, { label: key, ...slider })
-        .on('change', (event) => section.onChange?.(path, event.last))
+      const slider = typeof value === 'number' ? rangeFor(inFile(path), value, section.ranges) : {}
+      const binding = folderFor(dot < 0 ? '' : path.slice(0, dot)).addBinding(owner, key, {
+        label: humanize(key),
+        ...slider,
+      })
+      hover(binding.element, help(path))
+      binding.on('change', (event) => section.onChange?.(path, event.last))
     }
   }
 
@@ -105,6 +125,13 @@ export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs
       return !pane.hidden
     },
   }
+}
+
+/** Shows `text` as the browser's tooltip when hovering `element` (only its title row, for folders). */
+function hover(element: HTMLElement, text: string | undefined) {
+  if (!text) return
+  const titleRow = element.querySelector(':scope > .tp-fldv_b') as HTMLElement | null
+  ;(titleRow ?? element).title = text
 }
 
 function flash(button: ButtonApi, message: string) {

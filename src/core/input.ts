@@ -1,7 +1,7 @@
 /**
  * The one small input layer. Game code asks about actions ("throttle",
  * "leanBack") and axes ("steer"), never about raw keys; which keys do what
- * lives in config.input.bindings.
+ * lives in config.controls.keys.
  *
  * Keyboard keys are only on or off, so axes ease in and out: holding a key
  * moves the axis toward full over `riseTime` seconds, and letting go eases it
@@ -21,8 +21,9 @@ export interface AxisDef {
 
 export interface InputConfig {
   /** Action name -> the keys that trigger it (KeyboardEvent.code values). */
-  bindings: Record<string, string[]>
-  axes: Record<string, AxisDef>
+  keys: Record<string, string[]>
+  /** Axis name -> the two actions that push it and how it eases. */
+  easing: Record<string, AxisDef>
 }
 
 /**
@@ -73,7 +74,7 @@ export class Input {
       if (this.isBound(e.code)) e.preventDefault?.() // stop arrow keys scrolling the page
       if (e.repeat) return
       this.heldKeys.add(e.code)
-      for (const [action, codes] of Object.entries(this.config.bindings)) {
+      for (const [action, codes] of Object.entries(this.config.keys)) {
         if (codes.includes(e.code)) this.pressCallbacks.get(action)?.forEach((fn) => fn())
       }
     })
@@ -86,7 +87,7 @@ export class Input {
 
   /** Whether any key bound to `action` is held right now. */
   isDown(action: string): boolean {
-    const codes = this.config.bindings[action]
+    const codes = this.config.keys[action]
     return codes !== undefined && codes.some((code) => this.heldKeys.has(code))
   }
 
@@ -104,7 +105,7 @@ export class Input {
 
   /** Advances every axis by `dt` seconds. Called once per physics step. */
   update(dt: number): void {
-    for (const [name, def] of Object.entries(this.config.axes)) {
+    for (const [name, def] of Object.entries(this.config.easing)) {
       const target =
         (this.isDown(def.positive) ? 1 : 0) - (def.negative && this.isDown(def.negative) ? 1 : 0)
       this.axisValues.set(name, rampToward(this.axis(name), target, def.riseTime, def.fallTime, dt))
@@ -112,7 +113,7 @@ export class Input {
   }
 
   private isBound(code: string): boolean {
-    return Object.values(this.config.bindings).some((codes) => codes.includes(code))
+    return Object.values(this.config.keys).some((codes) => codes.includes(code))
   }
 }
 

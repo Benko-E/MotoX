@@ -1,9 +1,11 @@
 import * as THREE from 'three'
-import { config, configRanges, currentBike } from './config'
+import { config, configRanges, EARTH_GRAVITY } from './config'
+import configSource from './config.ts?raw'
 import { Input } from './core/input'
 import { FixedStepLoop } from './core/loop'
 import { freeride } from './maps/freeride'
 import { mapRanges } from './maps/ranges'
+import mapTypesSource from './maps/types.ts?raw'
 import { Bike } from './physics/bike'
 import { initPhysics, PhysicsWorld } from './physics/world'
 import { BikeView } from './render/bikeView'
@@ -13,7 +15,8 @@ import { createScene } from './render/scene'
 import { TerrainView } from './render/terrainView'
 import { generateTerrain } from './terrain/generate'
 import { heightAt } from './terrain/heightfield'
-import { createTuningPanel } from './ui/tuningPanel'
+import { readNotes } from './ui/notes'
+import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
 
 /** With the free-fly camera, B drops the bike this far ahead of the camera. */
 const DROP_AHEAD = 6
@@ -25,14 +28,14 @@ await initPhysics()
 const map = freeride
 const view = createScene(document.getElementById('app')!, config)
 const hud = document.getElementById('hud')!
-const input = new Input(config.input, window)
+const input = new Input(config.controls, window)
 
 const physics = new PhysicsWorld()
 const terrainView = new TerrainView(view.scene, view.renderer)
 let terrain = generateTerrain(map)
 const groundAt = (x: number, z: number) => heightAt(terrain.field, x, z)
 
-const bike = new Bike(physics, currentBike())
+const bike = new Bike(physics, config.bike)
 const bikeView = new BikeView(view.scene, bike)
 
 function rebuildTerrain() {
@@ -54,22 +57,32 @@ const chase = new ChaseCamera(config, groundAt)
 /** Which camera is showing: the chase camera behind the bike, or the free-fly one. */
 let flying = false
 
-const panel = createTuningPanel(
-  [
-    { title: 'config', target: config, ranges: configRanges },
-    {
-      title: 'map',
-      target: map,
-      ranges: mapRanges,
-      // Rebuilding the whole map takes a moment, so wait until the slider is let go.
-      onChange: (_path, last) => {
-        if (!last) return
-        rebuildTerrain()
-        bike.resetUpright()
-      },
-    },
-  ],
-  {
+// The panel: one folder per part of config.ts, the bike's feel open at the top,
+// then the map. Hovering a slider shows the comment written above it in the file.
+const configNotes = readNotes(configSource)
+const sections: PanelSection[] = Object.entries(config).map(([name, target]) => ({
+  title: name,
+  target,
+  path: name,
+  ranges: configRanges,
+  notes: configNotes,
+  open: ['bike', 'bike.speed', 'bike.turning', 'jumps'],
+}))
+sections.push({
+  title: 'map',
+  target: map,
+  path: '',
+  ranges: mapRanges,
+  notes: readNotes(mapTypesSource),
+  notesByName: true,
+  // Rebuilding the whole map takes a moment, so wait until the slider is let go.
+  onChange: (_path, last) => {
+    if (!last) return
+    rebuildTerrain()
+    bike.resetUpright()
+  },
+})
+const panel = createTuningPanel(sections, {
     title: 'suspension (live, 0 = fully out, 1 = fully in)',
     source: {
       get front() {
@@ -81,8 +94,7 @@ const panel = createTuningPanel(
     },
     min: 0,
     max: 1,
-  },
-)
+})
 input.onPress('togglePanel', () => {
   // Opening the panel gives the mouse back, so its sliders can be used straight away.
   if (panel.toggle()) document.exitPointerLock()
@@ -104,10 +116,10 @@ input.onPress('toggleCamera', () => {
 
 const loop = new FixedStepLoop({
   get stepHz() {
-    return config.physics.stepHz
+    return config.advanced.physics.stepHz
   },
   get maxStepsPerFrame() {
-    return config.physics.maxStepsPerFrame
+    return config.advanced.physics.maxStepsPerFrame
   },
   step(dt) {
     input.update(dt)
@@ -126,7 +138,7 @@ const loop = new FixedStepLoop({
     bike.controls.brake = flying ? 0 : input.axis('brake')
     bike.controls.steer = flying ? 0 : input.axis('steer')
     bike.update(dt)
-    physics.step(dt, config.physics.gravity)
+    physics.step(dt, config.jumps.gravity * EARTH_GRAVITY)
     bike.record()
     if (flying) fly.step(dt, input)
     stepsThisSecond++
@@ -212,19 +224,19 @@ function readout(): string[] {
         'R   bike upright again   B   drop the bike from 6 m',
       ]
   return [
-    'Moto · step 4 (handling fix 1)',
+    'Moto · step 4 (arcade handling)',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
     `throttle  ${bar(throttle)}   brake ${bar(brake, 5)}`,
-    `steer     ${steering}  ${bike.steerAngle.toFixed(1).padStart(5)}° of ${bike.maxSteer.toFixed(1)}° at this speed`,
+    `steer     ${steering}  tightest turn here ${bike.turnRadius.toFixed(1)} m`,
     wheel('front', 0),
     wheel('rear ', 1),
     `airtime   ${air}   last jump ${bike.lastAirtime.toFixed(2)} s`,
-    `lean ${degrees(bike.roll)}   pitch ${degrees(bike.pitch)}`,
+    `lean ${degrees(bike.lean)}   pitch ${degrees(bike.pitch)}   rear slide ${bike.slide.toFixed(2)} m/s`,
     '',
     ...keys,
-    '`   tuning panel',
+    '`   tuning panel (hover a slider to see what it does)',
   ]
 }
 

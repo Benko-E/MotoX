@@ -3,11 +3,20 @@ import type { Bike } from '../physics/bike'
 
 /**
  * A placeholder bike drawn from the physics state: a frame, a seat, forks
- * that stretch with the suspension, and wheels that spin. It only reads the
- * physics, so swapping in a real model later can't change the handling.
+ * that stretch with the suspension, and wheels that spin. It leans into turns
+ * about where the tyres touch the ground and turns its front wheel with the
+ * steering; both are only drawn, the physics bike stays upright. It only reads
+ * the physics, so swapping in a real model later can't change the handling.
  */
 export class BikeView {
+  /** Follows the physics bike exactly. */
   private readonly root = new THREE.Group()
+  /** Sits on the ground under the bike and tips it into the turn. */
+  private readonly leanPivot = new THREE.Group()
+  /** Everything that's drawn, lifted back up from the lean pivot. */
+  private readonly model = new THREE.Group()
+  /** The front wheel and fork, turned with the steering. */
+  private readonly frontEnd = new THREE.Group()
   private readonly wheels: THREE.Mesh[] = []
   private readonly legs: THREE.Mesh[] = []
   private readonly blend = new THREE.Quaternion()
@@ -24,36 +33,41 @@ export class BikeView {
     const tyre = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95 })
     const rim = new THREE.MeshStandardMaterial({ color: 0xe0b23a, roughness: 0.5 })
 
-    const box = (w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number) => {
+    const box = (parent: THREE.Object3D, w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
       mesh.position.set(x, y, z)
       mesh.castShadow = true
-      this.root.add(mesh)
+      parent.add(mesh)
       return mesh
     }
-    const half = bike.stats.wheelbase / 2
-    box(0.3, 0.3, 0.9, red, 0, 0, 0) // frame and engine (same size as the physics box)
-    box(0.26, 0.12, 0.75, dark, 0, 0.2, 0.15) // seat
-    box(0.24, 0.16, 0.3, red, 0, 0.22, -0.3) // tank
-    box(0.7, 0.04, 0.04, dark, 0, 0.42, -half + 0.1) // handlebar
-    box(0.3, 0.03, 0.35, red, 0, 0.12, -half - 0.05) // front fender
+    const half = bike.stats.build.wheelbase / 2
+    box(this.model, 0.3, 0.3, 0.9, red, 0, 0, 0) // frame and engine (same size as the physics box)
+    box(this.model, 0.26, 0.12, 0.75, dark, 0, 0.2, 0.15) // seat
+    box(this.model, 0.24, 0.16, 0.3, red, 0, 0.22, -0.3) // tank
+    box(this.frontEnd, 0.7, 0.04, 0.04, dark, 0, 0.42, 0.1) // handlebar
+    box(this.frontEnd, 0.3, 0.03, 0.35, red, 0, 0.12, -0.05) // front fender
+    this.frontEnd.position.z = -half
+    this.model.add(this.frontEnd)
 
     // A wheel with a yellow stripe across, so you can see it turn.
     const wheelShape = new THREE.CylinderGeometry(1, 1, 0.12, 24).rotateZ(Math.PI / 2)
     const stripeShape = new THREE.BoxGeometry(0.13, 1.6, 0.18)
     for (let i = 0; i < 2; i++) {
+      const parent = i === 0 ? this.frontEnd : this.model
       const wheel = new THREE.Mesh(wheelShape, tyre)
       wheel.add(new THREE.Mesh(stripeShape, rim))
       wheel.castShadow = true
       this.wheels.push(wheel)
-      this.root.add(wheel)
+      parent.add(wheel)
       // Fork legs at the front, swingarm at the rear: run from the frame to the axle.
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1, 0.06), metal)
       leg.castShadow = true
       this.legs.push(leg)
-      this.root.add(leg)
+      parent.add(leg)
     }
 
+    this.leanPivot.add(this.model)
+    this.root.add(this.leanPivot)
     scene.add(this.root)
   }
 
@@ -85,21 +99,28 @@ export class BikeView {
     this.to.copy(current.rotation)
     this.root.quaternion.copy(this.blend.slerpQuaternions(this.from, this.to, alpha))
 
-    const half = stats.wheelbase / 2
-    wheels.forEach((state, i) => {
-      const radius = i === 0 ? stats.front.radius : stats.rear.radius
-      const along = i === 0 ? -half : half
-      const drop = THREE.MathUtils.lerp(state.previousExtension, state.extension, alpha)
+    const half = stats.build.wheelbase / 2
+    const drops = wheels.map((state) => THREE.MathUtils.lerp(state.previousExtension, state.extension, alpha))
+    wheels.forEach((_state, i) => {
+      const radius = this.bike.radius(i)
+      const along = i === 0 ? 0 : half // the front wheel sits in the front end, already at -half
       const wheel = this.wheels[i]
       wheel.scale.set(1, radius, radius)
-      wheel.position.set(0, -drop, along)
-      wheel.rotation.x = -state.spin
+      wheel.position.set(0, -drops[i], along)
+      wheel.rotation.x = -wheels[i].spin
 
       // The leg runs from 0.25 m above the top of the travel down to the axle.
       const leg = this.legs[i]
       const top = 0.25
-      leg.scale.y = top + drop
-      leg.position.set(0, (top - drop) / 2, along)
+      leg.scale.y = top + drops[i]
+      leg.position.set(0, (top - drops[i]) / 2, along)
     })
+    this.frontEnd.rotation.y = (-this.bike.steerAngle * Math.PI) / 180
+
+    // Lean about the line where the tyres touch the ground.
+    const groundBelow = (drops[0] + drops[1] + this.bike.radius(0) + this.bike.radius(1)) / 2
+    this.leanPivot.position.y = -groundBelow
+    this.model.position.y = groundBelow
+    this.leanPivot.rotation.z = -this.bike.lean
   }
 }

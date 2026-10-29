@@ -91,9 +91,11 @@ describe('bike', () => {
   it('rolls downhill when pointed downhill', () => {
     const { bike, run } = setup(slope())
     bike.placeOnGround(0, 0, 90) // heading 90 rides toward +x, down the slope
+    run(1)
+    const early = bike.forwardSpeed
     run(3)
-    expect(bike.forwardSpeed).toBeGreaterThan(3)
-    expect(bike.body.translation().x).toBeGreaterThan(3)
+    expect(bike.forwardSpeed).toBeGreaterThan(early + 0.5) // gravity beats the coasting slowdown
+    expect(bike.body.translation().x).toBeGreaterThan(0.5)
   })
 
   it('holds its line across a slope instead of sliding down it', () => {

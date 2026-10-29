@@ -1,144 +1,106 @@
 /**
- * Moto tuning: every value that affects how the game feels lives in this file.
+ * Moto settings: everything that decides how the game feels.
  *
- * Change a number, save, and the game in your browser reloads with it. Or
- * press ` (backtick) in the game for the tuning panel: it has a slider for
- * every number here. Panel changes are lost on reload, so use its "copy
- * changed values" button and paste the result to Claude to keep them.
+ * The easiest way to tune: press ` (the key left of 1) in the game. The panel
+ * has a slider for every number here, and hovering a slider shows what it
+ * does. Changes apply at once while you ride but are lost when the page
+ * reloads, so when something feels good, press "copy changed values" and
+ * paste it to Claude to keep it.
  *
- * Each later step adds its own section (bike, suspension, steering, lean,
- * camera follow, crashes).
+ * Or change a number here and save: the game reloads with it.
  */
 import type { Ranges } from './ui/tunables'
 
 export const config = {
-  physics: {
-    /** Physics steps per second. The bike is simulated in slices this small no
-     * matter how fast your screen refreshes, so it handles the same on every
-     * machine. Higher is more precise but costs more CPU. */
-    stepHz: 120,
-    /** Most physics steps one frame may run. If the game stalls (for example
-     * the tab was in the background), it skips ahead instead of
-     * fast-forwarding through everything it missed. */
-    maxStepsPerFrame: 8,
-    /** Gravity, metres per second squared. Earth is 9.81. A bit lower makes
-     * jumps floatier; much lower feels like the moon. */
-    gravity: 9.81,
-  },
+  /** The bike you ride. */
+  bike: {
+    /** How fast it goes, how quickly it gets there, and how quickly it stops. */
+    speed: {
+      /** Fastest it goes on flat ground, km/h. */
+      topSpeed: 105,
+      /** Seconds from standing still to 60 km/h at full throttle. Lower is punchier. */
+      secondsTo60: 2.4,
+      /** Seconds to stop from 60 km/h at full brake. Lower is stronger brakes. */
+      secondsToStopFrom60: 1.7,
+      /** How quickly it slows down with neither throttle nor brake, km/h per second. */
+      coastSlowdown: 5,
+    },
 
-  /** Which bike you ride. Each entry in `bikes` is a complete bike. */
-  currentBike: 'dirt250',
+    /** How tight it turns, how quickly it reacts, and how far it leans. */
+    turning: {
+      /** Radius of the tightest turn when barely moving, metres. */
+      tightestTurnSlow: 2.5,
+      /** Radius of the tightest turn at top speed, metres. Bigger means wider arcs at speed. */
+      tightestTurnFast: 35,
+      /** How the turn widens as you speed up. 1 = evenly with speed; higher stays tight for longer and only opens up near top speed. */
+      turnCurve: 1.8,
+      /** Seconds the bike takes to start turning once you steer. Lower is snappier. */
+      steeringResponse: 0.08,
+      /** Sideways grip, as a share of the bike's weight. A turn that would need more grip than this is made wider, so the bike goes where it points instead of sliding. */
+      grip: 1.5,
+      /** How far the bike leans into turns at most, degrees. Only the look: it does not change how the bike turns. */
+      maxLean: 35,
+      /** Seconds the lean takes to follow the turn. */
+      leanResponse: 0.15,
+      /** How fast you can turn in the air at full steer, degrees per second. 0 = not at all. */
+      airTurn: 45,
+    },
 
-  bikes: {
-    dirt250: {
-      mass: {
-        /** The bike alone, kg. */
-        bike: 105,
-        /** The rider, kg. */
-        rider: 75,
-      },
-      /** Where the weight of bike and rider together sits, metres, measured
-       * from the middle point between the tops of the two suspensions. Higher
-       * makes the bike pitch more under braking and throttle; forward puts
-       * more weight on the front wheel. */
-      centerOfMass: { height: 0.35, forward: -0.05 },
-      /** How hard the bike is to rotate, kg·m². Higher feels heavier and lazier.
-       * pitch: nose up/down. yaw: turning left/right. roll: leaning sideways. */
-      inertia: { pitch: 70, yaw: 70, roll: 25 },
+    /** How soft the bike sits, how it soaks up bumps and landings, and how much it bounces. */
+    suspension: {
+      /** How far the front fork can compress, metres. */
+      frontTravel: 0.3,
+      /** How far the rear shock can compress, metres. */
+      rearTravel: 0.31,
+      /** How far the bike sinks in under its own weight when standing, as a share of the travel (0.3 = 30%). More is softer. */
+      sag: 0.3,
+      /** How much stiffer the suspension gets near the end of its travel. 0 = not at all, 1 = twice as stiff at the very end. More soaks up big landings without bottoming out. */
+      stiffening: 1.5,
+      /** How much it resists squeezing in. Low soaks up bumps softly, high feels harsh. */
+      bumpDamping: 0.3,
+      /** How much it holds back springing out again. Around 1 stops it bouncing after small bumps; a bit more also after big landings, where the springs are squeezed hardest. Lower bounces. */
+      reboundDamping: 1.4,
+      /** After a hard landing that used up all the travel, how firmly the wheel is pushed back out, newtons per metre. The hit itself is always soaked up: a thud, never a bounce. */
+      bottomOutStiffness: 40000,
+    },
+
+    /** How heavy the bike is and where the weight sits. */
+    weight: {
+      /** Bike and rider together, kg. */
+      total: 180,
+      /** How high the weight sits, metres above the tops of the suspension. Higher pitches more under braking. */
+      height: 0.35,
+      /** How far forward of the middle the weight sits, metres. Forward puts more of it on the front wheel. */
+      forward: -0.05,
+      /** How much braking dips the nose, 0 to 1. 1 is like a real bike, where hard braking can tip it up onto the front wheel. */
+      noseDive: 0.5,
+    },
+
+    /** The bike's build. These rarely need changing. */
+    build: {
       /** Distance between the two wheels, metres. */
       wheelbase: 1.48,
-
-      /** Front fork. radius: wheel radius, metres. travel: how far the
-       * suspension can compress, metres. spring: stiffness, newtons per metre.
-       * progression: how much stiffer it gets near the end of its travel (0 =
-       * not at all, 1 = twice as stiff at the very end). bumpDamping /
-       * reboundDamping: how much it resists compressing / extending, N per
-       * m/s. More rebound damping stops it bouncing. */
-      front: { radius: 0.36, travel: 0.3, spring: 9500, progression: 1.5, bumpDamping: 700, reboundDamping: 2400 },
-      /** Rear shock, same meaning as the front. */
-      rear: { radius: 0.34, travel: 0.31, spring: 10500, progression: 1.5, bumpDamping: 800, reboundDamping: 2600 },
-      /** When a hard landing uses up all the travel, the rest of the hit is
-       * soaked up completely (a thud, never a bounce). stiffness: how firmly
-       * the wheel is then pushed back to the end of its travel, N per metre. */
-      bottomOut: { stiffness: 40000 },
-
-      tyres: {
-        /** Grip compared to the bike's weight. 1 = it can take a push as big
-         * as its weight before sliding. This also sets how tight you can turn
-         * at speed: more grip, tighter turns. */
-        grip: 1.5,
-        /** How firmly the tyres stop sideways sliding, 0 to 1. Low feels like
-         * ice, 1 is instant. */
-        lateralResponse: 0.6,
-        /** How much the tyres slow a freely rolling bike, compared to its weight. */
-        rollingResistance: 0.015,
-      },
-
-      engine: {
-        /** The strongest push the rear wheel gets, newtons. This is the punch
-         * off the line. */
-        maxForce: 1100,
-        /** How much the throttle lifts the front wheel, 0 to 1. 1 is like a
-         * real bike (hard throttle wheelies, and the front goes so light it
-         * can hardly steer). Lower keeps weight on the front; leaning back
-         * will still pull wheelies. */
-        wheelieTendency: 0.35,
-        /** Engine power at the rear wheel, watts. Decides how hard it still
-         * pulls at speed, and with `drag`, the top speed. */
-        power: 14000,
-        /** How strongly letting go of the throttle slows the bike, newtons. */
-        engineBraking: 250,
-      },
-
-      brakes: {
-        /** Total braking force at full brake, newtons. Past about 1250 the
-         * rear wheel starts lifting (a stoppie). */
-        force: 1150,
-        /** Share of the braking done by the front wheel, 0 to 1. The front
-         * brake is what makes the fork dive. */
-        frontShare: 0.65,
-      },
-
-      /** Air resistance of bike and rider (drag area, m²). With engine power
-       * this sets the top speed. */
-      drag: 0.55,
-
-      /** How far the front wheel can turn. Full steering at standstill, and
-       * less the faster you go, so turns get wider with speed. */
-      steering: {
-        /** Most the front wheel turns when standing still, degrees. */
-        maxAngle: 32,
-        /** At this speed you only get half of maxAngle, metres per second
-         * (multiply by 3.6 for km/h). */
-        halfAngleSpeed: 7.5,
-        /** How quickly steering fades above that speed. 2 keeps the sideways
-         * pull of a full turn about the same at every higher speed. */
-        falloff: 2,
-      },
-
-      /** The invisible helper that keeps the bike from falling over sideways.
-       * Real bikes balance by steering; this does it for you. */
-      upright: {
-        /** How strongly it pulls the bike back upright, N·m per radian. */
-        stiffness: 3000,
-        /** How much it calms the wobble, N·m per rad/s. */
-        damping: 400,
-        /** Its strength in the air, compared to on the ground (0 to 1). */
-        airStrength: 0.5,
-        /** Most the bike leans into a turn, degrees. It leans as much as a
-         * real bike would for how fast it is turning, up to this. */
-        maxTurnLean: 55,
-      },
+      /** Front wheel radius, metres. */
+      frontWheel: 0.36,
+      /** Rear wheel radius, metres. */
+      rearWheel: 0.34,
+      /** How hard the bike is to rotate, kg·m². Higher is lazier. pitch: nose up and down. yaw: turning. roll: tipping sideways. */
+      inertia: { pitch: 70, yaw: 70, roll: 25 },
+      /** The invisible helper that keeps the bike from falling over sideways. stiffness: how hard it pulls upright. damping: how much it calms the wobble. */
+      upright: { stiffness: 6000, damping: 700 },
     },
   },
 
-  camera: {
-    /** Field of view in degrees. Wider feels faster but distorts the edges. */
-    fov: 65,
+  /** How jumps feel. */
+  jumps: {
+    /** Gravity compared to Earth. 1 = real; lower makes jumps floatier, higher makes the bike drop like a stone. */
+    gravity: 1,
   },
 
-  /** The camera that follows the bike. */
-  chaseCamera: {
+  /** The camera behind the bike. */
+  camera: {
+    /** How wide the view is, degrees. Wider feels faster but stretches the edges. */
+    fov: 65,
     /** How far behind the bike, metres. */
     distance: 5.5,
     /** Extra distance per metre per second of speed, so speed feels faster. */
@@ -147,38 +109,29 @@ export const config = {
     height: 2.0,
     /** The point it looks at, metres above the bike. */
     lookHeight: 0.9,
-    /** Seconds it takes to swing round behind the bike after it turns. Lower
-     * is snappier, higher is smoother. */
+    /** Seconds it takes to swing round behind the bike after it turns. Lower is snappier, higher is smoother. */
     turnLag: 0.3,
-    /** Seconds it takes to follow the bike up and down. Higher keeps jumps
-     * and bumps from shaking the view. */
+    /** Seconds it takes to follow the bike up and down. Higher keeps jumps and bumps from shaking the view. */
     heightLag: 0.25,
     /** Seconds it takes to catch up with the bike's position. */
     positionLag: 0.08,
   },
 
-  /** The free-fly camera, for looking around the map. */
-  flyCamera: {
-    /** Flying speed, metres per second. */
-    speed: 25,
-    /** Speed multiplier while Shift is held. */
-    fastMultiplier: 4,
-    /** How far the view turns per pixel of mouse movement. */
-    mouseSensitivity: 0.0025,
-  },
-
-  input: {
-    /** Which keys do what. Names are KeyboardEvent codes: KeyW is the W key,
-     * Backquote the ` key left of 1, ShiftLeft the left Shift. They name the
-     * key's position, so they work the same on any keyboard layout. */
-    bindings: {
-      togglePanel: ['Backquote'],
+  /** Keys, and how quickly key presses ease in and out. */
+  controls: {
+    /** Which keys do what. Names are keyboard key codes: KeyW is the W key, Backquote the ` key left of 1, ShiftLeft the left Shift. They name the key's position, so they work on any keyboard layout. */
+    keys: {
       throttle: ['KeyW'],
       brake: ['KeyS'],
       steerLeft: ['KeyA'],
       steerRight: ['KeyD'],
+      /** Put the bike back upright where it is. */
+      reset: ['KeyR'],
+      /** Drop the bike from a height (for testing landings). */
+      dropBike: ['KeyB'],
       /** Switch between the chase camera and the free-fly camera. */
       toggleCamera: ['KeyC'],
+      togglePanel: ['Backquote'],
       flyForward: ['KeyW'],
       flyBack: ['KeyS'],
       flyLeft: ['KeyA'],
@@ -186,41 +139,76 @@ export const config = {
       flyUp: ['KeyE'],
       flyDown: ['KeyQ'],
       flyFast: ['ShiftLeft', 'ShiftRight'],
-      /** Put the bike back upright where it is. */
-      reset: ['KeyR'],
-      /** Drop the bike from where the camera is (for testing). */
-      dropBike: ['KeyB'],
     },
-    /** Keys are on/off, so these ease in and out. riseTime: seconds from 0
-     * to full while held. fallTime: seconds back to 0 after letting go. */
-    axes: {
-      throttle: { positive: 'throttle', riseTime: 0.15, fallTime: 0.1 },
+    /** Keys are only on or off, so these ease in and out. riseTime: seconds from nothing to full while the key is held. fallTime: seconds back to nothing after letting go. */
+    easing: {
+      throttle: { positive: 'throttle', riseTime: 0.12, fallTime: 0.1 },
       brake: { positive: 'brake', riseTime: 0.1, fallTime: 0.08 },
-      steer: { negative: 'steerLeft', positive: 'steerRight', riseTime: 0.25, fallTime: 0.18 },
+      steer: { negative: 'steerLeft', positive: 'steerRight', riseTime: 0.15, fallTime: 0.12 },
       flyMove: { negative: 'flyBack', positive: 'flyForward', riseTime: 0.3, fallTime: 0.25 },
       flyStrafe: { negative: 'flyLeft', positive: 'flyRight', riseTime: 0.3, fallTime: 0.25 },
       flyLift: { negative: 'flyDown', positive: 'flyUp', riseTime: 0.3, fallTime: 0.25 },
     },
   },
+
+  /** The engine room. Rarely needs touching. */
+  advanced: {
+    physics: {
+      /** Physics steps per second. The bike moves in slices this small however fast your screen refreshes, so it rides the same on every machine. */
+      stepHz: 120,
+      /** Most physics steps one frame may run. After a stall (for example the tab was in the background) it skips ahead instead of fast-forwarding. */
+      maxStepsPerFrame: 8,
+    },
+    /** The free-fly camera (C), for looking around the map. */
+    flyCamera: {
+      /** Flying speed, metres per second. */
+      speed: 25,
+      /** Speed multiplier while Shift is held. */
+      fastMultiplier: 4,
+      /** How far the view turns per pixel of mouse movement. */
+      mouseSensitivity: 0.0025,
+    },
+  },
 }
 
 export type Config = typeof config
-export type BikeStats = Config['bikes']['dirt250']
-export type WheelStats = BikeStats['front']
+export type BikeStats = Config['bike']
 
-/** The stats of the bike being ridden. */
-export function currentBike(settings: Config = config): BikeStats {
-  return settings.bikes[settings.currentBike as keyof Config['bikes']]
-}
+/** Earth's gravity, m/s². */
+export const EARTH_GRAVITY = 9.81
 
-/** Slider ranges for values where "0 to 4x the file value" doesn't fit.
- * A * matches any name in that place (any bike, any list entry). */
+/** The sliders' ranges. A * matches any name or list position in that place. */
 export const configRanges: Ranges = {
-  'physics.stepHz': [30, 240, 1],
-  'physics.maxStepsPerFrame': [1, 20, 1],
+  'bike.speed.topSpeed': [40, 200, 1],
+  'bike.speed.secondsTo60': [0.5, 10, 0.1],
+  'bike.speed.secondsToStopFrom60': [0.5, 6, 0.1],
+  'bike.speed.coastSlowdown': [0, 30, 0.5],
+  'bike.turning.tightestTurnSlow': [0.5, 15, 0.1],
+  'bike.turning.tightestTurnFast': [5, 150, 1],
+  'bike.turning.turnCurve': [0.5, 4, 0.05],
+  'bike.turning.steeringResponse': [0, 0.5, 0.01],
+  'bike.turning.grip': [0.3, 3, 0.05],
+  'bike.turning.maxLean': [0, 60, 1],
+  'bike.turning.leanResponse': [0, 0.6, 0.01],
+  'bike.turning.airTurn': [0, 180, 1],
+  'bike.suspension.frontTravel': [0.1, 0.5, 0.01],
+  'bike.suspension.rearTravel': [0.1, 0.5, 0.01],
+  'bike.suspension.sag': [0.05, 0.7, 0.01],
+  'bike.suspension.stiffening': [0, 4, 0.05],
+  'bike.suspension.bumpDamping': [0, 2, 0.01],
+  'bike.suspension.reboundDamping': [0, 3, 0.01],
+  'bike.suspension.bottomOutStiffness': [0, 200000, 1000],
+  'bike.weight.total': [60, 400, 1],
+  'bike.weight.height': [0, 1, 0.01],
+  'bike.weight.forward': [-0.5, 0.5, 0.01],
+  'bike.weight.noseDive': [0, 1, 0.01],
+  'bike.build.wheelbase': [1, 2, 0.01],
+  'bike.build.frontWheel': [0.2, 0.5, 0.01],
+  'bike.build.rearWheel': [0.2, 0.5, 0.01],
+  'jumps.gravity': [0.3, 2, 0.01],
   'camera.fov': [30, 110, 1],
-  'bikes.*.brakes.frontShare': [0, 1, 0.01],
-  'bikes.*.engine.wheelieTendency': [0, 1, 0.01],
-  'bikes.*.upright.maxTurnLean': [0, 70, 1],
-  'bikes.*.steering.maxAngle': [0, 60, 0.5],
+  'controls.easing.*.riseTime': [0, 1, 0.01],
+  'controls.easing.*.fallTime': [0, 1, 0.01],
+  'advanced.physics.stepHz': [30, 240, 1],
+  'advanced.physics.maxStepsPerFrame': [1, 20, 1],
 }

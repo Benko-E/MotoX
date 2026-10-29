@@ -10,8 +10,8 @@ function makeInput(config?: Partial<InputConfig>) {
   const target = new EventTarget()
   const input = new Input(
     {
-      bindings: { throttle: ['KeyW', 'ArrowUp'], left: ['KeyA'], right: ['KeyD'], panel: ['Backquote'] },
-      axes: { steer: { negative: 'left', positive: 'right', riseTime: 0.2, fallTime: 0.1 } },
+      keys: { throttle: ['KeyW', 'ArrowUp'], left: ['KeyA'], right: ['KeyD'], panel: ['Backquote'] },
+      easing: { steer: { negative: 'left', positive: 'right', riseTime: 0.2, fallTime: 0.1 } },
       ...config,
     },
     target,
@@ -82,7 +82,7 @@ describe('Input', () => {
   it('reads ramp times live from the config, so the tuning panel applies at once', () => {
     const { input, target } = makeInput()
     target.dispatchEvent(key('keydown', 'KeyD'))
-    input.config.axes.steer.riseTime = 0.4
+    input.config.easing.steer.riseTime = 0.4
     input.update(0.1)
     expect(input.axis('steer')).toBeCloseTo(0.25, 9)
   })
@@ -101,7 +101,7 @@ describe('Input', () => {
   it('ignores keys typed into a text field', () => {
     // A tuning-panel number box: typing "w" there must not move anything.
     const field = Object.assign(new EventTarget(), { tagName: 'INPUT' })
-    const input = new Input({ bindings: { throttle: ['KeyW'] }, axes: {} }, field)
+    const input = new Input({ keys: { throttle: ['KeyW'] }, easing: {} }, field)
     field.dispatchEvent(key('keydown', 'KeyW'))
     expect(input.isDown('throttle')).toBe(false)
   })

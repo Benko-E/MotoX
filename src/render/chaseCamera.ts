@@ -31,7 +31,7 @@ export class ChaseCamera {
     bikeHeading: number,
     speed: number,
   ): void {
-    const c = this.config.chaseCamera
+    const c = this.config.camera
     if (!this.placed || this.focus.distanceTo(bikePosition) > SNAP_DISTANCE) {
       this.focus.copy(bikePosition)
       this.heading = bikeHeading

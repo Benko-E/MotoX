@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
+import { config, EARTH_GRAVITY } from '../src/config'
 import type { Bike } from '../src/physics/bike'
-import { maxSteerAngle } from '../src/physics/steering'
+import { turnRadiusAt } from '../src/physics/bikeTuning'
 import { initPhysics } from '../src/physics/world'
 import { DEG, flat, ground, setup, slope } from './physicsSetup'
 
@@ -8,6 +9,8 @@ beforeAll(async () => {
   await initPhysics()
 })
 
+const KMH = 1 / 3.6
+const { speed: speedSettings, turning } = config.bike
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 /** Works throttle and brake to hold the bike near `target` m/s. */
@@ -20,121 +23,76 @@ function cruise(bike: Bike, target: number) {
 /** On flat ground, moves the bike back when it nears the edge (speed and direction kept), for long runs. */
 function keepOnMap(bike: Bike) {
   const p = bike.body.translation()
-  if (Math.abs(p.z) > 250) bike.body.setTranslation({ x: p.x, y: p.y, z: 0 }, true)
+  if (Math.abs(p.x) > 250 || Math.abs(p.z) > 250) bike.body.setTranslation({ x: 0, y: p.y, z: 0 }, true)
 }
 
-describe('steering curve', () => {
-  const steering = { maxAngle: 30, halfAngleSpeed: 5, falloff: 2 }
+/** Steady turning radius right now, metres. */
+const radius = (bike: Bike) => bike.forwardSpeed / Math.max(Math.abs(bike.body.angvel().y), 1e-9)
 
-  it('gives full steering when still, half at halfAngleSpeed, and less and less above it', () => {
-    expect(maxSteerAngle(steering, 0)).toBe(30)
-    expect(maxSteerAngle(steering, 5)).toBe(15)
-    expect(maxSteerAngle(steering, 10)).toBeCloseTo(6, 9) // 30 / (1 + 2^2)
-    expect(maxSteerAngle(steering, -10)).toBeCloseTo(6, 9) // the same rolling backward
-  })
-})
+/** The radius the settings ask for at a speed: the turning curve, or wider if grip can't hold it. */
+const expectedRadius = (v: number) =>
+  Math.max(turnRadiusAt(turning, speedSettings, v), (v * v) / (turning.grip * EARTH_GRAVITY))
 
-describe('riding', () => {
-  it('pulls away with punch, then keeps building speed', () => {
-    const { bike, run } = setup(flat(600))
-    bike.placeOnGround(0, 250, 0)
-    run(1)
-    bike.controls.throttle = 1
-    run(1)
-    const afterOne = bike.forwardSpeed
-    run(2)
-    const afterThree = bike.forwardSpeed
-    expect(afterOne).toBeGreaterThan(4) // punchy
-    expect(afterThree).toBeGreaterThan(afterOne + 3) // still building
-    expect(afterThree).toBeLessThan(25) // but not instant
-  })
-
-  it('keeps the front wheel down at full throttle from a standstill', () => {
-    // wheelies are for leaning back, not for plain throttle
-    const { bike, run } = setup(flat(600))
-    bike.placeOnGround(0, 250, 0)
-    run(1)
-    bike.controls.throttle = 1
-    let frontLifted = false
-    run(4, () => {
-      if (!bike.wheels[0].onGround) frontLifted = true
-    })
-    expect(frontLifted).toBe(false)
-  })
-
-  it('keeps the front down at full throttle up a steep hill', () => {
-    const { bike, run } = setup(ground((x) => -x * Math.tan(15 * DEG))) // uphill toward -x
-    bike.placeOnGround(80, 0, 270)
-    run(0.5)
-    bike.controls.throttle = 1
-    let frontLifted = false
-    run(4, () => {
-      if (!bike.wheels[0].onGround) frontLifted = true
-    })
-    expect(frontLifted).toBe(false)
-  })
-
-  it('keeps weight on the front wheel at full throttle, so it can still steer', () => {
-    const { bike, run } = setup(flat(600))
-    bike.placeOnGround(0, 250, 0)
-    run(1)
-    const resting = bike.wheels[0].load
-    bike.controls.throttle = 1
-    let least = Infinity
-    run(0.3)
-    run(3, () => {
-      least = Math.min(least, bike.wheels[0].load)
-    })
-    expect(least).toBeGreaterThan(resting * 0.5)
-  })
-
-  it('still turns hard with the throttle held', () => {
+describe('speed', () => {
+  it('reaches 60 km/h in about secondsTo60 from a standstill', () => {
     const { bike, run } = setup(flat(600))
     bike.placeOnGround(0, 0, 0)
-    run(8, () => cruise(bike, 40 / 3.6))
-    bike.controls.steer = 1
-    bike.controls.throttle = 1
-    bike.controls.brake = 0
     run(1)
-    expect(bike.forwardSpeed / Math.abs(bike.body.angvel().y)).toBeLessThan(25)
+    bike.controls.throttle = 1
+    let time = 0
+    run(10, () => {
+      keepOnMap(bike)
+      if (bike.forwardSpeed < 60 * KMH) time += 1 / 120
+    })
+    expect(time).toBeGreaterThan(speedSettings.secondsTo60 * 0.9)
+    expect(time).toBeLessThan(speedSettings.secondsTo60 * 1.1)
   })
 
-  it('levels off at a top speed', () => {
+  it('levels off at topSpeed', () => {
     const { bike, run } = setup(flat(600))
     bike.placeOnGround(0, 0, 0)
     bike.controls.throttle = 1
     run(30, () => keepOnMap(bike))
-    const atThirty = bike.forwardSpeed
-    run(10, () => keepOnMap(bike))
-    expect(Math.abs(bike.forwardSpeed - atThirty)).toBeLessThan(0.5)
-    expect(atThirty).toBeGreaterThan(20)
-    expect(atThirty).toBeLessThan(45)
+    expect(bike.forwardSpeed / KMH).toBeGreaterThan(speedSettings.topSpeed * 0.97)
+    expect(bike.forwardSpeed / KMH).toBeLessThan(speedSettings.topSpeed * 1.01)
   })
 
-  it('brakes hard, diving the front suspension, and comes to a stop', () => {
+  it('stops from 60 km/h in about secondsToStopFrom60, diving the front without lifting the rear', () => {
     const { bike, run } = setup(flat(600))
     bike.placeOnGround(0, 250, 0)
-    run(2)
+    run(1)
     const restFront = bike.wheels[0].compressionRatio
-    const restRear = bike.wheels[1].compressionRatio
     bike.controls.throttle = 1
-    for (let t = 0; t < 6 && bike.forwardSpeed < 15; t += 0.05) run(0.05)
-    expect(bike.forwardSpeed).toBeGreaterThan(14)
-
+    for (let t = 0; t < 6 && bike.forwardSpeed < 60 * KMH; t += 1 / 120) run(1 / 120)
     bike.controls.throttle = 0
     bike.controls.brake = 1
     let time = 0
     let frontMost = 0
-    let rearLeast = 1
-    run(6, () => {
+    let rearLifted = false
+    run(5, () => {
       if (bike.speed > 0.1) time += 1 / 120
       frontMost = Math.max(frontMost, bike.wheels[0].compressionRatio)
-      rearLeast = Math.min(rearLeast, bike.wheels[1].compressionRatio)
+      if (!bike.wheels[1].onGround) rearLifted = true
     })
-    expect(time).toBeLessThan(3) // from about 15 m/s: better than 5 m/s² on average
-    expect(frontMost).toBeGreaterThan(restFront + 0.12) // the fork dives
-    expect(rearLeast).toBeLessThan(restRear) // the rear lifts a little
+    expect(time).toBeGreaterThan(speedSettings.secondsToStopFrom60 * 0.85)
+    expect(time).toBeLessThan(speedSettings.secondsToStopFrom60 * 1.15)
+    expect(frontMost).toBeGreaterThan(restFront + 0.1) // the fork dives
+    expect(rearLifted).toBe(false) // no stoppie
     expect(bike.speed).toBeLessThan(0.05) // and it stays stopped
+  })
+
+  it('slows down by itself at about coastSlowdown when you let go', () => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 0, 0)
+    run(10, () => {
+      keepOnMap(bike)
+      cruise(bike, 60 * KMH)
+    })
+    const before = bike.forwardSpeed / KMH
+    bike.controls.throttle = 0
+    bike.controls.brake = 0
+    run(1, () => keepOnMap(bike))
+    expect(before - bike.forwardSpeed / KMH).toBeCloseTo(speedSettings.coastSlowdown, 0)
   })
 
   it('holds still on a slope with the brake on', () => {
@@ -145,92 +103,126 @@ describe('riding', () => {
     expect(bike.speed).toBeLessThan(0.05)
   })
 
-  it('turns tight at low speed and in wide arcs at high speed', () => {
-    const radiusAt = (speed: number) => {
-      const { bike, run } = setup(flat(600))
-      bike.placeOnGround(0, 0, 0)
-      run(6, () => cruise(bike, speed))
-      bike.controls.steer = 1
-      run(2, () => cruise(bike, speed))
-      return bike.forwardSpeed / Math.abs(bike.body.angvel().y)
+  it('keeps the front wheel down at full throttle, on the flat and up a steep hill', () => {
+    for (const field of [flat(600), ground((x) => -x * Math.tan(15 * DEG))]) {
+      const { bike, run } = setup(field)
+      bike.placeOnGround(80, 0, 270) // toward -x: uphill on the hill
+      run(1)
+      bike.controls.throttle = 1
+      let frontLifted = false
+      run(4, () => {
+        if (!bike.wheels[0].onGround) frontLifted = true
+      })
+      expect(frontLifted).toBe(false)
     }
-    const slow = radiusAt(5)
-    const fast = radiusAt(20)
-    expect(slow).toBeLessThan(8)
-    expect(fast / slow).toBeGreaterThan(4)
   })
+})
 
-  it('turns tight at 40 km/h and still in a wide arc at 80 km/h', () => {
-    const radiusAt = (kmh: number) => {
-      const { bike, run } = setup(flat(600))
-      bike.placeOnGround(0, 0, 0)
-      run(10, () => cruise(bike, kmh / 3.6))
-      bike.controls.steer = 1
-      run(1, () => cruise(bike, kmh / 3.6))
-      return bike.forwardSpeed / Math.abs(bike.body.angvel().y)
-    }
-    expect(radiusAt(40)).toBeLessThan(10)
-    const at80 = radiusAt(80)
-    expect(at80).toBeGreaterThan(15)
-    expect(at80).toBeLessThan(35)
-  })
-
-  it('steering left turns left and leans the bike into the turn', () => {
+describe('turning', () => {
+  /** A bike in a steady full-steer turn at `kmh`, and its world's step function. */
+  const steadyTurn = (kmh: number) => {
     const { bike, run } = setup(flat(600))
     bike.placeOnGround(0, 0, 0)
-    run(5, () => cruise(bike, 10))
-    bike.controls.steer = -1
-    run(1, () => cruise(bike, 10))
-    expect(bike.heading).toBeLessThan(-10) // swung round toward -x, the left
-    expect(bike.roll).toBeLessThan(-5 * DEG) // leaning left
+    run(8, () => cruise(bike, kmh * KMH))
+    bike.controls.steer = 1
+    run(1.5, () => cruise(bike, kmh * KMH))
+    return { bike, run }
+  }
+
+  it('turns as tight as the turning settings say, slow and fast', () => {
+    for (const kmh of [15, 50, 90]) {
+      const { bike } = steadyTurn(kmh)
+      const want = expectedRadius(bike.forwardSpeed)
+      expect(radius(bike)).toBeGreaterThan(want * 0.85)
+      expect(radius(bike)).toBeLessThan(want * 1.15)
+    }
   })
 
-  it('leans into a fast turn as far as it should, not further', () => {
-    const { bike, run } = setup(flat(600))
-    bike.placeOnGround(0, 250, 0)
-    run(6, () => cruise(bike, 22))
-    bike.controls.steer = 1
-    run(1.5, () => cruise(bike, 22))
-    expect(bike.targetLean).toBeGreaterThan(20 * DEG) // a real lean
-    expect(Math.abs(bike.roll - bike.targetLean)).toBeLessThan(3 * DEG)
+  it('goes where it points: the rear wheel follows the turn instead of sliding out', () => {
+    for (const kmh of [15, 50, 90]) {
+      expect(Math.abs(steadyTurn(kmh).bike.slide)).toBeLessThan(0.3)
+    }
   })
 
-  it('straightens up after a fast turn without whipping over or losing a wheel', () => {
-    // about 86 km/h, where this once flipped the bike
+  it('does not slide the rear out when you steer while accelerating hard from a standstill', () => {
+    // the first ride: W from a standstill, then D, and the rear swung out
     const { bike, run } = setup(flat(600))
-    bike.placeOnGround(0, 250, 0)
-    run(7, () => cruise(bike, 24))
+    bike.placeOnGround(0, 0, 0)
+    run(1)
+    bike.controls.throttle = 1
+    run(0.8)
     bike.controls.steer = 1
-    run(1.5, () => cruise(bike, 24))
-    bike.controls.steer = 0
-    let wheelLifted = false
-    let mostOtherWay = 0
+    let mostSlide = 0
     run(2, () => {
-      cruise(bike, 24)
-      if (bike.wheels.some((wheel) => !wheel.onGround)) wheelLifted = true
-      mostOtherWay = Math.min(mostOtherWay, bike.roll)
+      mostSlide = Math.max(mostSlide, Math.abs(bike.slide))
     })
-    expect(wheelLifted).toBe(false)
-    expect(mostOtherWay).toBeGreaterThan(-8 * DEG) // overshoots to the left by less than 8 degrees
+    expect(mostSlide).toBeLessThan(0.5)
+  })
+
+  it('steering left turns left and leans left', () => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 0, 0)
+    run(5, () => cruise(bike, 40 * KMH))
+    bike.controls.steer = -1
+    run(1, () => cruise(bike, 40 * KMH))
+    expect(bike.heading).toBeLessThan(-10) // swung round toward -x, the left
+    expect(bike.lean).toBeLessThan(-5 * DEG)
+  })
+
+  it('never leans further than maxLean, and the physics bike itself stays upright', () => {
+    const { bike } = steadyTurn(90)
+    expect(Math.abs(bike.lean)).toBeGreaterThan(turning.maxLean * DEG * 0.9) // a full lean
+    expect(Math.abs(bike.lean)).toBeLessThan(turning.maxLean * DEG + 0.01)
     expect(Math.abs(bike.roll)).toBeLessThan(2 * DEG)
   })
 
-  it('can brake hard straight out of a fast turn without flipping', () => {
-    const { bike, run } = setup(flat(600))
-    bike.placeOnGround(0, 250, 0)
-    run(7, () => cruise(bike, 24))
-    bike.controls.steer = 1
-    run(1.5, () => cruise(bike, 24))
+  it('straightens up after a fast turn and can brake hard straight out of it', () => {
+    const { bike, run } = steadyTurn(90)
     bike.controls.steer = 0
     bike.controls.throttle = 0
-    run(0.3)
     bike.controls.brake = 1
-    let mostLean = 0
+    let wheelLifted = false
     run(3, () => {
-      mostLean = Math.max(mostLean, Math.abs(bike.roll))
+      if (!bike.wheels.every((wheel) => wheel.onGround)) wheelLifted = true
     })
-    expect(mostLean).toBeLessThan(50 * DEG) // never past the turn's own lean
-    expect(Math.abs(bike.roll)).toBeLessThan(3 * DEG) // and upright once stopped
+    expect(wheelLifted).toBe(false)
+    expect(Math.abs(bike.lean)).toBeLessThan(1 * DEG)
+    expect(Math.abs(bike.slide)).toBeLessThan(0.1)
+  })
+})
+
+describe('air and landings', () => {
+  it('carries its speed over a crest and takes off instead of sticking to the ground', () => {
+    const { bike, run } = setup(ground((_x, z) => 1.5 * Math.exp(-((z / 6) ** 2)))) // a 1.5 m hump at z = 0
+    bike.placeOnGround(0, 90, 0) // rides toward -z, over the hump
+    run(8, () => cruise(bike, 20))
+    expect(bike.lastAirtime).toBeGreaterThan(0.2)
+  })
+
+  it('turns in the air at about airTurn degrees per second', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0, 20) // a long fall
+    bike.controls.steer = 1
+    run(0.6)
+    expect(Math.abs(bike.body.angvel().y) / DEG).toBeGreaterThan(turning.airTurn * 0.85)
+    expect(Math.abs(bike.body.angvel().y) / DEG).toBeLessThan(turning.airTurn * 1.15)
+  })
+
+  it('lands a jump crooked without spinning out, and rides on the way it points', () => {
+    // the first ride: any jump not taken dead straight spun the bike out on landing
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 200, 0, 2) // 2 m up, pointing toward -z
+    // moving at 15 m/s, but 25 degrees off to the side of where it points
+    const off = 25 * DEG
+    bike.body.setLinvel({ x: 15 * Math.sin(off), y: 0, z: -15 * Math.cos(off) }, true)
+    const pointing = bike.heading
+    let fastestSpin = 0
+    run(2, () => {
+      fastestSpin = Math.max(fastestSpin, Math.abs(bike.body.angvel().y))
+    })
+    expect(fastestSpin).toBeLessThan(30 * DEG)
+    expect(Math.abs(bike.heading - pointing)).toBeLessThan(10) // still points the same way
+    expect(Math.abs(bike.slide)).toBeLessThan(0.3) // and goes that way
     expect(bike.wheels.every((wheel) => wheel.onGround)).toBe(true)
   })
 
@@ -259,7 +251,6 @@ describe('riding', () => {
     bike.placeOnGround(0, 0, 0)
     run(0.5)
     const [p, r] = [(75 * DEG) / 2, (-25 * DEG) / 2]
-    // pitch about x first, then roll about the bike's own forward axis
     bike.body.setRotation(
       { x: Math.sin(p) * Math.cos(r), y: -Math.sin(p) * Math.sin(r), z: Math.cos(p) * Math.sin(r), w: Math.cos(p) * Math.cos(r) },
       true,
@@ -270,13 +261,5 @@ describe('riding', () => {
       fastestSpin = Math.max(fastestSpin, Math.abs(bike.body.angvel().y))
     })
     expect(fastestSpin).toBeLessThan(90 * DEG)
-  })
-
-  it('carries its speed over a crest and takes off instead of sticking to the ground', () => {
-    // a 1.5 m hump across the road at z = 0
-    const { bike, run } = setup(ground((_x, z) => 1.5 * Math.exp(-((z / 6) ** 2))))
-    bike.placeOnGround(0, 90, 0) // rides toward -z, over the hump
-    run(8, () => cruise(bike, 20))
-    expect(bike.lastAirtime).toBeGreaterThan(0.2)
   })
 })

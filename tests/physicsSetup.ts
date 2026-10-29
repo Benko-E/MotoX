@@ -1,5 +1,5 @@
 /** Shared setup for the headless physics tests. */
-import { currentBike } from '../src/config'
+import { config } from '../src/config'
 import { Bike } from '../src/physics/bike'
 import { PhysicsWorld } from '../src/physics/world'
 import type { PlacedRamp } from '../src/terrain/generate'
@@ -31,7 +31,7 @@ export const slope = () => ground((x) => -x * Math.tan(10 * DEG))
 export function setup(field: Heightfield, ramps: PlacedRamp[] = []) {
   const physics = new PhysicsWorld()
   physics.setGround(field, ramps)
-  const bike = new Bike(physics, structuredClone(currentBike()))
+  const bike = new Bike(physics, structuredClone(config.bike))
   const run = (seconds: number, each?: () => void) => {
     for (let t = 0; t < seconds - 1e-9; t += DT) {
       each?.()

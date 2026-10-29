@@ -36,7 +36,7 @@ export class FlyCamera {
     })
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement !== element && !dragging) return
-      const sensitivity = this.config.flyCamera.mouseSensitivity
+      const sensitivity = this.config.advanced.flyCamera.mouseSensitivity
       this.yaw -= event.movementX * sensitivity
       this.pitch = clamp(this.pitch - event.movementY * sensitivity, -MAX_PITCH, MAX_PITCH)
     })
@@ -53,7 +53,7 @@ export class FlyCamera {
 
   step(dt: number, input: Input): void {
     this.previous.copy(this.position)
-    const { speed, fastMultiplier } = this.config.flyCamera
+    const { speed, fastMultiplier } = this.config.advanced.flyCamera
     const metres = speed * (input.isDown('flyFast') ? fastMultiplier : 1) * dt
 
     const cosPitch = Math.cos(this.pitch)
