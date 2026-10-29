@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Bike } from '../physics/bike'
+import { RiderView } from './riderView'
 
 /**
  * A placeholder bike drawn from the physics state: a frame, a seat, forks
@@ -17,6 +18,9 @@ export class BikeView {
   private readonly model = new THREE.Group()
   /** The front wheel and fork, turned with the steering. */
   private readonly frontEnd = new THREE.Group()
+  private readonly rider: RiderView
+  /** The rider's lean as drawn: follows the lean input, so the body moves smoothly. */
+  private riderLean = 0
   private readonly wheels: THREE.Mesh[] = []
   private readonly legs: THREE.Mesh[] = []
   private readonly blend = new THREE.Quaternion()
@@ -66,6 +70,7 @@ export class BikeView {
       parent.add(leg)
     }
 
+    this.rider = new RiderView(this.model, this.frontEnd)
     this.leanPivot.add(this.model)
     this.root.add(this.leanPivot)
     scene.add(this.root)
@@ -87,8 +92,8 @@ export class BikeView {
     return (Math.atan2(forward.x, -forward.z) * 180) / Math.PI
   }
 
-  /** Draws the bike `alpha` of the way from the previous physics step to the latest. */
-  update(alpha: number): void {
+  /** Draws the bike `alpha` of the way from the previous physics step to the latest; `dt` is the frame time. */
+  update(alpha: number, dt: number): void {
     const { previous, current, stats, wheels } = this.bike
     this.root.position.lerpVectors(
       new THREE.Vector3().copy(previous.position),
@@ -122,5 +127,10 @@ export class BikeView {
     this.leanPivot.position.y = -groundBelow
     this.model.position.y = groundBelow
     this.leanPivot.rotation.z = -this.bike.lean
+
+    this.riderLean += (this.bike.controls.lean - this.riderLean) * (1 - Math.exp(-Math.min(dt, 0.1) / 0.08))
+    const squash = (wheels[0].compressionRatio + wheels[1].compressionRatio) / 2
+    this.frontEnd.updateMatrixWorld(true)
+    this.rider.update(this.riderLean, squash)
   }
 }

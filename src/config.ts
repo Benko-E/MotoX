@@ -76,6 +76,24 @@ export const config = {
       noseDive: 0.5,
     },
 
+    /** Leaning forward and back (arrow keys up and down). */
+    rider: {
+      /** In the air: how fast leaning spins the bike nose up (lean back) or nose down (lean forward), degrees per second at full lean. Let go and it keeps the spin it has. */
+      airSpin: 150,
+      /** Seconds the air spin takes to build up once you lean. */
+      airSpinResponse: 0.12,
+      /** Leaning back with the throttle open lifts the front wheel up to this angle, degrees. 0 = no wheelies. */
+      wheelieAngle: 30,
+      /** Leaning forward with the brake on lifts the rear wheel up to this angle, degrees. 0 = no stoppies. */
+      stoppieAngle: 15,
+      /** Seconds a wheelie or stoppie takes to reach its angle. Lower pops up faster. */
+      liftResponse: 0.3,
+      /** How much you can still steer with the front wheel in the air during a wheelie, 0 to 1. */
+      wheelieSteering: 0.3,
+      /** On the ground, how hard leaning shifts the weight onto the front or rear suspension, N·m. Only a little: this is the feel of moving your body, not a wheelie. */
+      weightShift: 300,
+    },
+
     /** The bike's build. These rarely need changing. */
     build: {
       /** Distance between the two wheels, metres. */
@@ -125,6 +143,8 @@ export const config = {
       brake: ['KeyS'],
       steerLeft: ['KeyA'],
       steerRight: ['KeyD'],
+      leanForward: ['ArrowUp'],
+      leanBack: ['ArrowDown'],
       /** Put the bike back upright where it is. */
       reset: ['KeyR'],
       /** Drop the bike from a height (for testing landings). */
@@ -145,6 +165,7 @@ export const config = {
       throttle: { positive: 'throttle', riseTime: 0.12, fallTime: 0.1 },
       brake: { positive: 'brake', riseTime: 0.1, fallTime: 0.08 },
       steer: { negative: 'steerLeft', positive: 'steerRight', riseTime: 0.15, fallTime: 0.12 },
+      lean: { negative: 'leanBack', positive: 'leanForward', riseTime: 0.15, fallTime: 0.15 },
       flyMove: { negative: 'flyBack', positive: 'flyForward', riseTime: 0.3, fallTime: 0.25 },
       flyStrafe: { negative: 'flyLeft', positive: 'flyRight', riseTime: 0.3, fallTime: 0.25 },
       flyLift: { negative: 'flyDown', positive: 'flyUp', riseTime: 0.3, fallTime: 0.25 },
@@ -202,6 +223,13 @@ export const configRanges: Ranges = {
   'bike.weight.height': [0, 1, 0.01],
   'bike.weight.forward': [-0.5, 0.5, 0.01],
   'bike.weight.noseDive': [0, 1, 0.01],
+  'bike.rider.airSpin': [0, 400, 1],
+  'bike.rider.airSpinResponse': [0, 0.5, 0.01],
+  'bike.rider.wheelieAngle': [0, 60, 1],
+  'bike.rider.stoppieAngle': [0, 45, 1],
+  'bike.rider.liftResponse': [0.05, 1, 0.01],
+  'bike.rider.wheelieSteering': [0, 1, 0.01],
+  'bike.rider.weightShift': [0, 2000, 10],
   'bike.build.wheelbase': [1, 2, 0.01],
   'bike.build.frontWheel': [0.2, 0.5, 0.01],
   'bike.build.rearWheel': [0.2, 0.5, 0.01],

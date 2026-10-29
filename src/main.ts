@@ -137,6 +137,7 @@ const loop = new FixedStepLoop({
     bike.controls.throttle = flying ? 0 : input.axis('throttle')
     bike.controls.brake = flying ? 0 : input.axis('brake')
     bike.controls.steer = flying ? 0 : input.axis('steer')
+    bike.controls.lean = flying ? 0 : input.axis('lean')
     bike.update(dt)
     physics.step(dt, config.jumps.gravity * EARTH_GRAVITY)
     bike.record()
@@ -166,7 +167,7 @@ const lookPoint = new THREE.Vector3()
 /** Moves the game on by one screen frame of `frameTime` seconds and draws it. */
 function showFrame(frameTime: number) {
   loop.advance(frameTime)
-  bikeView.update(loop.alpha)
+  bikeView.update(loop.alpha, frameTime)
   if (flying) fly.apply(view.camera, loop.alpha)
   else chase.update(view.camera, Math.min(frameTime, 0.1), bikeView.position, bikeView.heading, bike.speed)
   view.camera.getWorldDirection(lookPoint).multiplyScalar(20).add(view.camera.position)
@@ -210,7 +211,9 @@ function readout(): string[] {
     return `${name}  ${state}  ${bar(w.compressionRatio)} ${(w.compressionRatio * 100).toFixed(0).padStart(3)}%`
   }
   const { throttle, brake, steer } = bike.controls
-  const steering = steer < 0 ? bar(-steer, 5).split('').reverse().join('') + '|▯▯▯▯▯' : '▯▯▯▯▯|' + bar(steer, 5)
+  const sides = (amount: number) =>
+    amount < 0 ? bar(-amount, 5).split('').reverse().join('') + '|▯▯▯▯▯' : '▯▯▯▯▯|' + bar(amount, 5)
+  const steering = sides(steer)
   const air = bike.airtime > 0 ? `${bike.airtime.toFixed(2)} s` : 'on the ground'
   const keys = flying
     ? [
@@ -220,16 +223,19 @@ function readout(): string[] {
         'B   drop the bike ahead of the camera',
       ]
     : [
-        'W throttle   S brake   A / D steer   C free-fly camera',
+        'W throttle   S brake   A / D steer   ↑ / ↓ lean forward / back',
+        'in the air: lean to spin   ↓ + throttle: wheelie   ↑ + brake: stoppie',
+        'C free-fly camera',
         'R   bike upright again   B   drop the bike from 6 m',
       ]
   return [
-    'Moto · step 4 (arcade handling)',
+    'Moto · step 5 (leaning)',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
     `throttle  ${bar(throttle)}   brake ${bar(brake, 5)}`,
     `steer     ${steering}  tightest turn here ${bike.turnRadius.toFixed(1)} m`,
+    `lean      ${sides(bike.controls.lean)}  (back | forward)`,
     wheel('front', 0),
     wheel('rear ', 1),
     `airtime   ${air}   last jump ${bike.lastAirtime.toFixed(2)} s`,

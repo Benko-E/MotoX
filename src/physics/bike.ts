@@ -85,8 +85,9 @@ export class Bike {
   previous: Pose
   current: Pose
 
-  /** Set these before each update: throttle and brake 0 to 1, steer -1 (left) to 1 (right). */
-  readonly controls = { throttle: 0, brake: 0, steer: 0 }
+  /** Set these before each update: throttle and brake 0 to 1, steer -1 (left) to 1 (right),
+   * lean -1 (back) to 1 (forward). */
+  readonly controls = { throttle: 0, brake: 0, steer: 0, lean: 0 }
   /** How far the bike is drawn leaning into the turn, radians (positive = right). */
   lean = 0
   /** How far the front wheel is drawn turned, degrees (positive = right). */
@@ -182,6 +183,7 @@ export class Bike {
     const throttle = clamp(this.controls.throttle, 0, 1)
     const brake = clamp(this.controls.brake, 0, 1)
     const steer = clamp(this.controls.steer, -1, 1)
+    const lean = clamp(this.controls.lean, -1, 1)
 
     // ---- Suspension ----
     const loads = this.staticLoads(gravity)
@@ -262,7 +264,9 @@ export class Bike {
 
     let newLinvel = linvel
     let newAngvel = angvel
-    let turnRate = dot(angvel, UP)
+    const right = rotate(rotation, RIGHT)
+    const { rider } = stats
+    let leanTorque = 0
 
     if (grounded > 0) {
       // ---- Riding on the ground ----
@@ -296,11 +300,12 @@ export class Bike {
 
       // Turning: the turn asked for, made wider if grip can't hold it.
       this.turnRadius = Math.max(turnRadiusAt(turning, speed, speedAhead), speedAhead ** 2 / (turning.grip * gravity))
-      const wantedTurnRate = (-steer * speedAhead) / this.turnRadius
+      // with the front wheel up in a wheelie there's less to steer with
+      const steering = steer * (this.wheels[0].onGround ? 1 : clamp(rider.wheelieSteering, 0, 1))
+      const wantedTurnRate = (-steering * speedAhead) / this.turnRadius
       const turnNow = dot(angvel, n)
       const newTurn = turnNow + (wantedTurnRate - turnNow) * ease(dt, turning.steeringResponse) * onWheels
       newAngvel = add(angvel, scale(n, newTurn - turnNow))
-      turnRate = newTurn
 
       // Grip: it goes where it points. The rear wheel must not slide sideways,
       // so the middle of the bike moves sideways just as much as turning about
@@ -316,6 +321,29 @@ export class Bike {
       const leanWanted = clamp(-Math.atan((speedAhead * newTurn) / gravity), -turning.maxLean * DEG, turning.maxLean * DEG)
       this.lean += (leanWanted - this.lean) * ease(dt, turning.leanResponse)
       this.steerAngle = (steer * Math.atan(stats.build.wheelbase / turnRadiusAt(turning, speed, speedAhead))) / DEG
+
+      // Leaning back with the throttle open lifts the front into a wheelie;
+      // leaning forward with the brake on lifts the rear into a stoppie. Each
+      // eases the bike toward its angle (measured from the ground) and holds it
+      // there, so it can't loop over. Let go and gravity brings it back down.
+      const noseUp = Math.asin(clamp(dot(forward, n), -1, 1))
+      let liftTo = 0
+      let lifting = 0
+      if (lean < 0 && this.wheels[1].onGround) {
+        liftTo = -lean * throttle * rider.wheelieAngle * DEG
+        lifting = -lean
+      } else if (lean > 0 && this.wheels[0].onGround) {
+        liftTo = -lean * brake * rider.stoppieAngle * DEG
+        lifting = lean
+      }
+      // nothing to do with both wheels down and no lift asked for
+      if (lifting > 0 && (Math.abs(liftTo) > 0.5 * DEG || Math.abs(noseUp) > 0.5 * DEG)) {
+        const wantedRate = clamp((liftTo - noseUp) / Math.max(rider.liftResponse, 0.05), -3, 3)
+        const rateNow = dot(newAngvel, right)
+        newAngvel = add(newAngvel, scale(right, (wantedRate - rateNow) * ease(dt, 0.04) * lifting))
+      }
+      // Moving your body forward or back squashes the front or rear suspension a little.
+      leanTorque = -lean * rider.weightShift * onWheels
     } else {
       // ---- In the air ----
       // Steering turns the bike slowly about the vertical, if airTurn allows it.
@@ -325,12 +353,17 @@ export class Bike {
         const turnNow = dot(angvel, UP)
         const newTurn = turnNow + (wanted - turnNow) * ease(dt, turning.steeringResponse)
         newAngvel = add(angvel, scale(UP, newTurn - turnNow))
-        turnRate = newTurn
+      }
+      // Leaning spins the bike nose up (back) or nose down (forward). Without
+      // leaning it keeps whatever spin it has.
+      if (lean !== 0) {
+        const wanted = -lean * rider.airSpin * DEG
+        const rateNow = dot(newAngvel, right)
+        newAngvel = add(newAngvel, scale(right, (wanted - rateNow) * ease(dt, rider.airSpinResponse) * Math.abs(lean)))
       }
       this.lean += (0 - this.lean) * ease(dt, stats.turning.leanResponse)
       this.steerAngle = steer * 10
     }
-    void turnRate
 
     // ---- Upright helper: keeps the physics bike from tipping sideways ----
     // It works about the level part of the bike's forward direction. It lets
@@ -351,6 +384,7 @@ export class Bike {
     body.resetTorques(true)
     for (const [force, point] of pushes) body.addForceAtPoint(force, point, true)
     body.addTorque(scale(level, uprightTorque), true)
+    body.addTorque(scale(right, leanTorque), true)
 
     if (grounded === 0) this.airtime += dt
     else if (this.airtime > 0) {
