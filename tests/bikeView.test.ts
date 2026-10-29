@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { Bike } from '../src/physics/bike'
 import { initPhysics } from '../src/physics/world'
 import { BikeView } from '../src/render/bikeView'
+import { FACTORY } from '../src/render/livery'
 import { DEG, flat, setup } from './physicsSetup'
 
 beforeAll(async () => {
@@ -63,6 +64,48 @@ describe('it looks like a dirt bike', () => {
     const part = standing(1)
     expect(part('front fender').min.y).toBeGreaterThan(part('front tyre').max.y)
     expect(part('rear fender').min.y).toBeGreaterThan(part('rear tyre').max.y)
+  })
+})
+
+describe('the wheels', () => {
+  it('are dirt bike wheels: a thin knobby tyre on a rim, with yellow spokes to the hub', () => {
+    const { scene } = drawn()
+    for (const name of ['front tyre', 'rear tyre']) {
+      const wheel = scene.getObjectByName(name)!
+      for (const part of ['tyre', 'knobs', 'rim', 'spokes', 'hub']) expect(wheel.getObjectByName(part), `${name} ${part}`).toBeDefined()
+      const spokes = wheel.getObjectByName('spokes') as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
+      expect(spokes.material.color.getHex()).toBe(FACTORY.spokes)
+      expect(FACTORY.spokes).toBe(0xf2c418) // yellow
+    }
+  })
+
+  it('still sit right on the ground, knobs and all', () => {
+    const { bike, run, view, scene } = drawn()
+    bike.placeOnGround(0, 0, 0)
+    run(2)
+    view.update(1, 1 / 60)
+    for (const name of ['front tyre', 'rear tyre']) {
+      const wheel = scene.getObjectByName(name)!
+      wheel.updateWorldMatrix(true, true)
+      expect(Math.abs(new THREE.Box3().setFromObject(wheel, true).min.y)).toBeLessThan(0.01)
+    }
+  })
+})
+
+describe('colours', () => {
+  it('a different livery recolours the bike and the rider (for other riders later)', () => {
+    const { bike } = setup(flat(600))
+    const scene = new THREE.Scene()
+    new BikeView(scene, bike, { ...FACTORY, jersey: 0x22aa44, plastics: 0x2255dd })
+    const colours = new Set<number>()
+    scene.traverse((part) => {
+      const material = (part as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+      if (material?.color) colours.add(material.color.getHex())
+    })
+    expect(colours.has(0x22aa44)).toBe(true)
+    expect(colours.has(0x2255dd)).toBe(true)
+    expect(colours.has(FACTORY.jersey)).toBe(false)
+    expect(colours.has(FACTORY.plastics)).toBe(false)
   })
 })
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { FACTORY, type Livery } from './livery'
 
 /** Grips at the ends of the handlebar, in the handlebar's own space. */
 export const GRIPS = [new THREE.Vector3(-0.4, 0, 0), new THREE.Vector3(0.4, 0, 0)]
@@ -154,11 +155,12 @@ export class RiderView {
   constructor(
     private readonly bike: THREE.Object3D,
     private readonly bars: THREE.Object3D,
+    livery: Livery = FACTORY,
   ) {
-    const jersey = new THREE.MeshStandardMaterial({ color: 0x2b6fd8, roughness: 0.7 })
-    const pants = new THREE.MeshStandardMaterial({ color: 0x33363d, roughness: 0.8 })
-    const helmet = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4 })
-    const visor = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 })
+    const jersey = new THREE.MeshStandardMaterial({ color: livery.jersey, roughness: 0.7 })
+    const pants = new THREE.MeshStandardMaterial({ color: livery.pants, roughness: 0.8 })
+    const helmet = new THREE.MeshStandardMaterial({ color: livery.helmet, roughness: 0.4 })
+    const visor = new THREE.MeshStandardMaterial({ color: livery.visor, roughness: 0.2 })
 
     // The torso box hangs up from its bottom edge, so rotating it tips it about the hips.
     this.torso = new THREE.Mesh(new THREE.BoxGeometry(0.34, TORSO_LENGTH, 0.22).translate(0, TORSO_LENGTH / 2, 0), jersey)
@@ -182,7 +184,7 @@ export class RiderView {
     this.forearms = [0, 1].map(() => this.limb(0.08, jersey))
     this.thighs = [0, 1].map(() => this.limb(0.13, pants))
     this.shins = [0, 1].map(() => this.limb(0.11, pants))
-    const boot = new THREE.MeshStandardMaterial({ color: 0xe9e9e4, roughness: 0.6 })
+    const boot = new THREE.MeshStandardMaterial({ color: livery.boots, roughness: 0.6 })
     this.boots = [0, 1].map(() => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.26), boot)
       mesh.castShadow = true

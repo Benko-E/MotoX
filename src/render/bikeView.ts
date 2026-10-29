@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 import type { Bike } from '../physics/bike'
+import { FACTORY, type Livery } from './livery'
 import { RiderMotion } from './riderMotion'
 import { PEGS, RiderView } from './riderView'
+import { buildWheel } from './wheel'
 
 /**
  * A placeholder dirt bike drawn from the physics state: high bars on raked
@@ -43,7 +45,7 @@ export class BikeView {
   readonly riderMotion = new RiderMotion()
   /** The rider's lean as drawn: follows the lean input, so the body moves smoothly. */
   private riderLean = 0
-  private readonly wheels: THREE.Mesh[] = []
+  private readonly wheels: THREE.Object3D[] = []
   private readonly forks: THREE.Mesh[]
   private readonly swingarm: THREE.Mesh[]
   private readonly shock: THREE.Mesh
@@ -66,14 +68,21 @@ export class BikeView {
   constructor(
     scene: THREE.Scene,
     private readonly bike: Bike,
+    /** The colours of the bike and its rider. */
+    livery: Livery = FACTORY,
   ) {
-    const red = new THREE.MeshStandardMaterial({ color: 0xd8432b, roughness: 0.55 })
-    const white = new THREE.MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.6 })
-    const dark = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.8 })
-    const metal = new THREE.MeshStandardMaterial({ color: 0xb8bcc4, roughness: 0.4, metalness: 0.6 })
-    const tyre = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95 })
-    const rim = new THREE.MeshStandardMaterial({ color: 0xe0b23a, roughness: 0.5 })
-    const spring = new THREE.MeshStandardMaterial({ color: 0xe8c21e, roughness: 0.5 })
+    const red = new THREE.MeshStandardMaterial({ color: livery.plastics, roughness: 0.55 })
+    const white = new THREE.MeshStandardMaterial({ color: livery.plates, roughness: 0.6 })
+    const dark = new THREE.MeshStandardMaterial({ color: livery.trim, roughness: 0.8 })
+    const metal = new THREE.MeshStandardMaterial({ color: livery.metal, roughness: 0.4, metalness: 0.6 })
+    const spring = new THREE.MeshStandardMaterial({ color: livery.shock, roughness: 0.5 })
+    const wheelParts = {
+      tyre: new THREE.MeshStandardMaterial({ color: livery.tyres, roughness: 0.95 }),
+      rim: new THREE.MeshStandardMaterial({ color: livery.rims, roughness: 0.35, metalness: 0.7 }),
+      spokes: new THREE.MeshStandardMaterial({ color: livery.spokes, roughness: 0.45 }),
+      metal,
+      trim: dark,
+    }
 
     /** A box part; `tilt` (radians) lifts its front end. */
     const box = (
@@ -129,15 +138,10 @@ export class BikeView {
     this.frontEnd.position.z = -half
     this.model.add(this.frontEnd)
 
-    // A wheel with a yellow stripe across, so you can see it turn, and a hub.
-    const wheelShape = new THREE.CylinderGeometry(1, 1, 0.1, 24).rotateZ(Math.PI / 2)
-    const stripeShape = new THREE.BoxGeometry(0.11, 1.6, 0.16)
-    const hubShape = new THREE.CylinderGeometry(0.24, 0.24, 0.14, 12).rotateZ(Math.PI / 2)
+    // Spoked wheels: thin knobby tyres on rims, so you can see through them.
     for (let i = 0; i < 2; i++) {
-      const wheel = new THREE.Mesh(wheelShape, tyre)
+      const wheel = buildWheel(wheelParts, i === 1)
       wheel.name = i === 0 ? 'front tyre' : 'rear tyre'
-      wheel.add(new THREE.Mesh(stripeShape, rim), new THREE.Mesh(hubShape, metal))
-      wheel.castShadow = true
       this.wheels.push(wheel)
       ;(i === 0 ? this.frontEnd : this.model).add(wheel)
     }
@@ -147,7 +151,7 @@ export class BikeView {
     this.swingarm = [0, 1].map(() => this.rod(0.05, metal))
     this.shock = this.rod(0.07, spring)
 
-    this.rider = new RiderView(this.model, this.bars)
+    this.rider = new RiderView(this.model, this.bars, livery)
     this.leanPivot.add(this.model)
     this.root.add(this.leanPivot)
     scene.add(this.root)
@@ -210,7 +214,7 @@ export class BikeView {
       const radius = this.bike.radius(i)
       const along = i === 0 ? 0 : half // the front wheel sits in the front end, already at -half
       const wheel = this.wheels[i]
-      wheel.scale.set(1, radius, radius)
+      wheel.scale.setScalar(radius)
       wheel.position.set(0, -drops[i], along)
       wheel.rotation.x = -wheels[i].spin - (i === 1 ? this.wheelspinTurns : 0)
     })
