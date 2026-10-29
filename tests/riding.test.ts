@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { config, EARTH_GRAVITY } from '../src/config'
+import { config } from '../src/config'
 import type { Bike } from '../src/physics/bike'
 import { turnRadiusAt } from '../src/physics/bikeTuning'
 import { initPhysics } from '../src/physics/world'
@@ -29,9 +29,8 @@ function keepOnMap(bike: Bike) {
 /** Steady turning radius right now, metres. */
 const radius = (bike: Bike) => bike.forwardSpeed / Math.max(Math.abs(bike.body.angvel().y), 1e-9)
 
-/** The radius the settings ask for at a speed: the turning curve, or wider if grip can't hold it. */
-const expectedRadius = (v: number) =>
-  Math.max(turnRadiusAt(turning, speedSettings, v), (v * v) / (turning.grip * EARTH_GRAVITY))
+/** The radius the turning settings ask for at a speed. */
+const expectedRadius = (v: number) => turnRadiusAt(turning, speedSettings, v)
 
 describe('speed', () => {
   it('reaches 60 km/h in about secondsTo60 from a standstill', () => {
@@ -138,6 +137,31 @@ describe('turning', () => {
     }
   })
 
+  it('turns at top speed as tight as tightestTurnFast says, whatever the grip', () => {
+    // the first tuning session: tightestTurnFast seemed to do nothing at 110 km/h
+    const { bike, run } = setup(flat(600))
+    bike.stats.turning.grip = 1
+    bike.stats.turning.tightestTurnFast = 12
+    bike.placeOnGround(0, 0, 0)
+    bike.controls.throttle = 1
+    run(20, () => keepOnMap(bike))
+    bike.controls.steer = 1
+    run(1.5)
+    expect(radius(bike)).toBeGreaterThan(12 * 0.85)
+    expect(radius(bike)).toBeLessThan(12 * 1.15)
+    expect(Math.abs(bike.slide)).toBeLessThan(0.3) // and still goes where it points
+  })
+
+  it('does not speed up past topSpeed while holding a full turn', () => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 0, 0)
+    bike.controls.throttle = 1
+    run(20, () => keepOnMap(bike))
+    bike.controls.steer = 1
+    run(3)
+    expect(bike.speed / KMH).toBeLessThan(speedSettings.topSpeed * 1.01)
+  })
+
   it('goes where it points: the rear wheel follows the turn instead of sliding out', () => {
     for (const kmh of [15, 50, 90]) {
       expect(Math.abs(steadyTurn(kmh).bike.slide)).toBeLessThan(0.3)
@@ -165,7 +189,7 @@ describe('turning', () => {
     run(5, () => cruise(bike, 40 * KMH))
     bike.controls.steer = -1
     run(1, () => cruise(bike, 40 * KMH))
-    expect(bike.heading).toBeLessThan(-10) // swung round toward -x, the left
+    expect(bike.body.angvel().y).toBeGreaterThan(0.2) // turning anticlockwise seen from above: to the left
     expect(bike.lean).toBeLessThan(-5 * DEG)
   })
 

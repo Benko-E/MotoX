@@ -17,11 +17,11 @@ export const config = {
     /** How fast it goes, how quickly it gets there, and how quickly it stops. */
     speed: {
       /** Fastest it goes on flat ground, km/h. */
-      topSpeed: 105,
+      topSpeed: 110,
       /** Seconds from standing still to 60 km/h at full throttle. Lower is punchier. */
-      secondsTo60: 2.4,
+      secondsTo60: 1.3,
       /** Seconds to stop from 60 km/h at full brake. Lower is stronger brakes. */
-      secondsToStopFrom60: 1.7,
+      secondsToStopFrom60: 1.1,
       /** How quickly it slows down with neither throttle nor brake, km/h per second. */
       coastSlowdown: 5,
     },
@@ -29,17 +29,17 @@ export const config = {
     /** How tight it turns, how quickly it reacts, and how far it leans. */
     turning: {
       /** Radius of the tightest turn when barely moving, metres. */
-      tightestTurnSlow: 2.5,
+      tightestTurnSlow: 0.7,
       /** Radius of the tightest turn at top speed, metres. Bigger means wider arcs at speed. */
-      tightestTurnFast: 35,
+      tightestTurnFast: 20,
       /** How the turn widens as you speed up. 1 = evenly with speed; higher stays tight for longer and only opens up near top speed. */
-      turnCurve: 1.8,
+      turnCurve: 1.6,
       /** Seconds the bike takes to start turning once you steer. Lower is snappier. */
-      steeringResponse: 0.08,
-      /** Sideways grip, as a share of the bike's weight. A turn that would need more grip than this is made wider, so the bike goes where it points instead of sliding. */
-      grip: 1.5,
+      steeringResponse: 0.03,
+      /** How hard the tyres catch a sideways slide, as a share of the bike's weight: landing a jump crooked, or riding across a steep slope. Higher straightens you out faster. Turning itself never slides: the turn settings above decide how tight it turns. */
+      grip: 3,
       /** How far the bike leans into turns at most, degrees. Only the look: it does not change how the bike turns. */
-      maxLean: 35,
+      maxLean: 40,
       /** Seconds the lean takes to follow the turn. */
       leanResponse: 0.15,
       /** How fast you can turn in the air at full steer, degrees per second. 0 = not at all. */
@@ -208,7 +208,7 @@ export const configRanges: Ranges = {
   'bike.turning.tightestTurnFast': [5, 150, 1],
   'bike.turning.turnCurve': [0.5, 4, 0.05],
   'bike.turning.steeringResponse': [0, 0.5, 0.01],
-  'bike.turning.grip': [0.3, 3, 0.05],
+  'bike.turning.grip': [0.3, 6, 0.05],
   'bike.turning.maxLean': [0, 60, 1],
   'bike.turning.leanResponse': [0, 0.6, 0.01],
   'bike.turning.airTurn': [0, 180, 1],

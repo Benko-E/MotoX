@@ -8,7 +8,7 @@ import {
   springRate,
   turnRadiusAt,
 } from './bikeTuning'
-import { add, cross, dot, normalize, rotate, scale, sub, vec, yawRotation, type Quat, type Vec3 } from './vec'
+import { add, cross, dot, normalize, rotate, rotateAround, scale, sub, vec, yawRotation, type Quat, type Vec3 } from './vec'
 import type { PhysicsWorld } from './world'
 
 /**
@@ -23,11 +23,11 @@ import type { PhysicsWorld } from './world'
  * Riding is direct control instead of simulated tyres:
  * - throttle, brake and coasting speed the bike up and slow it down exactly
  *   as the speed settings say
- * - steering sets how fast the bike turns, from the turning settings. It turns
- *   about its rear wheel like a real bike, so the rear follows the front's path
- * - grip keeps it going the way it points by taking away sideways speed, as
- *   hard as the grip setting allows, and a turn that would need more grip than
- *   that is made wider instead, so the bike never slides out on its own
+ * - steering sets how fast the bike turns, exactly as the turning settings
+ *   say. It turns about its rear wheel like a real bike, so the rear follows
+ *   the front's path, and turning never makes it slide
+ * - grip catches any other sideways slide (landing a jump crooked, riding
+ *   across a steep slope), as hard as the grip setting allows
  * - the physics bike always stays upright. Leaning into turns is worked out
  *   here, but only drawn
  *
@@ -298,8 +298,8 @@ export class Bike {
       const brakePoint = sub(centerOfMass, scale(n, comHeight * clamp(stats.weight.noseDive, 0, 1)))
       pushes.push([scale(ahead, mass * against * slowing * brakeShare * onWheels), brakePoint])
 
-      // Turning: the turn asked for, made wider if grip can't hold it.
-      this.turnRadius = Math.max(turnRadiusAt(turning, speed, speedAhead), speedAhead ** 2 / (turning.grip * gravity))
+      // Turning: exactly the turn the settings ask for at this speed.
+      this.turnRadius = turnRadiusAt(turning, speed, speedAhead)
       // with the front wheel up in a wheelie there's less to steer with
       const steering = steer * (this.wheels[0].onGround ? 1 : clamp(rider.wheelieSteering, 0, 1))
       const wantedTurnRate = (-steering * speedAhead) / this.turnRadius
@@ -309,13 +309,22 @@ export class Bike {
 
       // Grip: it goes where it points. The rear wheel must not slide sideways,
       // so the middle of the bike moves sideways just as much as turning about
-      // the rear wheel needs, and no more. Grip limits how hard that can pull.
+      // the rear wheel needs, and no more. The turn always gets the pull it
+      // needs; grip limits how hard any other sideways slide is caught.
+      // The speed along the bike turns with the bike (so a turn never adds or
+      // loses speed), lined up with where the bike will point at the end of
+      // this step, since it keeps turning during the step.
       const toRear = stats.build.wheelbase / 2 + stats.weight.forward
+      const aheadAfter = rotateAround(ahead, n, newTurn * dt)
+      const sideAfter = rotateAround(side, n, newTurn * dt)
       const wantedSideways = -newTurn * toRear
-      const sideways = dot(linvel, side)
-      const maxPull = turning.grip * gravity * dt
-      const pull = clamp(wantedSideways - sideways, -maxPull, maxPull) * onWheels
-      newLinvel = add(linvel, scale(side, pull))
+      const sideways = dot(linvel, side) // the slide, if any, carries on into the step
+      // (the turn's needs: the pull of going round, plus swinging the middle
+      // across when the turn tightens or opens up)
+      const maxPull = (turning.grip * gravity + Math.abs(speedAhead * newTurn)) * dt + Math.abs(newTurn - turnNow) * toRear
+      const sidewaysAfter = sideways + clamp(wantedSideways - sideways, -maxPull, maxPull)
+      const carried = add(add(scale(aheadAfter, speedAhead), scale(sideAfter, sidewaysAfter)), scale(n, dot(linvel, n)))
+      newLinvel = add(linvel, scale(sub(carried, linvel), onWheels))
 
       // Leaning into the turn, for the drawing: as far as the turn pulls sideways, up to maxLean.
       const leanWanted = clamp(-Math.atan((speedAhead * newTurn) / gravity), -turning.maxLean * DEG, turning.maxLean * DEG)
