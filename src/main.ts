@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { config, configRanges, EARTH_GRAVITY } from './config'
+import { config, configChoices, configRanges, EARTH_GRAVITY } from './config'
 import configSource from './config.ts?raw'
 import { Input } from './core/input'
 import { FixedStepLoop } from './core/loop'
@@ -19,6 +19,8 @@ import { createScene } from './render/scene'
 import { TerrainView } from './render/terrainView'
 import { generateTerrain } from './terrain/generate'
 import { heightAt } from './terrain/heightfield'
+import { Hud } from './hud/hud'
+import { Speedometer } from './hud/speedometer'
 import { HelpTimer } from './ui/helpCard'
 import { readNotes } from './ui/notes'
 import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
@@ -33,7 +35,7 @@ await initPhysics()
 const map = freeride
 const view = createScene(document.getElementById('app')!, config)
 /** The readout of numbers, shown with the tuning panel. */
-const hud = document.getElementById('hud')!
+const readoutBox = document.getElementById('hud')!
 const banner = document.getElementById('banner')!
 /** A short note after a sloppy landing, and how long it has left on screen, seconds. */
 const landingNote = document.getElementById('landing')!
@@ -42,6 +44,9 @@ let landingNoteLeft = 0
 let landingsSeen = 0
 /** The controls card at the start: up until you press a key, gone a few seconds into riding. */
 const help = document.getElementById('help')!
+/** What's on screen while you ride: placed by config.hud. */
+const hud = new Hud(document.body, config.hud)
+hud.add('speed', new Speedometer())
 const helpTimer = new HelpTimer(6, 1.5)
 const input = new Input(config.controls, window)
 
@@ -92,6 +97,7 @@ const sections: PanelSection[] = Object.entries(config).map(([name, target]) => 
   target,
   path: name,
   ranges: configRanges,
+  choices: configChoices,
   notes: configNotes,
   open: ['bike', 'bike.speed', 'bike.turning', 'jumps'],
 }))
@@ -126,7 +132,7 @@ input.onPress('togglePanel', () => {
   // The readout of numbers comes and goes with the panel. Opening them gives
   // the mouse back, so the sliders can be used straight away.
   const open = panel.toggle()
-  hud.hidden = !open
+  readoutBox.hidden = !open
   if (open) document.exitPointerLock()
 })
 
@@ -209,6 +215,7 @@ function showFrame(frameTime: number) {
   loop.advance(frameTime)
   bikeView.update(loop.alpha, frameTime)
   groundEffects.update(Math.min(frameTime, 0.1))
+  hud.update({ speed: bike.speed, topSpeed: config.bike.speed.topSpeed }, frameTime)
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)
   if (flying) fly.apply(view.camera, loop.alpha)
@@ -218,7 +225,7 @@ function showFrame(frameTime: number) {
   view.camera.getWorldDirection(lookPoint).multiplyScalar(20).add(view.camera.position)
   view.focusShadows(lookPoint)
   view.render()
-  if (!hud.hidden) hud.textContent = readout().join('\n')
+  if (!readoutBox.hidden) readoutBox.textContent = readout().join('\n')
   if (help.style.display !== 'none') {
     help.style.opacity = String(helpTimer.update(frameTime, input.anyHeld))
     if (helpTimer.shown === 0) help.style.display = 'none'

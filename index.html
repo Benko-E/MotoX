@@ -68,6 +68,45 @@
         font-weight: normal;
         letter-spacing: 0;
       }
+      /* The HUD: sizes in em are HUD units (1% of the screen height times hud.size). */
+      .hud-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Black', sans-serif;
+        color: #fff;
+      }
+      .hud-slot {
+        position: absolute;
+      }
+      .hud-speed {
+        transform: skewX(-10deg);
+        text-align: right;
+        text-shadow: 0 0 0.25em rgba(0, 0, 0, 0.6);
+      }
+      .hud-speed-number {
+        font-size: 6.5em;
+        line-height: 0.9;
+        letter-spacing: 0.02em;
+        -webkit-text-stroke: 0.04em rgba(0, 0, 0, 0.75);
+        paint-order: stroke fill;
+      }
+      .hud-speed-unit {
+        margin-left: 0.35em;
+        font-size: 1.8em;
+        opacity: 0.85;
+      }
+      .hud-speed-track {
+        width: 17em;
+        height: 0.9em;
+        margin: 0.5em 0 0 auto;
+        background: rgba(0, 0, 0, 0.45);
+        border: 0.12em solid rgba(255, 255, 255, 0.55);
+      }
+      .hud-speed-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #ffb14a, #ff7a1a 60%, #ff3d1a);
+      }
       #help {
         position: fixed;
         top: 7%;

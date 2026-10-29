@@ -6,6 +6,8 @@
 
 /** Slider ranges by path: [min, max, step?]. A `*` matches any list position. */
 export type Ranges = Record<string, [number, number, number?]>
+/** Lists to pick text settings from (a dropdown), by path; `*` matches any name. */
+export type Choices = Record<string, readonly string[]>
 
 export interface Tunable {
   /** Dotted path from the root, e.g. "hills.height" or "lips.2.heading". */
@@ -28,14 +30,23 @@ export function rangeFor(path: string, value: number, ranges: Ranges) {
   return { min, max, step }
 }
 
-/** Every number and on/off switch under `root`, in file order. Text (like key names) is skipped. */
-export function collectTunables(root: object, prefix = ''): Tunable[] {
+/** The list a text setting is picked from, or undefined if it isn't one. */
+export function choicesFor(path: string, choices: Choices): readonly string[] | undefined {
+  return choices[path] ?? Object.entries(choices).find(([pattern]) => matches(pattern, path))?.[1]
+}
+
+/**
+ * Every number and on/off switch under `root`, in file order. Text (like key
+ * names) is skipped, except where `keepText` says to (settings picked from a list).
+ */
+export function collectTunables(root: object, prefix = '', keepText?: (path: string) => boolean): Tunable[] {
   const found: Tunable[] = []
   const owner = root as Record<string, unknown>
   for (const [key, value] of Object.entries(owner)) {
     const path = prefix ? `${prefix}.${key}` : key
     if (typeof value === 'number' || typeof value === 'boolean') found.push({ path, owner, key })
-    else if (value !== null && typeof value === 'object') found.push(...collectTunables(value, path))
+    else if (typeof value === 'string' && keepText?.(path)) found.push({ path, owner, key })
+    else if (value !== null && typeof value === 'object') found.push(...collectTunables(value, path, keepText))
   }
   return found
 }

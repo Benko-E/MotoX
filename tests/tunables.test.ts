@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { changedValues, collectTunables, rangeFor } from '../src/ui/tunables'
+import { changedValues, choicesFor, collectTunables, rangeFor } from '../src/ui/tunables'
+
+describe('choices', () => {
+  it('text settings get a dropdown only where there is a list of choices for them', () => {
+    const choices = { 'hud.*.anchor': ['top', 'bottom'] }
+    expect(choicesFor('hud.speed.anchor', choices)).toEqual(['top', 'bottom'])
+    expect(choicesFor('controls.keys.throttle', choices)).toBeUndefined()
+  })
+
+  it('collects text values only where asked, such as an anchor', () => {
+    const paths = collectTunables({ size: 1, name: 'x', speed: { anchor: 'top' } }, '', (path) => path.endsWith('anchor')).map((t) => t.path)
+    expect(paths).toEqual(['size', 'speed.anchor'])
+  })
+})
 
 describe('rangeFor', () => {
   it('lets a slider go from 0 to 4x the file value by default', () => {

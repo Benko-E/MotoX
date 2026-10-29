@@ -1,6 +1,6 @@
 import { Pane, type ButtonApi, type FolderApi } from 'tweakpane'
 import { humanize, noteFor, type Notes } from './notes'
-import { changedValues, collectTunables, rangeFor, type Ranges } from './tunables'
+import { changedValues, choicesFor, collectTunables, rangeFor, type Choices, type Ranges } from './tunables'
 
 export interface PanelSection {
   title: string
@@ -9,6 +9,8 @@ export interface PanelSection {
   /** Where `target` sits in its settings file ("bike"), for looking up ranges and notes. '' for the whole file. */
   path: string
   ranges: Ranges
+  /** Lists to pick text settings from (dropdowns), by path in the file. */
+  choices?: Choices
   /** Hover help for each setting, by its full path in the file. */
   notes: Notes
   /** Match notes on the setting's last name only (for lists, like a map's jumps). */
@@ -106,13 +108,17 @@ export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs
       return folder
     }
 
-    for (const { owner, key, path } of collectTunables(section.target)) {
+    const listFor = (path: string) => choicesFor(inFile(path), section.choices ?? {})
+    for (const { owner, key, path } of collectTunables(section.target, '', (path) => listFor(path) !== undefined)) {
       const dot = path.lastIndexOf('.')
       const value = owner[key]
       const slider = typeof value === 'number' ? rangeFor(inFile(path), value, section.ranges) : {}
+      const list = listFor(path)
+      const dropdown = list ? { options: Object.fromEntries(list.map((choice) => [humanize(choice), choice])) } : {}
       const binding = folderFor(dot < 0 ? '' : path.slice(0, dot)).addBinding(owner, key, {
         label: humanize(key),
         ...slider,
+        ...dropdown,
       })
       hover(binding.element, help(path))
       binding.on('change', (event) => section.onChange?.(path, event.last))

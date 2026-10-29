@@ -1,5 +1,5 @@
 /**
- * Moto settings: everything that decides how the game feels.
+ * MotoX settings: everything that decides how the game feels.
  *
  * The easiest way to tune: press ` (the key left of 1) in the game. The panel
  * has a slider for every number here, and hovering a slider shows what it
@@ -9,7 +9,8 @@
  *
  * Or change a number here and save: the game reloads with it.
  */
-import type { Ranges } from './ui/tunables'
+import { ANCHORS, type Anchor } from './hud/layout'
+import type { Choices, Ranges } from './ui/tunables'
 
 export const config = {
   /** The bike you ride. */
@@ -195,6 +196,27 @@ export const config = {
     positionLag: 0.08,
   },
 
+  /**
+   * What's on screen while you ride. Each element sits at an anchor (topLeft,
+   * top, topRight, left, center, right, bottomLeft, bottom, bottomRight),
+   * nudged in from there by x and y, in % of the screen height, so it looks
+   * the same at any screen size.
+   */
+  hud: {
+    /** Everything on the HUD bigger or smaller, 1 = normal. */
+    size: 1,
+    /** How fast you're going, with a bar filling toward top speed. */
+    speed: {
+      /** Show it at all. */
+      show: true,
+      /** Where on the screen it sits. */
+      anchor: 'bottomRight' as Anchor,
+      /** Nudged in from there: across, and up or down, % of the screen height. */
+      x: 3,
+      y: 3,
+    },
+  },
+
   /** How the tyres mark and throw the dirt. Only looks: nothing here changes the riding. */
   effects: {
     /** Tracks the tyres leave in the dirt. */
@@ -310,7 +332,15 @@ export type EffectSettings = Config['effects']
 export const EARTH_GRAVITY = 9.81
 
 /** The sliders' ranges. A * matches any name or list position in that place. */
+/** Settings that are picked from a list: a dropdown in the tuning panel. */
+export const configChoices: Choices = {
+  'hud.*.anchor': ANCHORS,
+}
+
 export const configRanges: Ranges = {
+  'hud.size': [0.4, 2.5, 0.05],
+  'hud.*.x': [-50, 50, 0.5],
+  'hud.*.y': [-50, 50, 0.5],
   'bike.speed.topSpeed': [40, 200, 1],
   'bike.speed.secondsTo60': [0.5, 10, 0.1],
   'bike.speed.secondsToStopFrom60': [0.5, 6, 0.1],
