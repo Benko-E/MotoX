@@ -38,7 +38,7 @@ let terrain = generateTerrain(map)
 const groundAt = (x: number, z: number) => heightAt(terrain.field, x, z)
 
 const bike = new Bike(physics, config.bike, config.advanced.bikeBody)
-const crashes = new CrashWatcher(physics, bike, config.crashes)
+const crashes = new CrashWatcher(physics, bike, config.crashes, config.advanced.fallingOver)
 const bikeView = new BikeView(view.scene, bike)
 
 function rebuildTerrain() {

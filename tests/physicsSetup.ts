@@ -49,7 +49,7 @@ export function setupWithCrashes(field: Heightfield, ramps: PlacedRamp[] = []) {
   const physics = new PhysicsWorld()
   physics.setGround(field, ramps)
   const bike = new Bike(physics, structuredClone(config.bike), structuredClone(config.advanced.bikeBody))
-  const crashes = new CrashWatcher(physics, bike, structuredClone(config.crashes))
+  const crashes = new CrashWatcher(physics, bike, structuredClone(config.crashes), structuredClone(config.advanced.fallingOver))
   const run = (seconds: number, each?: () => void) => {
     for (let t = 0; t < seconds - 1e-9; t += DT) {
       each?.()

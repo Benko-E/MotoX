@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat'
-import type { CrashSettings } from '../config'
+import type { CrashSettings, FallingOverSettings } from '../config'
 import type { Bike } from './bike'
 import { add, dot, rotate, vec, type Vec3 } from './vec'
 import type { PhysicsWorld } from './world'
@@ -7,11 +7,11 @@ import type { PhysicsWorld } from './world'
 /**
  * Watches the bike for crashes, and puts it back up afterwards.
  *
- * A crash is the rider's head touching the ground, the bike tipped far over
- * against the ground, or a landing that's too far off: nose-first or
- * tail-first beyond `worstLandingAngle` to the slope, or with more sideways
- * speed than `worstSidewaysLanding` (a rider would be flung over). Anything
- * less is left to the suspension and grip.
+ * A crash is the rider's head touching the ground, a landing that's too far
+ * off (nose-first or tail-first beyond `worstLandingAngle` to the slope, or
+ * with more sideways speed than `worstSidewaysLanding`: a rider would be
+ * flung over), or, as a safety net, the bike lying over sideways against the
+ * ground. Anything less is left to the suspension and grip.
  *
  * While crashed the bike's controls are dead and it tumbles to a quick stop;
  * after `resetDelay` it's put back upright on the spot, facing the way it was
@@ -21,6 +21,7 @@ import type { PhysicsWorld } from './world'
 const DEG = Math.PI / 180
 const UP = vec(0, 1, 0)
 const FORWARD = vec(0, 0, -1)
+const RIGHT = vec(1, 0, 0)
 /** How big the rider's head is for touching the ground, metres. */
 const HEAD_RADIUS = 0.15
 /** Where the rider's head is, in the bike's own space: leaning back, sitting, leaning forward.
@@ -54,6 +55,7 @@ export class CrashWatcher {
     private readonly bike: Bike,
     /** Read live, so the tuning panel applies at once. */
     readonly settings: CrashSettings,
+    readonly safety: FallingOverSettings,
   ) {}
 
   /** Call after every physics step. */
@@ -108,8 +110,12 @@ export class CrashWatcher {
       if (Math.abs(bike.slide) * 3.6 > settings.worstSidewaysLanding) return 'landed sideways too fast'
     }
 
-    const up = rotate(rotation, UP)
-    if (up.y < Math.cos(settings.worstTip * DEG) && this.nearGround(anyDown)) return 'tipped over'
+    // Lying over sideways against the ground it's on. Only sideways: tipping
+    // forward or back (wheelies, riding up a ramp, leaning back after a jump)
+    // never counts; flips are caught by the head or the landing instead.
+    const ground = bike.groundNormal ?? UP
+    const sideways = Math.asin(Math.min(Math.abs(dot(rotate(rotation, RIGHT), ground)), 1)) / DEG
+    if (sideways > this.safety.sideTip && this.nearGround(anyDown)) return 'fell over'
     return null
   }
 

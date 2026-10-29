@@ -117,12 +117,10 @@ export const config = {
     enabled: true,
     /** Seconds before the bike is put back up after a crash. R gets you up straight away. */
     resetDelay: 1.5,
-    /** Landing nose-first or tail-first more than this far off the slope is a crash, degrees. Less just thuds through the suspension. */
-    worstLandingAngle: 45,
-    /** Landing with this much sideways speed or more flings you over, km/h. Side-on at 30 km/h you slide and ride on; side-on at 60 km/h you crash. */
-    worstSidewaysLanding: 45,
-    /** The bike tipped over this far while touching the ground is a crash, degrees. */
-    worstTip: 65,
+    /** Landing nose-first or tail-first more than this far off the slope is a crash, degrees. Less just thuds through the suspension. 90 = never (a flip still crashes when the head hits the ground). */
+    worstLandingAngle: 90,
+    /** Landing with this much sideways speed or more flings you over, km/h. Below it you slide and ride on. */
+    worstSidewaysLanding: 80,
   },
 
   /** The camera behind the bike. */
@@ -184,6 +182,11 @@ export const config = {
 
   /** The engine room. You shouldn't need these: most of them don't change anything you can feel. */
   advanced: {
+    /** A crash safety net you won't normally notice: the bike lying over sideways against the ground. */
+    fallingOver: {
+      /** How far the bike may lie over sideways while touching the ground before it counts as a crash, degrees: 0 = upright, 90 = flat on its side. Only sideways counts (wheelies, stoppies and riding up ramps never do), and the lean you see in turns is only drawn, so riding never sets it off. */
+      sideTip: 70,
+    },
     /** How the physics engine treats the bike's body. Steering, air spin and wheelies set the bike's rotation directly, so you won't feel these. */
     bikeBody: {
       /** How hard the bike is to rotate, kg·m². Only shows when nothing else is steering the rotation, like toppling over after a crash. */
@@ -213,6 +216,7 @@ export type Config = typeof config
 export type BikeStats = Config['bike']
 export type BikeBody = Config['advanced']['bikeBody']
 export type CrashSettings = Config['crashes']
+export type FallingOverSettings = Config['advanced']['fallingOver']
 
 /** Earth's gravity, m/s². */
 export const EARTH_GRAVITY = 9.81
@@ -256,7 +260,7 @@ export const configRanges: Ranges = {
   'crashes.resetDelay': [0.2, 5, 0.1],
   'crashes.worstLandingAngle': [10, 90, 1],
   'crashes.worstSidewaysLanding': [5, 150, 1],
-  'crashes.worstTip': [30, 90, 1],
+  'advanced.fallingOver.sideTip': [30, 90, 1],
   'camera.fov': [30, 110, 1],
   'controls.easing.*.riseTime': [0, 1, 0.01],
   'controls.easing.*.fallTime': [0, 1, 0.01],

@@ -34,18 +34,21 @@ describe('what counts as a crash', () => {
   })
 
   it('landing nose-first further off the slope than worstLandingAngle is a crash; less is not', () => {
-    const bad = drop(-(config.crashes.worstLandingAngle + 10))
+    const bad = drop(-55)
+    bad.crashes.settings.worstLandingAngle = 45
     bad.run(1.5)
     expect(bad.crashes.count).toBe(1)
     expect(bad.crashes.reason).toMatch(/nose/)
 
-    const ok = drop(-(config.crashes.worstLandingAngle - 15))
+    const ok = drop(-30)
+    ok.crashes.settings.worstLandingAngle = 45
     ok.run(1.5)
     expect(ok.crashes.count).toBe(0)
   })
 
   it('landing tail-first too far off the slope is a crash', () => {
-    const { crashes, run } = drop(config.crashes.worstLandingAngle + 10)
+    const { crashes, run } = drop(55)
+    crashes.settings.worstLandingAngle = 45
     run(1.5)
     expect(crashes.count).toBe(1)
     expect(crashes.reason).toMatch(/tail/)
@@ -79,12 +82,12 @@ describe('what counts as a crash', () => {
     pitchTo(bike, 180)
     run(1.5)
     expect(crashes.count).toBe(1)
-    expect(crashes.reason).toMatch(/head|tipped/)
+    expect(crashes.reason).toMatch(/head|fell/)
   })
 
   it('the head touching the ground is a crash on its own, even with every other rule switched off', () => {
     const { bike, crashes, run } = setupWithCrashes(flat())
-    crashes.settings.worstTip = 180
+    crashes.safety.sideTip = 180
     crashes.settings.worstLandingAngle = 180
     crashes.settings.worstSidewaysLanding = 10_000
     bike.placeOnGround(0, 0, 0, 1.5)
@@ -113,6 +116,30 @@ describe('what counts as a crash', () => {
     bike.controls.throttle = 0
     bike.controls.brake = 1
     run(1.5) // a stoppie to a halt
+    expect(crashes.count).toBe(0)
+  })
+
+  it('tipping forward or back never counts as falling over, however low the side tip limit', () => {
+    // the fourth tuning session: "tipped over" fired riding up ramps and leaning back after jumps
+    const { bike, crashes, run } = setupWithCrashes(flat(600))
+    crashes.safety.sideTip = 30
+    bike.placeOnGround(0, 250, 0)
+    const rolling = () => {
+      const speed = bike.forwardSpeed
+      bike.controls.throttle = clamp((40 * KMH - speed) / 2, 0, 1)
+    }
+    run(4, rolling)
+    bike.controls.lean = -1
+    run(2, () => (bike.controls.throttle = 1)) // a 40 degree wheelie: more than 30, but backward
+    expect(bike.pitch / DEG).toBeGreaterThan(30)
+    expect(crashes.count).toBe(0)
+  })
+
+  it('riding up a steep slope is never a crash', () => {
+    const { bike, crashes, run } = setupWithCrashes(ground((x) => Math.max(0, -x - 20) * Math.tan(32 * DEG), 600))
+    bike.placeOnGround(0, 0, 270) // rides toward -x, onto a 32 degree climb at x = -20
+    run(4, () => (bike.controls.throttle = 1))
+    expect(bike.body.translation().y).toBeGreaterThan(5) // it really climbed
     expect(crashes.count).toBe(0)
   })
 
