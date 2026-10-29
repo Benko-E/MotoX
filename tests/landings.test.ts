@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { config } from '../src/config'
 import type { Bike } from '../src/physics/bike'
 import { initPhysics } from '../src/physics/world'
-import { DEG, flat, ground, setup, setupWithCrashes } from './physicsSetup'
+import { DEG, flat, setup, setupWithCrashes } from './physicsSetup'
 import type { Heightfield } from '../src/terrain/heightfield'
 
 beforeAll(async () => {
@@ -53,59 +53,54 @@ function landOn(
   return world
 }
 
-/** Drops the bike from `height` metres onto flat ground, rolling at `kmh`, until 0.2 s after it lands. */
-const landFlat = (height: number, kmh: number) => landOn(flat(600), height, { x: 0, z: -kmh * KMH })
-
 describe('landings', () => {
-  it('a soft landing is clean and keeps all its speed', () => {
-    const { crashes, bike, run } = readyToDrop(flat(600))
-    bike.placeOnGround(0, 250, 0, 1)
-    bike.body.setLinvel({ x: 0, y: 0, z: -20 }, true)
-    run(0.8) // falls about 1 m (about 16 km/h into the ground), then rolls
-    expect(crashes.landings).toBe(1)
-    expect(crashes.lastLanding!.sloppiness).toBe(0)
-    expect(groundSpeed(bike) / KMH).toBeGreaterThan(72 - 2) // only coasting
-  })
-
-  it('landing flat from high up is sloppy and costs speed: the harder, the more, up to speedLoss', () => {
-    for (const height of [6, 25]) {
-      const { crashes, bike } = landFlat(height, 72)
-      const impact = Math.sqrt(2 * 9.81 * height) / KMH // km/h straight into the ground
-      const sloppiness = Math.min((impact - landing.cleanImpact) / (landing.worstImpact - landing.cleanImpact), 1)
-      expect(crashes.lastLanding!.sloppiness).toBeGreaterThan(sloppiness - 0.08)
-      expect(crashes.lastLanding!.sloppiness).toBeLessThan(sloppiness + 0.08)
-      const kept = 72 * (1 - (landing.speedLoss / 100) * sloppiness)
-      expect(groundSpeed(bike) / KMH).toBeGreaterThan(kept - 4)
-      expect(groundSpeed(bike) / KMH).toBeLessThan(kept + 2)
-      expect(crashes.count).toBe(0) // landing hard on its own never crashes you
+  it('landing level on flat ground is clean and keeps all its speed, however high the jump', () => {
+    // the ninth tuning session: every flat landing off the kickers came out sloppy
+    for (const height of [1, 6, 25]) {
+      const { crashes, bike } = landOn(flat(600), height, { x: 0, z: -20 })
+      expect(crashes.lastLanding!.sloppiness).toBe(0)
+      expect(groundSpeed(bike) / KMH).toBeGreaterThan(72 - 2) // only coasting
+      expect(crashes.count).toBe(0)
     }
   })
 
-  it('falling fast onto a downslope that matches is clean, where the same fall onto flat ground is sloppy', () => {
-    // 25 m/s at 35 degrees down: 52 km/h of it straight down
-    const angle = 35 * DEG
-    const velocity = { x: 25 * Math.cos(angle), y: -25 * Math.sin(angle), z: 0 }
-    const downslope = ground((x) => (x > 0 ? -x * Math.tan(angle) : 0), 600)
-    const matching = landOn(downslope, 1.2, velocity, { x: 40, heading: 90, pitch: -35 })
-    expect(matching.crashes.landings).toBeGreaterThan(0)
-    expect(matching.crashes.lastLanding!.sloppiness).toBe(0)
-
-    // from 4 m up, thrown down so it hits the ground just as fast (shorter than 0.15 s in the air isn't a jump)
-    const fromHigher = { ...velocity, y: -Math.sqrt(velocity.y ** 2 - 2 * 9.81 * 4) }
-    const onFlat = landOn(flat(600), 4, fromHigher, { x: 0, heading: 90, pitch: 0 })
-    expect(onFlat.crashes.lastLanding!.sloppiness).toBeGreaterThan(0.5)
+  it('landing a bit nose-first or tail-first is clean; far off is sloppy, more and more toward worstLandingAngle', () => {
+    const at = (pitch: number) => landOn(flat(600), 1, { x: 0, z: -15 }, { x: 0, heading: 0, pitch }).crashes
+    expect(at(-25).lastLanding!.sloppiness).toBe(0)
+    expect(at(25).lastLanding!.sloppiness).toBe(0)
+    const expected = (55 - landing.sloppyAngle) / (config.crashes.worstLandingAngle - landing.sloppyAngle)
+    for (const pitch of [-55, 55]) {
+      const crashes = at(pitch)
+      expect(crashes.count).toBe(0)
+      expect(crashes.lastLanding!.sloppiness).toBeGreaterThan(expected - 0.1)
+      expect(crashes.lastLanding!.sloppiness).toBeLessThan(expected + 0.1)
+      expect(crashes.lastLanding!.speedLost).toBeGreaterThan(0)
+    }
   })
 
-  it('a little sideways is clean, more sideways is sloppy', () => {
-    const sideways = (kmh: number) => landOn(flat(600), 0.8, { x: kmh * KMH, z: -10 }).crashes.lastLanding!.sloppiness
-    expect(sideways(10)).toBe(0)
-    const expected = (50 - landing.cleanSideways) / (config.crashes.worstSidewaysLanding - landing.cleanSideways)
-    expect(sideways(50)).toBeGreaterThan(expected - 0.1)
-    expect(sideways(50)).toBeLessThan(expected + 0.1)
+  it('a little sideways is clean, even quite a lot; only near the crash limit is it sloppy', () => {
+    const sideways = (kmh: number) => landOn(flat(600), 0.8, { x: kmh * KMH, z: -10 }).crashes
+    expect(sideways(30).lastLanding!.sloppiness).toBe(0)
+    const near = sideways(65)
+    const expected = (65 - landing.sloppySideways) / (config.crashes.worstSidewaysLanding - landing.sloppySideways)
+    expect(near.count).toBe(0)
+    expect(near.lastLanding!.sloppiness).toBeGreaterThan(expected - 0.1)
+    expect(near.lastLanding!.sloppiness).toBeLessThan(expected + 0.1)
+  })
+
+  it('a sloppy landing costs its share of speedLoss of the speed along the ground', () => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 250, 0)
+    run(3, () => (bike.controls.throttle = groundSpeed(bike) < 72 * KMH ? 1 : 0))
+    bike.controls.throttle = 0
+    const before = groundSpeed(bike)
+    const lost = bike.landSloppily(0.5, landing)
+    expect(groundSpeed(bike)).toBeCloseTo(before * (1 - 0.5 * (landing.speedLoss / 100)), 5)
+    expect(lost).toBeCloseTo(before * 0.5 * (landing.speedLoss / 100), 5)
   })
 
   it('landings are still judged with crashes turned off', () => {
-    const { crashes } = landOn(flat(600), 25, { x: 0, z: 0 }, undefined, (world) => (world.crashes.settings.enabled = false))
+    const { crashes } = landOn(flat(600), 0.8, { x: 100 * KMH, z: -10 }, undefined, (world) => (world.crashes.settings.enabled = false))
     expect(crashes.lastLanding!.sloppiness).toBe(1)
   })
 })

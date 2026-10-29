@@ -129,14 +129,12 @@ export const config = {
   jumps: {
     /** Gravity compared to Earth. 1 = real; lower makes jumps floatier, higher makes the bike drop like a stone. */
     gravity: 1,
-    /** How landings are judged: a clean one keeps all your speed, a sloppy one costs some, and past the limits under crashes it's a crash. */
+    /** How landings are judged. Clean keeps all your speed; sloppy is a near crash and costs some; past the limits under crashes it's a crash. Landing level is always clean, however high the jump. */
     landing: {
-      /** Landing sideways slower than this is clean, km/h. Faster is sloppy, more and more up to crashes.worstSidewaysLanding, where it's a crash. */
-      cleanSideways: 15,
-      /** Hitting the ground slower than this is clean, km/h straight down into it. Landing on a downslope that matches your jump is soft; landing flat from high up is hard. */
-      cleanImpact: 20,
-      /** Hitting the ground this hard or harder is as sloppy as it gets, km/h straight down into it. Landing hard on its own never crashes you. */
-      worstImpact: 60,
+      /** Landing sideways faster than this is sloppy, km/h, more and more so up to crashes.worstSidewaysLanding, where it's a crash. */
+      sloppySideways: 50,
+      /** Landing nose-first or tail-first further off the ground than this is sloppy, degrees, more and more so up to crashes.worstLandingAngle. */
+      sloppyAngle: 35,
       /** How much speed the sloppiest landing costs, %. A little sloppy costs a little. */
       speedLoss: 40,
       /** Seconds the bike wobbles after a sloppy landing: steering and throttle bite less, and come back over this time. */
@@ -337,9 +335,8 @@ export const configRanges: Ranges = {
   'crashes.resetDelay': [0.2, 5, 0.1],
   'crashes.worstLandingAngle': [10, 90, 1],
   'crashes.worstSidewaysLanding': [5, 150, 1],
-  'jumps.landing.cleanSideways': [0, 100, 1],
-  'jumps.landing.cleanImpact': [0, 80, 1],
-  'jumps.landing.worstImpact': [5, 120, 1],
+  'jumps.landing.sloppySideways': [0, 150, 1],
+  'jumps.landing.sloppyAngle': [0, 90, 1],
   'jumps.landing.speedLoss': [0, 100, 1],
   'jumps.landing.wobble': [0, 2, 0.05],
   'advanced.fallingOver.sideTip': [30, 90, 1],

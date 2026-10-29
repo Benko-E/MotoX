@@ -112,9 +112,10 @@ export class Bike {
   groundNormal: Vec3 | null = null
   /** Crashed: the controls do nothing and the bike tumbles to a stop. */
   crashed = false
-  /** How the bike touched down after a jump in the latest step: speed straight into the
-   * ground and the rear wheel's sideways speed, m/s. Null in every other step. */
-  touchdown: { impact: number; sideways: number } | null = null
+  /** How the bike touched down after a jump in the latest step: how far nose up (positive)
+   * or down it was to the ground, radians, and the rear wheel's sideways speed, m/s. Null in
+   * every other step. */
+  touchdown: { angle: number; sideways: number } | null = null
   /** How far into a powerslide, 0 (not at all) to 1 (fully). */
   powersliding = 0
   /** How far the rear is swung out in a powerslide, radians (positive = nose left of the way it's going). */
@@ -340,7 +341,7 @@ export class Bike {
       const toRear = stats.build.wheelbase / 2 + stats.weight.forward
       const slideNow = dot(linvel, side) + dot(angvel, n) * toRear
       // touching down after a jump: remember how, for judging the landing
-      if (this.airtime >= MIN_JUMP) this.touchdown = { impact: Math.max(-dot(linvel, n), 0), sideways: slideNow }
+      if (this.airtime >= MIN_JUMP) this.touchdown = { angle: Math.asin(clamp(dot(forward, n), -1, 1)), sideways: slideNow }
 
       // with the front wheel up in a wheelie there's less to steer with
       const frontUp = !this.wheels[0].onGround && this.wheels[1].onGround
