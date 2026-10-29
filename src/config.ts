@@ -111,6 +111,20 @@ export const config = {
     gravity: 1,
   },
 
+  /** What counts as a crash, and getting back up. */
+  crashes: {
+    /** Turn crashes off completely (for trying things out). */
+    enabled: true,
+    /** Seconds before the bike is put back up after a crash. R gets you up straight away. */
+    resetDelay: 1.5,
+    /** Landing nose-first or tail-first more than this far off the slope is a crash, degrees. Less just thuds through the suspension. */
+    worstLandingAngle: 45,
+    /** Landing with this much sideways speed or more flings you over, km/h. Side-on at 30 km/h you slide and ride on; side-on at 60 km/h you crash. */
+    worstSidewaysLanding: 45,
+    /** The bike tipped over this far while touching the ground is a crash, degrees. */
+    worstTip: 65,
+  },
+
   /** The camera behind the bike. */
   camera: {
     /** How wide the view is, degrees. Wider feels faster but stretches the edges. */
@@ -198,6 +212,7 @@ export const config = {
 export type Config = typeof config
 export type BikeStats = Config['bike']
 export type BikeBody = Config['advanced']['bikeBody']
+export type CrashSettings = Config['crashes']
 
 /** Earth's gravity, m/s². */
 export const EARTH_GRAVITY = 9.81
@@ -238,6 +253,10 @@ export const configRanges: Ranges = {
   'bike.build.frontWheel': [0.2, 0.5, 0.01],
   'bike.build.rearWheel': [0.2, 0.5, 0.01],
   'jumps.gravity': [0.3, 2, 0.01],
+  'crashes.resetDelay': [0.2, 5, 0.1],
+  'crashes.worstLandingAngle': [10, 90, 1],
+  'crashes.worstSidewaysLanding': [5, 150, 1],
+  'crashes.worstTip': [30, 90, 1],
   'camera.fov': [30, 110, 1],
   'controls.easing.*.riseTime': [0, 1, 0.01],
   'controls.easing.*.fallTime': [0, 1, 0.01],

@@ -46,6 +46,9 @@ const UP = vec(0, 1, 0)
 const FORWARD = vec(0, 0, -1)
 const RIGHT = vec(1, 0, 0)
 const DEG = Math.PI / 180
+/** How quickly a crashed bike slides and tumbles to a stop (physics engine damping). */
+const CRASH_SLOWDOWN = 1.5
+const CRASH_SETTLE = 3
 /** Shorter times in the air don't count as a jump for `lastAirtime`, seconds. */
 const MIN_JUMP = 0.15
 
@@ -94,6 +97,10 @@ export class Bike {
   steerAngle = 0
   /** Radius of the tightest turn at the current speed, metres. */
   turnRadius = Infinity
+  /** Which way is straight out of the ground under the wheels, or null in the air. */
+  groundNormal: Vec3 | null = null
+  /** Crashed: the controls do nothing and the bike tumbles to a stop. */
+  crashed = false
 
   private massKey = ''
 
@@ -182,10 +189,12 @@ export class Bike {
     const velocityAt = (point: Vec3) => add(linvel, cross(angvel, sub(point, centerOfMass)))
     const pushes: Array<[Vec3, Vec3]> = []
 
-    const throttle = clamp(this.controls.throttle, 0, 1)
-    const brake = clamp(this.controls.brake, 0, 1)
-    const steer = clamp(this.controls.steer, -1, 1)
-    const lean = clamp(this.controls.lean, -1, 1)
+    // crashed, the controls do nothing
+    const live = this.crashed ? 0 : 1
+    const throttle = clamp(this.controls.throttle, 0, 1) * live
+    const brake = clamp(this.controls.brake, 0, 1) * live
+    const steer = clamp(this.controls.steer, -1, 1) * live
+    const lean = clamp(this.controls.lean, -1, 1) * live
 
     // ---- Suspension ----
     const loads = this.staticLoads(gravity)
@@ -269,7 +278,11 @@ export class Bike {
     const right = rotate(rotation, RIGHT)
     const { rider } = stats
 
-    if (grounded > 0) {
+    this.groundNormal = grounded > 0 ? normalize(groundNormal) : null
+    if (this.crashed) {
+      // No riding while crashed: the bike just tumbles and slides to a stop.
+      this.lean += (0 - this.lean) * ease(dt, stats.turning.leanResponse)
+    } else if (grounded > 0) {
       // ---- Riding on the ground ----
       const n = normalize(groundNormal)
       const contact = scale(groundPoint, 1 / grounded)
@@ -413,7 +426,7 @@ export class Bike {
     const pointing = clamp((0.87 - Math.abs(forward.y)) / (0.87 - 0.5), 0, 1) // full below 30°, none past 60°
     const fallen = clamp((Math.abs(this.roll) - 70 * DEG) / ((50 - 70) * DEG), 0, 1) // full below 50°, none past 70°
     const tipRate = dot(angvel, level)
-    const uprightTorque = (upright.stiffness * -this.roll - upright.damping * tipRate) * pointing * fallen
+    const uprightTorque = (upright.stiffness * -this.roll - upright.damping * tipRate) * pointing * fallen * live
 
     body.setLinvel(newLinvel, true)
     body.setAngvel(newAngvel, true)
@@ -466,6 +479,20 @@ export class Bike {
   /** Nose up (positive) or down, radians. */
   get pitch(): number {
     return Math.asin(clamp(rotate(this.body.rotation(), FORWARD).y, -1, 1))
+  }
+
+  /** The compass heading the bike is travelling in, degrees; where it points when barely moving. */
+  get travelHeading(): number {
+    const v = this.body.linvel()
+    if (Math.hypot(v.x, v.z) < 1) return this.heading
+    return Math.atan2(v.x, -v.z) / DEG
+  }
+
+  /** Starts or ends a crash: dead controls, and the bike slows down and settles quickly. */
+  setCrashed(crashed: boolean): void {
+    this.crashed = crashed
+    this.body.setLinearDamping(crashed ? CRASH_SLOWDOWN : 0)
+    this.body.setAngularDamping(crashed ? CRASH_SETTLE : 0)
   }
 
   /** Compass heading the bike points to, degrees (0 = toward -z, 90 = toward +x). */

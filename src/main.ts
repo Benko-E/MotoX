@@ -7,6 +7,7 @@ import { freeride } from './maps/freeride'
 import { mapRanges } from './maps/ranges'
 import mapTypesSource from './maps/types.ts?raw'
 import { Bike } from './physics/bike'
+import { CrashWatcher } from './physics/crashes'
 import { initPhysics, PhysicsWorld } from './physics/world'
 import { BikeView } from './render/bikeView'
 import { ChaseCamera } from './render/chaseCamera'
@@ -28,6 +29,7 @@ await initPhysics()
 const map = freeride
 const view = createScene(document.getElementById('app')!, config)
 const hud = document.getElementById('hud')!
+const banner = document.getElementById('banner')!
 const input = new Input(config.controls, window)
 
 const physics = new PhysicsWorld()
@@ -36,6 +38,7 @@ let terrain = generateTerrain(map)
 const groundAt = (x: number, z: number) => heightAt(terrain.field, x, z)
 
 const bike = new Bike(physics, config.bike, config.advanced.bikeBody)
+const crashes = new CrashWatcher(physics, bike, config.crashes)
 const bikeView = new BikeView(view.scene, bike)
 
 function rebuildTerrain() {
@@ -79,7 +82,7 @@ sections.push({
   onChange: (_path, last) => {
     if (!last) return
     rebuildTerrain()
-    bike.resetUpright()
+    crashes.recover()
   },
 })
 const panel = createTuningPanel(sections, {
@@ -123,7 +126,8 @@ const loop = new FixedStepLoop({
   },
   step(dt) {
     input.update(dt)
-    if (resetPressed) bike.resetUpright()
+    if (resetPressed) crashes.recover() // back upright, and out of a crash straight away
+    if (dropPressed && crashes.crashed) crashes.recover()
     if (dropPressed && flying) {
       const at = fly.pointAhead(DROP_AHEAD)
       bike.place(at.x, Math.max(at.y, groundAt(at.x, at.z) + 1.5), at.z, fly.heading)
@@ -141,6 +145,7 @@ const loop = new FixedStepLoop({
     bike.update(dt)
     physics.step(dt, config.jumps.gravity * EARTH_GRAVITY)
     bike.record()
+    crashes.step(dt)
     if (flying) fly.step(dt, input)
     stepsThisSecond++
   },
@@ -149,7 +154,7 @@ const loop = new FixedStepLoop({
 // For measuring and debugging from the browser console: `moto.bike`, `moto.config`, ...
 Object.assign(window, {
   moto: {
-    ...{ config, map, view, fly, chase, bike, physics, input, rebuildTerrain },
+    ...{ config, map, view, fly, chase, bike, crashes, physics, input, rebuildTerrain },
     terrain: () => terrain,
     simulate: (seconds: number, fps?: number) => simulate(seconds, fps),
   },
@@ -174,6 +179,10 @@ function showFrame(frameTime: number) {
   view.focusShadows(lookPoint)
   view.render()
   hud.textContent = readout().join('\n')
+  banner.style.display = crashes.crashed ? 'block' : 'none'
+  if (crashes.crashed) {
+    banner.innerHTML = `CRASH: ${crashes.reason}<small>back up in ${Math.max(crashes.timeLeft, 0).toFixed(1)} s, or press R</small>`
+  }
 }
 
 /**
@@ -229,7 +238,7 @@ function readout(): string[] {
         'R   bike upright again   B   drop the bike from 6 m',
       ]
   return [
-    'Moto · step 5 (leaning)',
+    'Moto · step 6 (crashes)',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
@@ -238,7 +247,7 @@ function readout(): string[] {
     `lean      ${sides(bike.controls.lean)}  (back | forward)`,
     wheel('front', 0),
     wheel('rear ', 1),
-    `airtime   ${air}   last jump ${bike.lastAirtime.toFixed(2)} s`,
+    `airtime   ${air}   last jump ${bike.lastAirtime.toFixed(2)} s   crashes ${crashes.count}`,
     `lean ${degrees(bike.lean)}   pitch ${degrees(bike.pitch)}   rear slide ${bike.slide.toFixed(2)} m/s`,
     '',
     ...keys,

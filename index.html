@@ -28,11 +28,31 @@
         white-space: pre;
         pointer-events: none;
       }
+      #banner {
+        position: fixed;
+        top: 28%;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 22px;
+        font: bold 26px/1.4 system-ui, sans-serif;
+        color: #fff;
+        text-align: center;
+        background: rgba(170, 30, 20, 0.75);
+        border-radius: 8px;
+        pointer-events: none;
+        display: none;
+      }
+      #banner small {
+        display: block;
+        font-size: 15px;
+        font-weight: normal;
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="hud"></div>
+    <div id="banner"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

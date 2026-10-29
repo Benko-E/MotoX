@@ -1,0 +1,140 @@
+import RAPIER from '@dimforge/rapier3d-compat'
+import type { CrashSettings } from '../config'
+import type { Bike } from './bike'
+import { add, dot, rotate, vec, type Vec3 } from './vec'
+import type { PhysicsWorld } from './world'
+
+/**
+ * Watches the bike for crashes, and puts it back up afterwards.
+ *
+ * A crash is the rider's head touching the ground, the bike tipped far over
+ * against the ground, or a landing that's too far off: nose-first or
+ * tail-first beyond `worstLandingAngle` to the slope, or with more sideways
+ * speed than `worstSidewaysLanding` (a rider would be flung over). Anything
+ * less is left to the suspension and grip.
+ *
+ * While crashed the bike's controls are dead and it tumbles to a quick stop;
+ * after `resetDelay` it's put back upright on the spot, facing the way it was
+ * travelling.
+ */
+
+const DEG = Math.PI / 180
+const UP = vec(0, 1, 0)
+const FORWARD = vec(0, 0, -1)
+/** How big the rider's head is for touching the ground, metres. */
+const HEAD_RADIUS = 0.15
+/** Where the rider's head is, in the bike's own space: leaning back, sitting, leaning forward.
+ * (The same places the placeholder rider is drawn.) */
+const HEAD_BACK = vec(0, 1.02, 0.34)
+const HEAD_SITTING = vec(0, 0.96, -0.13)
+const HEAD_FORWARD = vec(0, 0.77, -0.52)
+/** Shorter than this in the air isn't a jump whose landing gets judged, seconds. */
+const MIN_AIRTIME = 0.15
+/** Right after being put back up nothing counts as a crash, seconds. */
+const GRACE = 0.5
+/** How close to the ground the bike's middle has to be for "tipped over" to count, metres. */
+const NEAR_GROUND = 0.9
+
+export class CrashWatcher {
+  /** Crashed right now. */
+  crashed = false
+  /** Why the last crash happened, in words. */
+  reason: string | null = null
+  /** Crashes so far. */
+  count = 0
+  /** Seconds until the bike is put back up. */
+  timeLeft = 0
+
+  private airborneFor = 0
+  private grace = GRACE
+  private getUpHeading = 0
+
+  constructor(
+    private readonly physics: PhysicsWorld,
+    private readonly bike: Bike,
+    /** Read live, so the tuning panel applies at once. */
+    readonly settings: CrashSettings,
+  ) {}
+
+  /** Call after every physics step. */
+  step(dt: number): void {
+    if (this.crashed) {
+      this.timeLeft -= dt
+      if (this.timeLeft <= 0) this.recover()
+      return
+    }
+    const anyDown = this.bike.wheels.some((wheel) => wheel.onGround)
+    if (this.grace > 0) this.grace -= dt
+    else if (this.settings.enabled) {
+      const reason = this.check(anyDown)
+      if (reason) this.crash(reason)
+    }
+    this.airborneFor = anyDown ? 0 : this.airborneFor + dt
+  }
+
+  /** Back upright on the spot straight away, facing the way the bike was going. */
+  recover(): void {
+    const heading = this.crashed ? this.getUpHeading : this.bike.heading
+    const { x, z } = this.bike.body.translation()
+    this.bike.setCrashed(false)
+    this.bike.placeOnGround(x, z, heading)
+    this.crashed = false
+    this.timeLeft = 0
+    this.grace = GRACE
+    this.airborneFor = 0
+  }
+
+  private crash(reason: string): void {
+    this.crashed = true
+    this.reason = reason
+    this.count++
+    this.timeLeft = this.settings.resetDelay
+    this.getUpHeading = this.bike.travelHeading
+    this.bike.setCrashed(true)
+  }
+
+  private check(anyDown: boolean): string | null {
+    const { settings, bike } = this
+    const rotation = bike.body.rotation()
+    if (this.headTouching()) return 'head hit the ground'
+
+    // A landing after a jump: judged against the slope it lands on. (Checked
+    // before tipping, so a bad landing is named for what went wrong.)
+    if (anyDown && this.airborneFor >= MIN_AIRTIME) {
+      const slope = bike.groundNormal ?? UP
+      const noseUp = Math.asin(Math.max(-1, Math.min(1, dot(rotate(rotation, FORWARD), slope)))) / DEG
+      if (noseUp < -settings.worstLandingAngle) return 'landed nose first'
+      if (noseUp > settings.worstLandingAngle) return 'landed tail first'
+      if (Math.abs(bike.slide) * 3.6 > settings.worstSidewaysLanding) return 'landed sideways too fast'
+    }
+
+    const up = rotate(rotation, UP)
+    if (up.y < Math.cos(settings.worstTip * DEG) && this.nearGround(anyDown)) return 'tipped over'
+    return null
+  }
+
+  /** Whether the rider's head is touching anything solid. */
+  private headTouching(): boolean {
+    const { body, controls } = this.bike
+    const head = add(body.translation(), rotate(body.rotation(), headPosition(controls.lean)))
+    const hit = this.physics.world.intersectionWithShape(
+      head, { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Ball(HEAD_RADIUS),
+      undefined, undefined, undefined, body,
+    )
+    return hit !== null
+  }
+
+  private nearGround(anyDown: boolean): boolean {
+    if (anyDown) return true
+    const middle = this.bike.body.worldCom()
+    const ground = this.physics.groundHeightAt(middle.x, middle.z, this.bike.body)
+    return ground !== null && middle.y - ground < NEAR_GROUND
+  }
+}
+
+/** Where the head is in the bike's space for a lean of -1 (back) to 1 (forward). */
+function headPosition(lean: number): Vec3 {
+  const t = Math.min(Math.abs(lean), 1)
+  const to = lean < 0 ? HEAD_BACK : HEAD_FORWARD
+  return vec(0, HEAD_SITTING.y + (to.y - HEAD_SITTING.y) * t, HEAD_SITTING.z + (to.z - HEAD_SITTING.z) * t)
+}

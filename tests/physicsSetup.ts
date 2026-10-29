@@ -1,6 +1,7 @@
 /** Shared setup for the headless physics tests. */
 import { config } from '../src/config'
 import { Bike } from '../src/physics/bike'
+import { CrashWatcher } from '../src/physics/crashes'
 import { PhysicsWorld } from '../src/physics/world'
 import type { PlacedRamp } from '../src/terrain/generate'
 import { createHeightfield, sampleCoord, type Heightfield } from '../src/terrain/heightfield'
@@ -41,6 +42,24 @@ export function setup(field: Heightfield, ramps: PlacedRamp[] = []) {
     }
   }
   return { physics, bike, run }
+}
+
+/** The same, plus crash detection, stepped after the world like the game does. */
+export function setupWithCrashes(field: Heightfield, ramps: PlacedRamp[] = []) {
+  const physics = new PhysicsWorld()
+  physics.setGround(field, ramps)
+  const bike = new Bike(physics, structuredClone(config.bike), structuredClone(config.advanced.bikeBody))
+  const crashes = new CrashWatcher(physics, bike, structuredClone(config.crashes))
+  const run = (seconds: number, each?: () => void) => {
+    for (let t = 0; t < seconds - 1e-9; t += DT) {
+      each?.()
+      bike.update(DT)
+      physics.step(DT, 9.81)
+      bike.record()
+      crashes.step(DT)
+    }
+  }
+  return { physics, bike, crashes, run }
 }
 
 /** Rolls the bike sideways by `degrees` (positive = right side down) around its forward axis. */
