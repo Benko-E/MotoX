@@ -6,6 +6,7 @@ import {
   dampingRate,
   driveAcceleration,
   springRate,
+  topSpeed,
   turnRadiusAt,
 } from './bikeTuning'
 import { add, cross, dot, normalize, rotate, rotateAround, scale, sub, vec, yawRotation, type Quat, type Vec3 } from './vec'
@@ -62,6 +63,11 @@ const SLIDE_MARGIN = 10
 /** How quickly the drawn front wheel turns out when you steer with it off the ground, and how
  * quickly it changes over between riding and free as it lifts or lands, seconds. */
 const FRONT_WHEEL_SWING = 0.08
+/** A wheel off the ground: how long it takes to spin down by itself, how long the brake takes
+ * to stop it, and how long the throttle takes to rev the rear one up, seconds. */
+const FREE_SPIN_FADE = 6
+const BRAKE_STOPS_WHEEL = 0.1
+const REVS_UP = 0.4
 /** On the back wheel alone (a wheelie, or leaving a kicker's lip), how slowly the turn fades, seconds. */
 const BACK_WHEEL_TURN_FADE = 0.3
 
@@ -83,8 +89,9 @@ export interface WheelState {
   extension: number
   /** The same one physics step ago, for smooth drawing. */
   previousExtension: number
-  /** How far the wheel has turned, radians. */
+  /** How far the wheel has turned, radians, and how fast it's turning, radians per second. */
   spin: number
+  spinRate: number
   /** How hard the suspension pushes, newtons. */
   load: number
 }
@@ -165,6 +172,7 @@ export class Bike {
       extension: this.travel(i),
       previousExtension: this.travel(i),
       spin: 0,
+      spinRate: 0,
       load: 0,
     }))
     this.current = this.readPose()
@@ -179,7 +187,7 @@ export class Bike {
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
     this.wheels.forEach((wheel, i) => {
       wheel.onGround = wheel.bottomedOut = false
-      wheel.compression = wheel.compressionRatio = wheel.load = 0
+      wheel.compression = wheel.compressionRatio = wheel.load = wheel.spinRate = 0
       wheel.extension = wheel.previousExtension = this.travel(i)
     })
     this.airtime = 0
@@ -266,6 +274,7 @@ export class Bike {
         wheel.onGround = wheel.bottomedOut = false
         wheel.extension = travel
         wheel.compression = wheel.compressionRatio = wheel.load = 0
+        this.spinFree(wheel, i, throttle, brake, dt)
         return
       }
       wheel.onGround = true
@@ -311,7 +320,9 @@ export class Bike {
       wheel.load = Math.max(0, spring + damper + stop) * asWheel
       pushes.push([scale(normal, wheel.load), pushAt])
 
-      wheel.spin += (dot(velocityAt(pushAt), groundForward) * dt) / this.radius(i)
+      // on the ground it turns as fast as it rolls over it
+      wheel.spinRate = dot(velocityAt(pushAt), groundForward) / this.radius(i)
+      wheel.spin += wheel.spinRate * dt
       if (asWheel > 0) {
         grounded++
         groundNormal = add(groundNormal, normal)
@@ -586,6 +597,24 @@ export class Bike {
       if (this.airtime >= MIN_JUMP) this.lastAirtime = this.airtime
       this.airtime = 0
     }
+  }
+
+  /**
+   * A wheel off the ground spins on by itself, slowing down only gradually.
+   * In the air the throttle revs the rear wheel up, and the brake stops both.
+   * (Only for drawing.)
+   */
+  private spinFree(wheel: WheelState, i: number, throttle: number, brake: number, dt: number): void {
+    const revs = i === 1 ? (throttle * topSpeed(this.stats.speed)) / this.radius(i) : 0
+    let to = 0
+    let time = FREE_SPIN_FADE
+    if (brake > 0) time = BRAKE_STOPS_WHEEL / brake
+    else if (revs > wheel.spinRate) {
+      to = revs
+      time = REVS_UP
+    }
+    wheel.spinRate += (to - wheel.spinRate) * ease(dt, time)
+    wheel.spin += wheel.spinRate * dt
   }
 
   /** Remembers where the bike ended up. Call after the world steps. */

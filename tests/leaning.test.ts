@@ -87,6 +87,70 @@ describe('leaning in the air', () => {
   })
 })
 
+describe('the wheels spinning', () => {
+  /** A bike rolling at 50 km/h, then lifted into the air (and kept there), still moving. */
+  const offTheGround = () => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 250, 0)
+    run(4, () => cruise(bike, 50 * KMH))
+    const rolling = bike.wheels.map((wheel) => wheel.spinRate)
+    bike.controls.throttle = 0
+    bike.controls.brake = 0
+    const hover = () => {
+      const p = bike.body.translation()
+      bike.body.setTranslation({ x: p.x, y: 40, z: p.z }, true)
+      bike.body.setLinvel({ ...bike.body.linvel(), y: 0 }, true)
+    }
+    hover()
+    return { bike, run: (seconds: number, each?: () => void) => run(seconds, () => (hover(), each?.())), rolling }
+  }
+
+  it('on the ground they turn as fast as the bike rolls', () => {
+    const { rolling } = offTheGround()
+    for (const rate of rolling) expect(rate).toBeCloseTo((50 * KMH) / 0.43, -1)
+  })
+
+  it('in the air they keep spinning, slowing down only gradually', () => {
+    // the twelfth tuning session: they stopped dead the moment the bike left the ground
+    const { bike, run, rolling } = offTheGround()
+    const spinBefore = bike.wheels.map((wheel) => wheel.spin)
+    run(1)
+    bike.wheels.forEach((wheel, i) => {
+      expect(wheel.onGround).toBe(false)
+      expect(wheel.spinRate).toBeGreaterThan(rolling[i] * 0.75)
+      expect(wheel.spin - spinBefore[i]).toBeGreaterThan(rolling[i] * 0.75) // really turned
+    })
+    run(20)
+    for (const wheel of bike.wheels) expect(Math.abs(wheel.spinRate)).toBeLessThan(rolling[0] * 0.1) // and in the end they stop
+  })
+
+  it('in the air the throttle revs the rear wheel up, and the brake stops both', () => {
+    const { bike, run, rolling } = offTheGround()
+    bike.controls.throttle = 1
+    run(1)
+    expect(bike.wheels[1].spinRate).toBeGreaterThan(rolling[1] * 1.3)
+    bike.controls.throttle = 0
+    bike.controls.brake = 1
+    run(0.5)
+    for (const wheel of bike.wheels) expect(Math.abs(wheel.spinRate)).toBeLessThan(1)
+  })
+
+  it('in a wheelie the front wheel keeps spinning', () => {
+    const { bike, run } = setup(flat(600))
+    bike.placeOnGround(0, 250, 0)
+    run(4, () => cruise(bike, 40 * KMH))
+    const rolling = bike.wheels[0].spinRate
+    bike.controls.lean = -1
+    bike.controls.throttle = 1
+    let upFor = 0
+    run(1.5, () => {
+      if (!bike.wheels[0].onGround) upFor += 1 / 120
+    })
+    expect(upFor).toBeGreaterThan(0.5)
+    expect(bike.wheels[0].spinRate).toBeGreaterThan(rolling * 0.7)
+  })
+})
+
 describe('the front wheel in the air', () => {
   const fullLock = Math.atan(config.bike.build.wheelbase / config.bike.turning.tightestTurnSlow) / DEG
 
