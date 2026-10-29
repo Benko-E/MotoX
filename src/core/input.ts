@@ -79,7 +79,10 @@ export class Input {
       }
     })
     target.addEventListener('keyup', (event) => {
-      this.heldKeys.delete((event as KeyboardEvent).code)
+      const e = event as KeyboardEvent
+      // Space pressing a tuning-panel button left focused happens on release
+      if (!isTextField(e.target) && this.isBound(e.code)) e.preventDefault?.()
+      this.heldKeys.delete(e.code)
     })
     // Alt-tabbing away while holding a key never delivers its keyup.
     target.addEventListener('blur', () => this.heldKeys.clear())

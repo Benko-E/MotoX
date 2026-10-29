@@ -142,6 +142,7 @@ const loop = new FixedStepLoop({
     bike.controls.brake = flying ? 0 : input.axis('brake')
     bike.controls.steer = flying ? 0 : input.axis('steer')
     bike.controls.lean = flying ? 0 : input.axis('lean')
+    bike.controls.powerslide = !flying && input.isDown('powerslide')
     bike.update(dt)
     physics.step(dt, config.jumps.gravity * EARTH_GRAVITY)
     bike.record()
@@ -233,18 +234,20 @@ function readout(): string[] {
       ]
     : [
         'W throttle   S brake   A / D steer   ↑ / ↓ lean forward / back',
+        'Space + steer: powerslide (hold, or tap to kick the rear out)',
         'in the air: lean to spin   ↓ + throttle: wheelie   ↑ + brake: stoppie',
         'C free-fly camera',
         'R   bike upright again   B   drop the bike from 6 m',
       ]
   return [
-    'Moto · step 6 (crashes)',
+    'Moto · step 6 (crashes) + powerslides',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
     `throttle  ${bar(throttle)}   brake ${bar(brake, 5)}`,
     `steer     ${steering}  tightest turn here ${bike.turnRadius.toFixed(1)} m`,
     `lean      ${sides(bike.controls.lean)}  (back | forward)`,
+    `powerslide ${bar(bike.powersliding, 5)}  rear out ${degrees(Math.abs(bike.slideAngle))}`,
     wheel('front', 0),
     wheel('rear ', 1),
     `airtime   ${air}   last jump ${bike.lastAirtime.toFixed(2)} s   crashes ${crashes.count}`,

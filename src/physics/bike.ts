@@ -28,6 +28,8 @@ import type { PhysicsWorld } from './world'
  *   the front's path, and turning never makes it slide
  * - grip catches any other sideways slide (landing a jump crooked, riding
  *   across a steep slope), as hard as the grip setting allows
+ * - powerslides (Space) are the one slide you ask for: the rear swings out to
+ *   the angle steering asks for, and the bike slides round a tighter turn
  * - the physics bike always stays upright. Leaning into turns is worked out
  *   here, but only drawn
  *
@@ -51,6 +53,10 @@ const CRASH_SLOWDOWN = 1.5
 const CRASH_SETTLE = 3
 /** Shorter times in the air don't count as a jump for `lastAirtime`, seconds. */
 const MIN_JUMP = 0.15
+/** How quickly the rear follows the slide angle steering asks for in a powerslide, seconds. */
+const SLIDE_FOLLOW = 0.05
+/** In a powerslide the rear may wander this far past the slide angle before grip catches it, degrees. */
+const SLIDE_MARGIN = 10
 
 export interface Pose {
   position: Vec3
@@ -89,8 +95,8 @@ export class Bike {
   current: Pose
 
   /** Set these before each update: throttle and brake 0 to 1, steer -1 (left) to 1 (right),
-   * lean -1 (back) to 1 (forward). */
-  readonly controls = { throttle: 0, brake: 0, steer: 0, lean: 0 }
+   * lean -1 (back) to 1 (forward), powerslide held or not. */
+  readonly controls = { throttle: 0, brake: 0, steer: 0, lean: 0, powerslide: false }
   /** How far the bike is drawn leaning into the turn, radians (positive = right). */
   lean = 0
   /** How far the front wheel is drawn turned, degrees (positive = right). */
@@ -101,8 +107,14 @@ export class Bike {
   groundNormal: Vec3 | null = null
   /** Crashed: the controls do nothing and the bike tumbles to a stop. */
   crashed = false
+  /** How far into a powerslide, 0 (not at all) to 1 (fully). */
+  powersliding = 0
+  /** How far the rear is swung out in a powerslide, radians (positive = nose left of the way it's going). */
+  slideAngle = 0
 
   private massKey = ''
+  /** How fast the slide angle was changing in the last step, radians per second. */
+  private slideRate = 0
 
   constructor(
     private readonly physics: PhysicsWorld,
@@ -147,6 +159,7 @@ export class Bike {
     })
     this.airtime = 0
     this.lean = 0
+    this.powersliding = this.slideAngle = this.slideRate = 0
     this.current = this.readPose()
     this.previous = this.current
   }
@@ -282,6 +295,7 @@ export class Bike {
     if (this.crashed) {
       // No riding while crashed: the bike just tumbles and slides to a stop.
       this.lean += (0 - this.lean) * ease(dt, stats.turning.leanResponse)
+      this.powersliding = this.slideAngle = this.slideRate = 0
     } else if (grounded > 0) {
       // ---- Riding on the ground ----
       const n = normalize(groundNormal)
@@ -295,25 +309,60 @@ export class Bike {
       const onWheels =
         clamp((dot(up, n) - 0.34) / (0.5 - 0.34), 0, 1) * clamp((0.9 - Math.abs(dot(forward, n))) / (0.9 - 0.7), 0, 1)
 
+      // How the rear wheel moves: along the bike, and sideways (positive = right).
+      const toRear = stats.build.wheelbase / 2 + stats.weight.forward
+      const slideNow = dot(linvel, side) + dot(angvel, n) * toRear
+
+      // Powerslide: holding Space eases into it over kickOut, letting go eases
+      // out over hookUp. Only rolling forward on the rear wheel, above minSpeed.
+      const { powerslide } = stats
+      const rolling = Math.hypot(speedAhead, slideNow)
+      const wantSlide =
+        this.controls.powerslide && speedAhead > 0 && rolling * 3.6 >= powerslide.minSpeed && this.wheels[1].onGround
+          ? 1
+          : 0
+      const slideTime = wantSlide > this.powersliding ? powerslide.kickOut : powerslide.hookUp
+      this.powersliding += (wantSlide - this.powersliding) * ease(dt, slideTime)
+      if (this.powersliding < 1e-4) this.powersliding = 0
+      const sliding = this.powersliding
+      // the slide angle steering asks for: the nose into the turn, the rear out
+      const slideTo = -steer * powerslide.angle * DEG * sliding
+      // The rails the bike runs on are turned by the slide angle: in a
+      // powerslide the rear rolls along them at an angle to where the bike
+      // points. Anywhere between straight and the slide angle asked for (plus
+      // a little) counts as on the rails; past that, grip catches it as usual.
+      // Not powersliding, the rails go straight along the bike.
+      const margin = SLIDE_MARGIN * DEG * sliding
+      const slideMin = Math.min(0, slideTo) - margin
+      const slideMax = Math.max(0, slideTo) + margin
+      const railAngle = clamp(Math.atan2(slideNow, speedAhead), slideMin, slideMax)
+      this.slideAngle = railAngle
+      const railCos = Math.cos(railAngle)
+      const railSin = Math.sin(railAngle)
+      const along = add(scale(ahead, railCos), scale(side, railSin)) // the way the rails go
+      const speedAlong = speedAhead * railCos + slideNow * railSin
+      const slideAcross = slideNow * railCos - speedAhead * railSin
+
       // Speeding up and slowing down. Brakes and coasting can at most bring the
       // bike to a stop (allowing for the slope it is on), never push it backward.
       // The tyres can only push the way the bike is actually going: while it
-      // slides sideways (a crooked landing) the rear wheel mostly spins and the
-      // front can't turn much, and both come back as the bike straightens out
-      // (nothing at all side-on). Without a slide this is 1 and changes nothing.
-      const toRear = stats.build.wheelbase / 2 + stats.weight.forward
-      const slideNow = dot(linvel, side) + dot(angvel, n) * toRear
-      const traction = Math.cos(Math.atan2(Math.abs(slideNow), Math.abs(speedAhead))) ** 2
-      const drive = this.wheels[1].onGround ? throttle * driveAcceleration(speed, speedAhead) * traction : 0
+      // slides off its rails (a crooked landing) the rear wheel mostly spins and
+      // the front can't turn much, and both come back as the bike straightens
+      // out (nothing at all side-on). Without a slide this is 1 and changes
+      // nothing. In a powerslide the rear pushes along the bike, so only part
+      // of it pushes you along the slide, and the sliding tyre scrubs speed.
+      const slip = Math.atan2(Math.abs(slideAcross), Math.abs(speedAlong))
+      const traction = Math.cos(slip) ** 2
+      const drive = this.wheels[1].onGround ? throttle * driveAcceleration(speed, speedAlong) * traction * railCos : 0
       const braking = brake * brakeDeceleration(speed)
-      const coasting = (1 - throttle) * coastDeceleration(speed)
-      const nextSpeed = speedAhead + (drive - gravity * dot(UP, ahead)) * dt
+      const coasting = (1 - throttle) * coastDeceleration(speed) + (sliding * powerslide.scrub) / 3.6
+      const nextSpeed = speedAlong + (drive - gravity * dot(UP, along)) * dt
       const canSlow = Math.abs(nextSpeed) / dt
       const slowing = Math.min(braking + coasting, canSlow)
       const brakeShare = braking + coasting > 0 ? braking / (braking + coasting) : 0
       const against = -Math.sign(nextSpeed)
-      pushes.push([scale(ahead, mass * (drive * onWheels)), centerOfMass])
-      pushes.push([scale(ahead, mass * against * slowing * (1 - brakeShare) * onWheels), centerOfMass])
+      pushes.push([scale(along, mass * (drive * onWheels)), centerOfMass])
+      pushes.push([scale(along, mass * against * slowing * (1 - brakeShare) * onWheels), centerOfMass])
       // Braking acts lower down, so it dips the nose (noseDive 1 = at the ground,
       // like a real bike), but never so low that it could tip the bike over the
       // front wheel: plain braking never flips it, however strong the brakes.
@@ -324,30 +373,38 @@ export class Bike {
       const safeDepth = braking_ > 0 ? (0.8 * gravity * toFrontAxle) / braking_ : comHeight
       const brakeDepth = Math.min(comHeight * clamp(stats.weight.noseDive, 0, 1), safeDepth)
       const brakePoint = sub(centerOfMass, scale(n, brakeDepth))
-      pushes.push([scale(ahead, mass * against * slowing * brakeShare * onWheels), brakePoint])
+      pushes.push([scale(along, mass * against * slowing * brakeShare * onWheels), brakePoint])
 
-      // Turning: exactly the turn the settings ask for at this speed.
-      this.turnRadius = turnRadiusAt(turning, speed, speedAhead)
+      // Turning: exactly the turn the settings ask for at this speed, tighter
+      // in a powerslide. That's how fast the way you travel turns; in a
+      // powerslide the bike also swings toward the slide angle on top of that.
+      const normalRadius = turnRadiusAt(turning, speed, speedAlong)
+      this.turnRadius = normalRadius * (1 + (powerslide.tighterTurn - 1) * sliding)
       // with the front wheel up in a wheelie there's less to steer with
       const steering = steer * (this.wheels[0].onGround ? 1 : clamp(rider.wheelieSteering, 0, 1))
       // sliding tyres can't turn hard either: steering bites again as the bike straightens out
-      const wantedTurnRate = (-steering * speedAhead * traction) / this.turnRadius
+      const wantedTurnRate = (-steering * speedAlong * traction) / this.turnRadius
       const turnNow = dot(angvel, n)
-      const newTurn = turnNow + (wantedTurnRate - turnNow) * ease(dt, turning.steeringResponse) * onWheels
+      const travelTurnNow = turnNow - this.slideRate
+      const travelTurn = travelTurnNow + (wantedTurnRate - travelTurnNow) * ease(dt, turning.steeringResponse) * onWheels
+      this.slideRate = ((slideTo - railAngle) * ease(dt, SLIDE_FOLLOW) * onWheels) / dt
+      const newTurn = travelTurn + this.slideRate
       newAngvel = add(angvel, scale(n, newTurn - turnNow))
 
       // Grip: it goes where it points. The rear wheel must not slide sideways,
       // so the middle of the bike moves sideways just as much as turning about
       // the rear wheel needs, and no more. The turn always gets the pull it
       // needs; grip limits how hard any other sideways slide is caught.
-      // Where the bike would be going if it were on rails: its speed along it
-      // turned with the bike (so a turn never adds or loses speed), lined up
-      // with where it will point at the end of this step, plus the sideways
-      // swing that turning about the rear wheel needs.
+      // Where the bike would be going if it were on rails: its speed along
+      // them turned with the bike (so a turn never adds or loses speed), lined
+      // up with where the rails will point at the end of this step, plus the
+      // sideways swing that turning about the rear wheel needs.
       const aheadAfter = rotateAround(ahead, n, newTurn * dt)
       const sideAfter = rotateAround(side, n, newTurn * dt)
+      const railAfter = clamp(railAngle + this.slideRate * dt, slideMin, slideMax)
+      const alongAfter = add(scale(aheadAfter, Math.cos(railAfter)), scale(sideAfter, Math.sin(railAfter)))
       const onRailsVelocity = add(
-        add(scale(aheadAfter, speedAhead), scale(sideAfter, -newTurn * toRear)),
+        add(scale(alongAfter, speedAlong), scale(sideAfter, -newTurn * toRear)),
         scale(n, dot(linvel, n)),
       )
       // How hard the travel may change toward that. Riding normally the bike is
@@ -356,9 +413,9 @@ export class Bike {
       // way you travel bends no harder than `grip`, whatever you steer; steering
       // then mostly swings the bike's nose. The rails come back smoothly as the
       // slide straightens out (fully under 8° of slide, not at all past 25°).
-      const slip = Math.atan2(Math.abs(slideNow), Math.abs(speedAhead))
       const onRails = 1 - smoothstep((slip - 8 * DEG) / ((25 - 8) * DEG))
-      const turnNeeds = Math.abs(speedAhead * newTurn) * dt + Math.abs(newTurn - turnNow) * toRear
+      const travelTurned = newTurn - (railAfter - railAngle) / dt
+      const turnNeeds = Math.abs(speedAlong * travelTurned) * dt + Math.abs(newTurn - turnNow) * toRear
       const allowed = turning.grip * gravity * dt + onRails * turnNeeds
       const change = sub(onRailsVelocity, linvel)
       const needed = Math.hypot(change.x, change.y, change.z)
@@ -366,9 +423,14 @@ export class Bike {
       newLinvel = add(linvel, scale(change, share * onWheels))
 
       // Leaning into the turn, for the drawing: as far as the turn pulls sideways, up to maxLean.
-      const leanWanted = clamp(-Math.atan((speedAhead * newTurn) / gravity), -turning.maxLean * DEG, turning.maxLean * DEG)
+      const leanWanted = clamp(-Math.atan((speedAlong * travelTurned) / gravity), -turning.maxLean * DEG, turning.maxLean * DEG)
       this.lean += (leanWanted - this.lean) * ease(dt, turning.leanResponse)
-      this.steerAngle = (steer * Math.atan(stats.build.wheelbase / turnRadiusAt(turning, speed, speedAhead))) / DEG
+      // The front wheel is drawn pointing where it's going. In a powerslide
+      // that's the way the front of the bike really travels: opposite lock.
+      const normalSteer = (steer * Math.atan(stats.build.wheelbase / normalRadius)) / DEG
+      const frontAcross = speedAlong * Math.sin(railAfter) - newTurn * stats.build.wheelbase
+      const slideSteer = Math.atan2(frontAcross, Math.max(speedAlong * Math.cos(railAfter), 0.1)) / DEG
+      this.steerAngle = normalSteer + (slideSteer - normalSteer) * sliding
 
       // Leaning tips the bike toward an angle, measured from the ground, and
       // holds it there, so it can never loop over:
@@ -413,6 +475,8 @@ export class Bike {
       }
       this.lean += (0 - this.lean) * ease(dt, stats.turning.leanResponse)
       this.steerAngle = steer * 10
+      // a powerslide doesn't carry on through the air
+      this.powersliding = this.slideAngle = this.slideRate = 0
     }
 
     // ---- Upright helper: keeps the physics bike from tipping sideways ----

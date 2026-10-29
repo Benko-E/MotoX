@@ -76,6 +76,22 @@ export const config = {
       noseDive: 0.5,
     },
 
+    /** Powerslides (Space, like a handbrake): the rear swings out and you slide round the turn. */
+    powerslide: {
+      /** How far the rear swings out at full steer, degrees: how sideways the bike gets. */
+      angle: 30,
+      /** Seconds the rear takes to swing out once you press Space. */
+      kickOut: 0.15,
+      /** Seconds the rear takes to hook back up after you let go. */
+      hookUp: 0.3,
+      /** How tight the slide turns, compared to your normal turning circle at that speed. 0.6 = a circle 40% smaller. */
+      tighterTurn: 0.6,
+      /** How much speed sliding scrubs off, km/h per second. Throttle makes some of it back. */
+      scrub: 20,
+      /** Slowest speed a powerslide starts at, km/h. */
+      minSpeed: 15,
+    },
+
     /** Leaning forward and back (arrow keys up and down). */
     rider: {
       /** In the air: how fast leaning spins the bike nose up (lean back) or nose down (lean forward), degrees per second at full lean. Let go and it keeps the spin it has. */
@@ -153,6 +169,8 @@ export const config = {
       steerRight: ['KeyD'],
       leanForward: ['ArrowUp'],
       leanBack: ['ArrowDown'],
+      /** Hold or tap to powerslide, like a handbrake. */
+      powerslide: ['Space'],
       /** Put the bike back upright where it is. */
       reset: ['KeyR'],
       /** Drop the bike from a height (for testing landings). */
@@ -246,6 +264,12 @@ export const configRanges: Ranges = {
   'bike.weight.height': [0, 1, 0.01],
   'bike.weight.forward': [-0.5, 0.5, 0.01],
   'bike.weight.noseDive': [0, 1, 0.01],
+  'bike.powerslide.angle': [0, 70, 1],
+  'bike.powerslide.kickOut': [0, 0.6, 0.01],
+  'bike.powerslide.hookUp': [0.05, 1.5, 0.01],
+  'bike.powerslide.tighterTurn': [0.2, 1.5, 0.01],
+  'bike.powerslide.scrub': [0, 80, 1],
+  'bike.powerslide.minSpeed': [0, 60, 1],
   'bike.rider.airSpin': [0, 400, 1],
   'bike.rider.airSpinResponse': [0, 0.5, 0.01],
   'bike.rider.wheelieAngle': [0, 60, 1],

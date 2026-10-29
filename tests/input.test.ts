@@ -105,4 +105,14 @@ describe('Input', () => {
     field.dispatchEvent(key('keydown', 'KeyW'))
     expect(input.isDown('throttle')).toBe(false)
   })
+
+  it('stops the browser using a bound key itself, pressed or released', () => {
+    // Space would scroll the page, or press a tuning-panel button left focused (on release)
+    const { target } = makeInput({ keys: { powerslide: ['Space'] }, easing: {} })
+    for (const type of ['keydown', 'keyup'] as const) {
+      const event = Object.assign(new Event(type, { cancelable: true }), { code: 'Space', repeat: false })
+      target.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(true)
+    }
+  })
 })
