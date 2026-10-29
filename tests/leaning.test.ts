@@ -48,15 +48,84 @@ describe('leaning in the air', () => {
     }
   })
 
-  it('keeps spinning as it is when you stop leaning', () => {
+  it('letting go of lean holds the bike at the angle it got to: it stops turning over', () => {
+    // the seventh tuning session: it used to keep spinning after you let go
     const { bike, run } = setup(flat())
-    bike.placeOnGround(0, 0, 0, 20)
+    bike.placeOnGround(0, 0, 0, 30)
     bike.controls.lean = -1
-    run(0.5)
-    const spinning = noseUpRate(bike)
+    run(0.4)
     bike.controls.lean = 0
+    run(rider.airSpinResponse * 4)
+    expect(Math.abs(noseUpRate(bike))).toBeLessThan(5)
+    const held = bike.pitch
+    run(0.5)
+    expect(Math.abs(bike.pitch - held) / DEG).toBeLessThan(2)
+    expect(bike.pitch / DEG).toBeGreaterThan(30) // and it really did lean back first
+  })
+
+  it('a quick tap of lean turns the bike a little, then holds', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0, 30)
+    bike.controls.lean = -1
+    run(0.1)
+    bike.controls.lean = 0
+    run(0.6)
+    const held = bike.pitch
+    run(0.5)
+    expect(bike.pitch / DEG).toBeGreaterThan(5)
+    expect(bike.pitch / DEG).toBeLessThan(40)
+    expect(Math.abs(bike.pitch - held) / DEG).toBeLessThan(2)
+  })
+
+  it('until you lean, the bike keeps the spin it took off with', () => {
+    // a ramp's lip kicks the rear up, and the bike noses down from it: that's left alone
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0, 30)
+    bike.body.setAngvel({ x: -0.6, y: 0, z: 0 }, true) // nose down, about 34 degrees a second
+    run(0.5)
+    expect(noseUpRate(bike)).toBeCloseTo(-0.6 / DEG, -1)
+  })
+})
+
+describe('the front wheel in the air', () => {
+  const fullLock = Math.atan(config.bike.build.wheelbase / config.bike.turning.tightestTurnSlow) / DEG
+
+  /** A bike falling from high up, with the front wheel held turned all the way to the right. */
+  const flyingTurned = () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0, 30)
+    bike.controls.steer = 1
+    run(0.5)
+    return { bike, run }
+  }
+
+  it('holding steer in a jump turns the front wheel all the way', () => {
+    const { bike } = flyingTurned()
+    expect(bike.steerAngle).toBeGreaterThan(fullLock - 2)
+    expect(bike.steerAngle).toBeLessThan(fullLock + 2)
+  })
+
+  it('turns out quickly, but swings back to straight at about frontWheelReturn when you let go', () => {
+    const { bike, run } = setup(flat())
+    bike.placeOnGround(0, 0, 0, 30)
+    bike.controls.steer = 1
     run(0.3)
-    expect(noseUpRate(bike)).toBeCloseTo(spinning, 0)
+    expect(bike.steerAngle).toBeGreaterThan(fullLock * 0.9) // quick out
+    run(0.2)
+    bike.controls.steer = 0
+    run(config.bike.turning.frontWheelReturn)
+    // easing back: about a third of the way left after frontWheelReturn
+    expect(bike.steerAngle).toBeGreaterThan(fullLock * 0.25)
+    expect(bike.steerAngle).toBeLessThan(fullLock * 0.5)
+    run(config.bike.turning.frontWheelReturn * 4)
+    expect(Math.abs(bike.steerAngle)).toBeLessThan(fullLock * 0.05)
+  })
+
+  it('swings straight over to the other side quickly when you steer the other way', () => {
+    const { bike, run } = flyingTurned()
+    bike.controls.steer = -1
+    run(0.3)
+    expect(bike.steerAngle).toBeLessThan(-fullLock * 0.9)
   })
 })
 

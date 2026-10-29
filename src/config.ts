@@ -44,6 +44,8 @@ export const config = {
       leanResponse: 0.15,
       /** How fast you can turn in the air at full steer, degrees per second. 0 = not at all. */
       airTurn: 45,
+      /** Front wheel off the ground (jumps, wheelies): it turns all the way while you steer, and this is how many seconds it takes to swing back to straight after you let go. */
+      frontWheelReturn: 0.5,
     },
 
     /** How soft the bike sits, how it soaks up bumps and landings, and how much it bounces. */
@@ -94,9 +96,9 @@ export const config = {
 
     /** Leaning forward and back (arrow keys up and down). */
     rider: {
-      /** In the air: how fast leaning spins the bike nose up (lean back) or nose down (lean forward), degrees per second at full lean. Let go and it keeps the spin it has. */
+      /** In the air: how fast leaning spins the bike nose up (lean back) or nose down (lean forward), degrees per second at full lean. Let go and it holds the angle it got to. (Until you lean, it keeps whatever spin it took off with.) */
       airSpin: 150,
-      /** Seconds the air spin takes to build up once you lean. */
+      /** Seconds the air spin takes to build up when you lean, and to stop when you let go. */
       airSpinResponse: 0.12,
       /** Leaning back with the throttle open lifts the front wheel up to this angle, degrees. 0 = no wheelies. */
       wheelieAngle: 40,
@@ -255,6 +257,7 @@ export const configRanges: Ranges = {
   'bike.turning.maxLean': [0, 60, 1],
   'bike.turning.leanResponse': [0, 0.6, 0.01],
   'bike.turning.airTurn': [0, 180, 1],
+  'bike.turning.frontWheelReturn': [0.05, 2, 0.05],
   'bike.suspension.frontTravel': [0.1, 0.5, 0.01],
   'bike.suspension.rearTravel': [0.1, 0.5, 0.01],
   'bike.suspension.sag': [0.05, 0.7, 0.01],

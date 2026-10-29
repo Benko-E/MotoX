@@ -57,8 +57,9 @@ const MIN_JUMP = 0.15
 const SLIDE_FOLLOW = 0.05
 /** In a powerslide the rear may wander this far past the slide angle before grip catches it, degrees. */
 const SLIDE_MARGIN = 10
-/** How quickly the drawn front wheel swings to full lock as it lifts in a wheelie, and back as it lands, seconds. */
-const FRONT_WHEEL_SWING = 0.1
+/** How quickly the drawn front wheel turns out when you steer with it off the ground, and how
+ * quickly it changes over between riding and free as it lifts or lands, seconds. */
+const FRONT_WHEEL_SWING = 0.08
 
 export interface Pose {
   position: Vec3
@@ -117,8 +118,13 @@ export class Bike {
   private massKey = ''
   /** How fast the slide angle was changing in the last step, radians per second. */
   private slideRate = 0
-  /** How far the drawn front wheel has gone to full lock for a wheelie, 0 to 1. */
+  /** How far the drawn front wheel has changed over from riding to free (off the ground), 0 to 1. */
   private frontUpDrawn = 0
+  /** The drawn front wheel's angle on the ground, and free off the ground, degrees. */
+  private rideSteer = 0
+  private freeSteer = 0
+  /** Leaned at all since leaving the ground: from then on letting go holds the bike's angle. */
+  private airLeaned = false
 
   constructor(
     private readonly physics: PhysicsWorld,
@@ -163,7 +169,9 @@ export class Bike {
     })
     this.airtime = 0
     this.lean = 0
-    this.powersliding = this.slideAngle = this.slideRate = this.frontUpDrawn = 0
+    this.powersliding = this.slideAngle = this.slideRate = 0
+    this.frontUpDrawn = this.rideSteer = this.freeSteer = this.steerAngle = 0
+    this.airLeaned = false
     this.current = this.readPose()
     this.previous = this.current
   }
@@ -442,13 +450,8 @@ export class Bike {
       const normalSteer = (steer * Math.atan(stats.build.wheelbase / normalRadius)) / DEG
       const frontAcross = speedAlong * Math.sin(railAfter) - newTurn * stats.build.wheelbase
       const slideSteer = Math.atan2(frontAcross, Math.max(speedAlong * Math.cos(railAfter), 0.1)) / DEG
-      this.steerAngle = normalSteer + (slideSteer - normalSteer) * sliding
-      // In a wheelie the front wheel is in the air, free to turn all the way:
-      // as far as at a standstill, whatever the speed (eased, so it doesn't
-      // snap as the front lifts or lands).
-      this.frontUpDrawn += ((frontUp ? 1 : 0) - this.frontUpDrawn) * ease(dt, FRONT_WHEEL_SWING)
-      const fullLock = (steer * Math.atan(stats.build.wheelbase / turning.tightestTurnSlow)) / DEG
-      this.steerAngle += (fullLock - this.steerAngle) * this.frontUpDrawn
+      this.rideSteer = normalSteer + (slideSteer - normalSteer) * sliding
+      this.airLeaned = false
 
       // Leaning tips the bike toward an angle, measured from the ground, and
       // holds it there, so it can never loop over:
@@ -483,18 +486,33 @@ export class Bike {
         const newTurn = turnNow + (wanted - turnNow) * ease(dt, turning.steeringResponse)
         newAngvel = add(angvel, scale(UP, newTurn - turnNow))
       }
-      // Leaning spins the bike nose up (back) or nose down (forward). Without
-      // leaning it keeps whatever spin it has.
-      if (lean !== 0) {
+      // Leaning spins the bike nose up (back) or nose down (forward), and
+      // letting go stops the spin, holding the angle it got to. Until you
+      // lean at all it keeps whatever spin it took off with (a ramp's lip
+      // kicking the rear up noses it down).
+      if (lean !== 0) this.airLeaned = true
+      if (this.airLeaned) {
         const wanted = -lean * rider.airSpin * DEG
         const rateNow = dot(newAngvel, right)
-        newAngvel = add(newAngvel, scale(right, (wanted - rateNow) * ease(dt, rider.airSpinResponse) * Math.abs(lean)))
+        newAngvel = add(newAngvel, scale(right, (wanted - rateNow) * ease(dt, rider.airSpinResponse)))
       }
       this.lean += (0 - this.lean) * ease(dt, stats.turning.leanResponse)
-      this.steerAngle = steer * 10
       // a powerslide doesn't carry on through the air
       this.powersliding = this.slideAngle = this.slideRate = 0
     }
+
+    // ---- The front wheel as drawn ----
+    // On the ground it points where the turn (or slide) needs. Off the ground
+    // (a jump, a wheelie) it's free: it turns all the way while you steer, as
+    // far as at a standstill, and swings back to straight over
+    // frontWheelReturn when you let go, so you can line it up for the landing.
+    const fullLock = Math.atan(stats.build.wheelbase / stats.turning.tightestTurnSlow) / DEG
+    const freeTo = steer * fullLock
+    const backToStraight = freeTo * this.freeSteer >= 0 && Math.abs(freeTo) < Math.abs(this.freeSteer)
+    const swing = backToStraight ? stats.turning.frontWheelReturn : FRONT_WHEEL_SWING
+    this.freeSteer += (freeTo - this.freeSteer) * ease(dt, swing)
+    this.frontUpDrawn += ((this.wheels[0].onGround ? 0 : 1) - this.frontUpDrawn) * ease(dt, FRONT_WHEEL_SWING)
+    this.steerAngle = this.rideSteer + (this.freeSteer - this.rideSteer) * this.frontUpDrawn
 
     // ---- Upright helper: keeps the physics bike from tipping sideways ----
     // It works about the level part of the bike's forward direction. It lets
