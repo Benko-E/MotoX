@@ -29,8 +29,9 @@ const DEG = Math.PI / 180
 
 /**
  * Which jumps to mark for a bike at `at` heading `heading` (compass degrees):
- * the best few within reach, ahead, pointing much its way. One it's already
- * riding up (in `shown`) stays until it's past the lip.
+ * the best few within reach, ahead, pointing much its way, the ones it's
+ * heading straight at first. One it's already riding up (in `shown`) stays
+ * until it's past the lip.
  */
 export function pickLanes(
   jumps: readonly JumpSpot[],
@@ -41,6 +42,7 @@ export function pickLanes(
 ): number[] {
   const riding: number[] = []
   const ahead: number[] = []
+  const relevance = new Map<number, number>()
   jumps.forEach((jump, i) => {
     if (jump.score < settings.minScore) return
     const dx = Math.sin(jump.heading * DEG)
@@ -57,10 +59,13 @@ export function pickLanes(
     if (toStart > settings.showWithin) return
     const facing = Math.abs(turnBetween(Math.atan2(start.x - at.x, -(start.z - at.z)) / DEG, heading))
     if (toStart > CLOSE && facing > AHEAD) return
-    if (Math.abs(turnBetween(jump.heading, heading)) > YOUR_WAY) return
+    const turn = Math.abs(turnBetween(jump.heading, heading))
+    if (turn > YOUR_WAY) return
+    // what you're heading straight at comes first: a good jump off to the side counts for less
+    relevance.set(i, jump.score * Math.cos(Math.min(facing, AHEAD) * DEG) * Math.cos(turn * DEG))
     ahead.push(i)
   })
-  ahead.sort((a, b) => jumps[b].score - jumps[a].score)
+  ahead.sort((a, b) => relevance.get(b)! - relevance.get(a)!)
   return [...riding, ...ahead].slice(0, Math.max(settings.lanes, riding.length))
 }
 

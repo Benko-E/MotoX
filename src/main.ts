@@ -24,7 +24,7 @@ import { Hud } from './hud/hud'
 import { Speedometer } from './hud/speedometer'
 import { HelpTimer } from './ui/helpCard'
 import { readNotes } from './ui/notes'
-import { findJumps, type JumpSpot } from './world/jumpFinder'
+import { findJumpsGradually, type JumpSpot } from './world/jumpFinder'
 import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
 
 /** With the free-fly camera, B drops the bike this far ahead of the camera. */
@@ -72,13 +72,16 @@ const groundEffects = new GroundEffects(
 /** The good jumps in the hills, found by reading the ground, and the lanes marking the best ones near you. */
 let jumps: JumpSpot[] = []
 const jumpLanes = new JumpLanes(view.scene, jumps, groundAt, config.jumpGuide)
+let jumpSearch: Generator<void, JumpSpot[]> | null = null
+/** Each frame the jump search gets this long to work on, milliseconds. */
+const JUMP_SEARCH_BUDGET = 5
 
 function rebuildTerrain() {
   terrain = generateTerrain(map)
   terrainView.show(terrain.field, terrain.ramps, map)
   physics.setGround(terrain.field, terrain.ramps)
-  jumps = findJumps(terrain.field)
-  jumpLanes.replace(jumps)
+  // found a bit at a time between frames (see showFrame), so the game doesn't stall
+  jumpSearch = findJumpsGradually(terrain.field)
 }
 rebuildTerrain()
 bike.placeOnGround(map.spawn.x, map.spawn.z, map.spawn.heading)
@@ -224,6 +227,16 @@ function showFrame(frameTime: number) {
   loop.advance(frameTime)
   bikeView.update(loop.alpha, frameTime)
   groundEffects.update(Math.min(frameTime, 0.1))
+  if (jumpSearch) {
+    const until = performance.now() + JUMP_SEARCH_BUDGET
+    let step = jumpSearch.next()
+    while (!step.done && performance.now() < until) step = jumpSearch.next()
+    if (step.done) {
+      jumps = step.value
+      jumpLanes.replace(jumps)
+      jumpSearch = null
+    }
+  }
   jumpLanes.update(bikeView.position, bikeView.heading, Math.min(frameTime, 0.1))
   hud.update({ speed: bike.speed, topSpeed: config.bike.speed.topSpeed }, frameTime)
   const wheelClicks = input.takeWheel()

@@ -41,13 +41,22 @@ describe('which jumps get marked', () => {
 
   it('only good enough ones, and only the best few at once', () => {
     const s = settings()
-    const jumps = Array.from({ length: 12 }, (_, i) => jump(i * 25 - 140, -120, 0, 1 + i * 0.2))
+    // all straight ahead, one behind the other, so only how good they are decides
+    const jumps = Array.from({ length: 12 }, (_, i) => jump(0, -40 - i * 12, 0, 1 + i * 0.2))
     jumps.push(jump(0, -60, 0, s.minScore - 0.1)) // not good enough
     const picked = pickLanes(jumps, here, northward, s, new Set())
     expect(picked.length).toBe(s.lanes)
     expect(picked).not.toContain(12)
     const scores = picked.map((i) => jumps[i].score)
     expect(Math.min(...scores)).toBeGreaterThanOrEqual(Math.max(...jumps.filter((_, i) => !picked.includes(i) && i !== 12).map((j) => j.score)))
+  })
+
+  it('the jump you are heading straight at is shown before a better one off to the side', () => {
+    // the fourteenth tuning session: a better jump up on the left was marked, not the one straight ahead
+    const s = settings()
+    s.lanes = 1
+    const jumps = [jump(-120, -100, 0, 2.6), jump(0, -110, 0, 1.8)] // a better one 50 degrees left, and one dead ahead
+    expect(pickLanes(jumps, here, northward, s, new Set())).toEqual([1])
   })
 
   it('a lane you are riding up stays marked until you have passed its lip', () => {
