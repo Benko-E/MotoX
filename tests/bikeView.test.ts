@@ -15,7 +15,7 @@ function drawn() {
   const scene = new THREE.Scene()
   const view = new BikeView(scene, bike)
   const model = scene.children[0].children[0].children[0] // root -> lean pivot -> model
-  return { bike, run, view, model }
+  return { bike, run, view, model, scene }
 }
 
 /** Draws the bike leaning `degrees`, and reads off the drawing. */
@@ -36,6 +36,35 @@ function drawLeaning(bike: Bike, view: BikeView, model: THREE.Object3D, degrees:
     rearContact,
   }
 }
+
+describe('it looks like a dirt bike', () => {
+  /** The drawn bike standing still and level, with both suspensions pushed in `compression` of the way. */
+  function standing(compression: number) {
+    const { bike, run, view, scene } = drawn()
+    bike.placeOnGround(0, 0, 0)
+    run(1)
+    bike.wheels.forEach((wheel, i) => (wheel.extension = wheel.previousExtension = bike.travel(i) * (1 - compression)))
+    view.update(1, 1 / 60)
+    const part = (name: string) => {
+      const found = scene.getObjectByName(name)
+      expect(found, name).toBeDefined()
+      found!.updateWorldMatrix(true, true)
+      return new THREE.Box3().setFromObject(found!, true)
+    }
+    return part
+  }
+
+  it('the handlebar sits well above the seat', () => {
+    const part = standing(0.3)
+    expect(part('handlebar').min.y - part('seat').max.y).toBeGreaterThan(0.15)
+  })
+
+  it('the fenders sit high and stay clear of the tyres, even with the suspension all the way in', () => {
+    const part = standing(1)
+    expect(part('front fender').min.y).toBeGreaterThan(part('front tyre').max.y)
+    expect(part('rear fender').min.y).toBeGreaterThan(part('rear tyre').max.y)
+  })
+})
 
 describe('where the drawn tyres touch', () => {
   it('standing still, both drawn tyres sit right on the ground: no hovering', () => {

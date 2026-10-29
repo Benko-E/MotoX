@@ -3,7 +3,6 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { Bike } from '../src/physics/bike'
 import { initPhysics } from '../src/physics/world'
 import { RiderMotion } from '../src/render/riderMotion'
-import { config } from '../src/config'
 import { HEAD_BACK, HEAD_FORWARD, HEAD_SITTING } from '../src/physics/crashes'
 import { BARS } from '../src/render/bikeView'
 import { FOREARM, GRIPS, riderPose, SHIN, THIGH, UPPER_ARM, type RiderShape } from '../src/render/riderView'
@@ -105,9 +104,8 @@ describe('what the rider does', () => {
 })
 
 describe('the rider drawn', () => {
-  // the middle of the handlebar in the bike's space (the front end sits half a wheelbase ahead),
-  // and the grips with the bars turned `bars` degrees about it
-  const barsAt = BARS.clone().add(new THREE.Vector3(0, 0, -config.bike.build.wheelbase / 2))
+  // the grips with the bars turned `bars` degrees about their middle, in the bike's space
+  const barsAt = BARS.clone()
   const gripsTurned = (bars: number) =>
     GRIPS.map((grip) => grip.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), (-bars * Math.PI) / 180).add(barsAt))
   const grips = gripsTurned(0)

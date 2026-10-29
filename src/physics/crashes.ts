@@ -30,9 +30,9 @@ const RIGHT = vec(1, 0, 0)
 const HEAD_RADIUS = 0.15
 /** Where the rider's head is, in the bike's own space: leaning back, sitting, leaning forward.
  * (The same places the placeholder rider is drawn.) */
-export const HEAD_BACK = vec(0, 0.97, 0.05)
-export const HEAD_SITTING = vec(0, 0.96, -0.13)
-export const HEAD_FORWARD = vec(0, 0.77, -0.52)
+export const HEAD_BACK = vec(0, 1.23, 0.2)
+export const HEAD_SITTING = vec(0, 1.18, -0.14)
+export const HEAD_FORWARD = vec(0, 1.08, -0.37)
 /** Shorter than this in the air isn't a jump whose landing gets judged, seconds. */
 const MIN_AIRTIME = 0.15
 /** Right after being put back up nothing counts as a crash, seconds. */
@@ -152,7 +152,12 @@ export class CrashWatcher {
       head, { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Ball(HEAD_RADIUS),
       undefined, undefined, undefined, body,
     )
-    return hit !== null
+    if (hit !== null) return true
+    // Under the ground counts too: the head can go right through the
+    // ground's surface (in the moment after getting up, when nothing counts)
+    // and would otherwise never touch it again.
+    const ground = this.physics.groundHeightAt(head.x, head.z, body)
+    return ground !== null && head.y - HEAD_RADIUS < ground
   }
 
   private nearGround(anyDown: boolean): boolean {

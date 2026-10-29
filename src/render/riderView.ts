@@ -1,20 +1,20 @@
 import * as THREE from 'three'
 
 /** Grips at the ends of the handlebar, in the handlebar's own space. */
-export const GRIPS = [new THREE.Vector3(-0.3, 0, 0), new THREE.Vector3(0.3, 0, 0)]
+export const GRIPS = [new THREE.Vector3(-0.4, 0, 0), new THREE.Vector3(0.4, 0, 0)]
 /** Footpegs, in the bike's space. */
-const PEGS = [new THREE.Vector3(-0.17, -0.1, 0.05), new THREE.Vector3(0.17, -0.1, 0.05)]
+export const PEGS = [new THREE.Vector3(-0.2, -0.2, 0.05), new THREE.Vector3(0.2, -0.2, 0.05)]
 /** Where the rider's hips are, in the bike's space: sitting on the seat, and standing on the pegs. */
-const SEAT = new THREE.Vector3(0, 0.36, 0.16)
-const STAND = new THREE.Vector3(0, 0.58, 0.24)
+const SEAT = new THREE.Vector3(0, 0.58, 0.16)
+const STAND = new THREE.Vector3(0, 0.68, 0.28)
 /** A foot put out in a turn: out to the side, forward and down toward the ground (right foot; the left is mirrored). */
-const FOOT_OUT = new THREE.Vector3(0.38, -0.25, -0.36)
+const FOOT_OUT = new THREE.Vector3(0.36, -0.21, -0.28)
 const TORSO_LENGTH = 0.55
 const SHOULDER_WIDTH = 0.36
 const HIP_WIDTH = 0.24
 /** How far forward the torso tips, degrees: sitting, and more standing (over the bars). */
 const SITTING_CROUCH = 25
-const STANDING_CROUCH = 45
+const STANDING_CROUCH = 38
 /** Soaking up a landing all the way: how far the hips drop, metres, and the torso tips further, degrees. */
 const SOAK_DROP = 0.24
 const SOAK_TIP = 12
@@ -23,10 +23,10 @@ const TWIST = 0.5
 /** As far as the torso may tip further forward to keep hold of the bars, degrees. */
 const REACH_TIP = 45
 /** Lengths of the rider's limbs, metres. */
-export const THIGH = 0.42
-export const SHIN = 0.44
-export const UPPER_ARM = 0.38
-export const FOREARM = 0.38
+export const THIGH = 0.46
+export const SHIN = 0.48
+export const UPPER_ARM = 0.36
+export const FOREARM = 0.36
 const DEG = Math.PI / 180
 
 /** What the rider's body is doing (see RiderMotion), plus the lean input and suspension. */
@@ -71,9 +71,10 @@ export function riderPose(shape: RiderShape, grips: THREE.Vector3[]): RiderPose 
   // with a foot out he sits down for the turn
   const standing = shape.standing * (1 - Math.abs(legOut))
   const hips = SEAT.clone().lerp(STAND, standing)
-  hips.z += lean < 0 ? -lean * 0.16 : -lean * 0.14 // sit back, or slide forward
+  hips.z += lean < 0 ? -lean * 0.16 : -lean * 0.08 // sit back, or slide forward
   hips.y -= squash * 0.12 + absorb * SOAK_DROP
-  const crouch = (SITTING_CROUCH + (STANDING_CROUCH - SITTING_CROUCH) * standing + lean * 25 + absorb * SOAK_TIP) * DEG
+  const leaning = lean < 0 ? lean * 25 : lean * 15 // back upright, or forward over the bars
+  const crouch = (SITTING_CROUCH + (STANDING_CROUCH - SITTING_CROUCH) * standing + leaning + absorb * SOAK_TIP) * DEG
   // the shoulders twist with the bars: turning right, the left one comes forward
   const twist = -TWIST * shape.bars * DEG
 
@@ -147,6 +148,7 @@ export class RiderView {
   private readonly forearms: THREE.Mesh[]
   private readonly thighs: THREE.Mesh[]
   private readonly shins: THREE.Mesh[]
+  private readonly boots: THREE.Mesh[]
   private readonly grips = [new THREE.Vector3(), new THREE.Vector3()]
 
   constructor(
@@ -166,14 +168,27 @@ export class RiderView {
     const helmetShell = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), helmet)
     const helmetVisor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.06), visor)
     helmetVisor.position.set(0, 0.01, -0.12)
+    // a motocross helmet: a peak sticking out over the goggles, and a chin guard
+    const helmetPeak = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.02, 0.14), helmet)
+    helmetPeak.position.set(0, 0.1, -0.15)
+    helmetPeak.rotation.x = 0.3
+    const chinGuard = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.07, 0.08), helmet)
+    chinGuard.position.set(0, -0.08, -0.11)
     helmetShell.castShadow = true
-    this.head.add(helmetShell, helmetVisor)
+    this.head.add(helmetShell, helmetVisor, helmetPeak, chinGuard)
     bike.add(this.head)
 
     this.upperArms = [0, 1].map(() => this.limb(0.09, jersey))
     this.forearms = [0, 1].map(() => this.limb(0.08, jersey))
     this.thighs = [0, 1].map(() => this.limb(0.13, pants))
     this.shins = [0, 1].map(() => this.limb(0.11, pants))
+    const boot = new THREE.MeshStandardMaterial({ color: 0xe9e9e4, roughness: 0.6 })
+    this.boots = [0, 1].map(() => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.26), boot)
+      mesh.castShadow = true
+      bike.add(mesh)
+      return mesh
+    })
   }
 
   /** Puts the rider in shape: the lean input, suspension squash and bars (degrees), plus what his body is doing. */
@@ -191,6 +206,8 @@ export class RiderView {
       this.place(this.forearms[side], pose.elbows[side], pose.hands[side])
       this.place(this.thighs[side], pose.hipJoints[side], pose.knees[side])
       this.place(this.shins[side], pose.knees[side], pose.feet[side])
+      // the boot sits on the foot, toes forward
+      this.boots[side].position.copy(pose.feet[side]).add(new THREE.Vector3(0, 0.01, -0.05))
     }
   }
 
