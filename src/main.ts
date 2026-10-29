@@ -20,6 +20,7 @@ import { createScene } from './render/scene'
 import { TerrainView } from './render/terrainView'
 import { generateTerrain } from './terrain/generate'
 import { heightAt } from './terrain/heightfield'
+import { flattestSpotNear } from './terrain/startingSpot'
 import { Hud } from './hud/hud'
 import { Speedometer } from './hud/speedometer'
 import { HelpTimer } from './ui/helpCard'
@@ -31,6 +32,8 @@ import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
 const DROP_AHEAD = 6
 /** With the chase camera, B lifts the bike this high and lets go. */
 const DROP_HEIGHT = 6
+/** The bike starts on the flattest ground within this far of the map's spawn point, metres. */
+const SPAWN_SEARCH = 60
 
 await initPhysics()
 
@@ -54,8 +57,8 @@ const input = new Input(config.controls, window)
 
 const physics = new PhysicsWorld()
 const terrainView = new TerrainView(view.scene, view.renderer)
-let terrain = generateTerrain(map)
-const groundAt = (x: number, z: number) => heightAt(terrain.field, x, z)
+let field = generateTerrain(map)
+const groundAt = (x: number, z: number) => heightAt(field, x, z)
 
 const bike = new Bike(physics, config.bike, config.advanced.bikeBody)
 const crashes = new CrashWatcher(physics, bike, config.crashes, config.advanced.fallingOver, config.jumps.landing)
@@ -77,20 +80,21 @@ let jumpSearch: Generator<void, JumpSpot[]> | null = null
 const JUMP_SEARCH_BUDGET = 5
 
 function rebuildTerrain() {
-  terrain = generateTerrain(map)
-  terrainView.show(terrain.field, terrain.ramps, map)
-  physics.setGround(terrain.field, terrain.ramps)
+  field = generateTerrain(map)
+  terrainView.show(field)
+  physics.setGround(field)
   // found a bit at a time between frames (see showFrame), so the game doesn't stall
-  jumpSearch = findJumpsGradually(terrain.field)
+  jumpSearch = findJumpsGradually(field)
 }
 rebuildTerrain()
-bike.placeOnGround(map.spawn.x, map.spawn.z, map.spawn.heading)
+const start = flattestSpotNear(field, map.spawn.x, map.spawn.z, SPAWN_SEARCH)
+bike.placeOnGround(start.x, start.z, map.spawn.heading)
 
 const fly = new FlyCamera(view.renderer.domElement, config, groundAt)
-const spawnGround = groundAt(map.spawn.x, map.spawn.z)
+const startGround = groundAt(start.x, start.z)
 fly.place(
-  { x: map.spawn.x + 4, y: spawnGround + 2, z: map.spawn.z + 5 },
-  { x: map.spawn.x, y: spawnGround + 0.5, z: map.spawn.z },
+  { x: start.x + 4, y: startGround + 2, z: start.z + 5 },
+  { x: start.x, y: startGround + 0.5, z: start.z },
 )
 
 const chase = new ChaseCamera(config, groundAt)
@@ -205,7 +209,7 @@ const loop = new FixedStepLoop({
 Object.assign(window, {
   moto: {
     ...{ config, map, view, fly, chase, bike, crashes, physics, input, rebuildTerrain },
-    terrain: () => terrain,
+    terrain: () => field,
     jumps: () => jumps,
     simulate: (seconds: number, fps?: number) => simulate(seconds, fps),
   },

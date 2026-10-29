@@ -227,11 +227,11 @@ export const config = {
     /** Show the lanes at all. */
     show: true,
     /** How many lanes are shown at once, at most. */
-    lanes: 5,
+    lanes: 3,
     /** Only jumps whose run-up starts within this distance of you, metres. */
-    showWithin: 200,
+    showWithin: 400,
     /** Only jumps at least this good: about the seconds of air they give, less for cutting across the hill or a hard landing. */
-    minScore: 1.4,
+    minScore: 2,
   },
 
   /** How the tyres mark and throw the dirt. Only looks: nothing here changes the riding. */
@@ -309,7 +309,7 @@ export const config = {
   advanced: {
     /** A crash safety net you won't normally notice: the bike lying over sideways against the ground. */
     fallingOver: {
-      /** How far the bike may lie over sideways while touching the ground before it counts as a crash, degrees: 0 = upright, 90 = flat on its side. Only sideways counts (wheelies, stoppies and riding up ramps never do), and the lean you see in turns is only drawn, so riding never sets it off. */
+      /** How far the bike may lie over sideways while touching the ground before it counts as a crash, degrees: 0 = upright, 90 = flat on its side. Only sideways counts (wheelies, stoppies and riding up steep faces never do), and the lean you see in turns is only drawn, so riding never sets it off. */
       sideTip: 70,
     },
     /** How the physics engine treats the bike's body. Steering, air spin and wheelies set the bike's rotation directly, so you won't feel these. */

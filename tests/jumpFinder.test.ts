@@ -105,7 +105,7 @@ describe('finding jumps in the hills', () => {
   })
 
   it('reads any map: runs on the free-ride hills in good time', () => {
-    const { field } = generateTerrain(freeride)
+    const field = generateTerrain(freeride)
     const started = performance.now()
     const jumps = findJumps(field)
     expect(performance.now() - started).toBeLessThan(1500)

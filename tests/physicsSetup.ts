@@ -3,7 +3,6 @@ import { config } from '../src/config'
 import { Bike } from '../src/physics/bike'
 import { CrashWatcher } from '../src/physics/crashes'
 import { PhysicsWorld } from '../src/physics/world'
-import type { PlacedRamp } from '../src/terrain/generate'
 import { createHeightfield, sampleCoord, type Heightfield } from '../src/terrain/heightfield'
 
 export const DT = 1 / 120
@@ -29,9 +28,9 @@ export const slope = () => ground((x) => -x * Math.tan(10 * DEG))
  * A physics world with one bike. `run(seconds, each)` steps it like the game
  * does; `each` runs before every step, e.g. to work the controls.
  */
-export function setup(field: Heightfield, ramps: PlacedRamp[] = []) {
+export function setup(field: Heightfield) {
   const physics = new PhysicsWorld()
-  physics.setGround(field, ramps)
+  physics.setGround(field)
   const bike = new Bike(physics, structuredClone(config.bike), structuredClone(config.advanced.bikeBody))
   const run = (seconds: number, each?: () => void) => {
     for (let t = 0; t < seconds - 1e-9; t += DT) {
@@ -45,9 +44,9 @@ export function setup(field: Heightfield, ramps: PlacedRamp[] = []) {
 }
 
 /** The same, plus crash detection, stepped after the world like the game does. */
-export function setupWithCrashes(field: Heightfield, ramps: PlacedRamp[] = []) {
+export function setupWithCrashes(field: Heightfield) {
   const physics = new PhysicsWorld()
-  physics.setGround(field, ramps)
+  physics.setGround(field)
   const bike = new Bike(physics, structuredClone(config.bike), structuredClone(config.advanced.bikeBody))
   const crashes = new CrashWatcher(physics, bike, structuredClone(config.crashes), structuredClone(config.advanced.fallingOver), structuredClone(config.jumps.landing))
   const run = (seconds: number, each?: () => void) => {

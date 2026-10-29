@@ -43,6 +43,34 @@ describe('camera views', () => {
     }
   })
 
+  it('keeps the bike near the middle of the picture riding up a steep hill and dropping off a jump', () => {
+    // the fifteenth tuning session: in the far view the rider ended up near the top of the screen
+    // climbing, and almost out of the bottom coming down
+    for (const view of Object.keys(config.camera.views)) {
+      const chase = new ChaseCamera(settings(), () => -100)
+      chase.view = view
+      const cam = camera()
+      const bike = new THREE.Vector3()
+      const onScreen = () => (cam.updateMatrixWorld(), bike.clone().project(cam).y) // 0 the middle, 1 the top edge
+      // where the bike sits in this view riding along the flat
+      for (let i = 0; i < 120; i++) chase.update(cam, 1 / 120, bike.set(0, 0, -i * (25 / 120)), 0, 25)
+      const usual = onScreen()
+      let worst = 0
+      for (let i = 0; i < 360; i++) {
+        const t = i / 120
+        // 2 s climbing 25 degrees at 25 m/s, then 1 s off the top, falling
+        if (t < 2) bike.set(0, t * 25 * Math.sin(25 * DEG), -25 - t * 25 * Math.cos(25 * DEG))
+        else {
+          const f = t - 2
+          bike.set(0, 2 * 25 * Math.sin(25 * DEG) + f * 10.6 - 4.9 * f * f, -25 - (2 + f) * 25 * Math.cos(25 * DEG))
+        }
+        chase.update(cam, 1 / 120, bike, 0, 25)
+        worst = Math.max(worst, Math.abs(onScreen() - usual))
+      }
+      expect(worst, view).toBeLessThan(0.12) // it hardly moves from where it usually sits
+    }
+  })
+
   it('the scroll wheel zooms out further and in closer, within closest and furthest', () => {
     const { distance } = config.camera.views.chase
     expect(settled('chase', 3).z).toBeGreaterThan(distance * 1.2)

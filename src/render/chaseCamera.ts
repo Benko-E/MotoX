@@ -6,12 +6,16 @@ import { smoothAngleToward, smoothToward } from '../core/smoothing'
 const GROUND_CLEARANCE = 0.5
 /** If the bike suddenly ends up this far away (reset, drop), jump to it instead of gliding. */
 const SNAP_DISTANCE = 30
+/** Seconds the point it aims at takes to follow the bike: short, so the bike stays in the middle of the picture. */
+const AIM_LAG = 0.04
 
 /**
  * Third-person camera behind the bike. It follows only the bike's compass
  * heading, never its pitch or lean, so wheelies, jumps and leaning into turns
- * don't swing the view around. Height follows with its own, longer lag, so
- * bumps and landings don't shake the picture.
+ * don't swing the view around. Its height follows with its own, longer lag,
+ * so bumps and landings don't shake the picture, but it always aims at the
+ * bike itself, so the bike stays in the middle of the picture climbing a
+ * hill or dropping off a jump.
  */
 export class ChaseCamera {
   /** Which of config.camera.views it shows. */
@@ -20,6 +24,7 @@ export class ChaseCamera {
   zoom = 1
   private heading = 0
   private readonly focus = new THREE.Vector3()
+  private readonly aim = new THREE.Vector3()
   private placed = false
 
   constructor(
@@ -38,6 +43,7 @@ export class ChaseCamera {
     const c = this.config.camera
     if (!this.placed || this.focus.distanceTo(bikePosition) > SNAP_DISTANCE) {
       this.focus.copy(bikePosition)
+      this.aim.copy(bikePosition)
       this.heading = bikeHeading
       this.placed = true
     }
@@ -45,6 +51,9 @@ export class ChaseCamera {
     this.focus.x = smoothToward(this.focus.x, bikePosition.x, c.positionLag, dt)
     this.focus.z = smoothToward(this.focus.z, bikePosition.z, c.positionLag, dt)
     this.focus.y = smoothToward(this.focus.y, bikePosition.y, c.heightLag, dt)
+    this.aim.x = smoothToward(this.aim.x, bikePosition.x, AIM_LAG, dt)
+    this.aim.y = smoothToward(this.aim.y, bikePosition.y, AIM_LAG, dt)
+    this.aim.z = smoothToward(this.aim.z, bikePosition.z, AIM_LAG, dt)
 
     const view = (c.views as Record<string, { distance: number; height: number; lookHeight: number }>)[this.view] ?? c.views.chase
     const h = (this.heading * Math.PI) / 180
@@ -53,7 +62,7 @@ export class ChaseCamera {
     const z = this.focus.z + Math.cos(h) * distance
     const y = Math.max(this.focus.y + view.height * this.zoom, this.groundAt(x, z) + GROUND_CLEARANCE)
     camera.position.set(x, y, z)
-    camera.lookAt(this.focus.x, this.focus.y + view.lookHeight, this.focus.z)
+    camera.lookAt(this.aim.x, this.aim.y + view.lookHeight, this.aim.z)
   }
 
   /** Zooms out (positive) or in by scroll wheel clicks, within camera.closest and camera.furthest. */

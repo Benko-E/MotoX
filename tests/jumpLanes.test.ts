@@ -7,6 +7,8 @@ import type { JumpSpot } from '../src/world/jumpFinder'
 import { DEG, ground } from './physicsSetup'
 
 const settings = () => structuredClone(config.jumpGuide)
+/** A score good enough to be shown, whatever the setting is. */
+const good = config.jumpGuide.minScore + 0.5
 
 /** A made-up jump: its run-up goes 30 m along `heading` to the lip at (x, z). */
 function jump(x: number, z: number, heading: number, score: number): JumpSpot {
@@ -31,10 +33,10 @@ const northward = 0 // the bike heads toward -z
 describe('which jumps get marked', () => {
   it('ones ahead of you, pointing much your way, within range', () => {
     const jumps = [
-      jump(0, -100, 0, 2), // ahead, same way: yes
-      jump(0, 100, 0, 2), // behind you
-      jump(0, -100, 180, 2), // ahead, but you'd ride it the other way
-      jump(0, -400, 0, 2), // too far
+      jump(0, -100, 0, good), // ahead, same way: yes
+      jump(0, 100, 0, good), // behind you
+      jump(0, -100, 180, good), // ahead, but you'd ride it the other way
+      jump(0, -(settings().showWithin + 100), 0, good), // too far
     ]
     expect(pickLanes(jumps, here, northward, settings(), new Set())).toEqual([0])
   })
@@ -55,13 +57,13 @@ describe('which jumps get marked', () => {
     // the fourteenth tuning session: a better jump up on the left was marked, not the one straight ahead
     const s = settings()
     s.lanes = 1
-    const jumps = [jump(-120, -100, 0, 2.6), jump(0, -110, 0, 1.8)] // a better one 50 degrees left, and one dead ahead
+    const jumps = [jump(-120, -100, 0, s.minScore + 1.2), jump(0, -110, 0, s.minScore + 0.4)] // a better one 50 degrees left, and one dead ahead
     expect(pickLanes(jumps, here, northward, s, new Set())).toEqual([1])
   })
 
   it('a lane you are riding up stays marked until you have passed its lip', () => {
     // its lip 5 m ahead: you're near the top of the run-up, which started 25 m behind you
-    const jumps = [jump(0, -5, 0, 2)]
+    const jumps = [jump(0, -5, 0, good)]
     expect(pickLanes(jumps, here, northward, settings(), new Set())).toEqual([]) // not one you were riding
     expect(pickLanes(jumps, here, northward, settings(), new Set([0]))).toEqual([0]) // one you were
     expect(pickLanes(jumps, { x: 0, z: -10 }, northward, settings(), new Set([0]))).toEqual([]) // past the lip
@@ -71,7 +73,7 @@ describe('which jumps get marked', () => {
 describe('the lanes drawn', () => {
   it('lie on the ground, follow it up the run-up, and fade in when picked', () => {
     const field = ground((x) => Math.max(0, x) * Math.tan(15 * DEG), 300)
-    const spot = jump(30, 0, 90, 2)
+    const spot = jump(30, 0, 90, good)
     spot.runUp = spot.runUp.map((p) => ({ ...p, y: heightAt(field, p.x, p.z) }))
     const scene = new THREE.Scene()
     const lanes = new JumpLanes(scene, [spot], (x, z) => heightAt(field, x, z), settings())
@@ -90,7 +92,7 @@ describe('the lanes drawn', () => {
   it('turned off, shows nothing', () => {
     const s = settings()
     s.show = false
-    const lanes = new JumpLanes(new THREE.Scene(), [jump(30, 0, 90, 2)], () => 0, s)
+    const lanes = new JumpLanes(new THREE.Scene(), [jump(30, 0, 90, good)], () => 0, s)
     for (let i = 0; i < 60; i++) lanes.update({ x: 0, z: 0 }, 90, 1 / 60)
     expect(lanes.lane(0).material.opacity).toBe(0)
   })

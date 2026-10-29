@@ -10,7 +10,7 @@ describe('physics ground', () => {
   it('matches the terrain heights', () => {
     // different slopes along x and z, so mixing the two up would show
     const physics = new PhysicsWorld()
-    physics.setGround(ground((x, z) => x * 0.1 + z * 0.3), [])
+    physics.setGround(ground((x, z) => x * 0.1 + z * 0.3))
     expect(physics.groundHeightAt(30, -50)).toBeCloseTo(3 - 15, 2)
     expect(physics.groundHeightAt(-70, 20)).toBeCloseTo(-7 + 6, 2)
   })
@@ -18,16 +18,8 @@ describe('physics ground', () => {
   it('finds the ground even exactly on a line of the terrain grid', () => {
     // a ray exactly between two of the ground's triangles used to slip through
     const physics = new PhysicsWorld()
-    physics.setGround(ground((x) => -x * Math.tan(15 * DEG)), [])
+    physics.setGround(ground((x) => -x * Math.tan(15 * DEG)))
     expect(physics.groundHeightAt(80.74, -1e-16)).toBeCloseTo(-80.74 * Math.tan(15 * DEG), 1)
-  })
-
-  it('makes ramps solid', () => {
-    const physics = new PhysicsWorld()
-    const def = { x: 0, z: 0, heading: 0, width: 4, height: 2, lipAngle: 25, deckLength: 3, backAngle: 30 }
-    physics.setGround(flat(), [{ def, baseY: 0 }])
-    expect(physics.groundHeightAt(0, -1.5)).toBeCloseTo(2, 3) // on the deck
-    expect(physics.groundHeightAt(5, -1.5)).toBeCloseTo(0, 3) // beside the ramp
   })
 })
 

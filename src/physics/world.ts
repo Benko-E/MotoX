@@ -1,9 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat'
-import type { PlacedRamp } from '../terrain/generate'
 import type { Heightfield } from '../terrain/heightfield'
-import { buildRampMesh } from '../terrain/ramps'
 
-/** Friction of the ground and ramps, for anything that slides on them (not the tyres). */
+/** Friction of the ground, for anything that slides on them (not the tyres). */
 const GROUND_FRICTION = 0.8
 
 /** Loads the physics engine. Must finish before anything else in this folder is used. */
@@ -11,15 +9,15 @@ export async function initPhysics(): Promise<void> {
   await RAPIER.init()
 }
 
-/** The physics world: the ground and ramps as solid shapes, plus whatever moves on them. */
+/** The physics world: the ground as a solid shape, plus whatever moves on it. */
 export class PhysicsWorld {
   readonly world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
   /** Gravity used in the latest step, m/s². */
   gravity = 9.81
   private ground: RAPIER.Collider[] = []
 
-  /** Replaces the ground and ramps, e.g. after the map changed. */
-  setGround(field: Heightfield, ramps: PlacedRamp[]): void {
+  /** Replaces the ground, e.g. after the map changed. */
+  setGround(field: Heightfield): void {
     for (const collider of this.ground) this.world.removeCollider(collider, false)
 
     // Rapier wants the heights column by column; ours are stored row by row.
@@ -36,12 +34,6 @@ export class PhysicsWorld {
       RAPIER.HeightFieldFlags.FIX_INTERNAL_EDGES,
     ).setFriction(GROUND_FRICTION)
     this.ground = [this.world.createCollider(terrain)]
-
-    for (const ramp of ramps) {
-      const { positions, indices } = buildRampMesh(ramp.def, ramp.baseY)
-      const shape = RAPIER.ColliderDesc.trimesh(positions, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES)
-      this.ground.push(this.world.createCollider(shape.setFriction(GROUND_FRICTION)))
-    }
 
     // New shapes only become findable (for wheel casts and groundHeightAt)
     // after a step. A step of zero time does that without moving anything.
