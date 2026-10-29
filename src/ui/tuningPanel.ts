@@ -40,6 +40,7 @@ export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs
   wrapper.style.maxHeight = 'calc(100vh - 16px)'
   wrapper.style.overflowY = 'auto'
   pane.hidden = true
+  pane.element.dataset.ownScroll = '' // the scroll wheel scrolls the panel, not the camera zoom
 
   const fileValues = sections.map((section) => structuredClone(section.target))
 

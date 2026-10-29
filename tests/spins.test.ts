@@ -129,6 +129,21 @@ describe('landing a spin', () => {
     expect(landFacing(180, config.crashes.worstBackwardsLanding * 0.6).count).toBe(0)
   })
 
+  it('landing backwards slowly is fine: rev up and ride out of it forwards', () => {
+    // the thirteenth tuning session: "a 180 at lower speed is fine, so you can rev and accelerate out of it"
+    const world = setupWithCrashes(flat(600))
+    world.bike.placeOnGround(0, 250, 0)
+    world.run(0.6)
+    world.bike.placeOnGround(0, 250, 180, 1)
+    world.bike.body.setLinvel({ x: 0, y: 0, z: -30 * KMH }, true) // rolling backwards at 30 km/h
+    world.run(1)
+    expect(world.crashes.count).toBe(0)
+    world.bike.controls.throttle = 1
+    world.run(3)
+    expect(world.bike.forwardSpeed).toBeGreaterThan(20 * KMH) // riding away forwards
+    expect(world.crashes.count).toBe(0)
+  })
+
   it('landing facing the way you go after a full spin is fine', () => {
     expect(landFacing(360, 50).count).toBe(0)
   })

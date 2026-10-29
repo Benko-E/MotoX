@@ -14,6 +14,10 @@ const SNAP_DISTANCE = 30
  * bumps and landings don't shake the picture.
  */
 export class ChaseCamera {
+  /** Which of config.camera.views it shows. */
+  view = 'chase'
+  /** How far it's zoomed, as a share of the view's distance (the scroll wheel). */
+  zoom = 1
   private heading = 0
   private readonly focus = new THREE.Vector3()
   private placed = false
@@ -42,13 +46,20 @@ export class ChaseCamera {
     this.focus.z = smoothToward(this.focus.z, bikePosition.z, c.positionLag, dt)
     this.focus.y = smoothToward(this.focus.y, bikePosition.y, c.heightLag, dt)
 
+    const view = (c.views as Record<string, { distance: number; height: number; lookHeight: number }>)[this.view] ?? c.views.chase
     const h = (this.heading * Math.PI) / 180
-    const distance = c.distance + c.distancePerSpeed * speed
+    const distance = view.distance * this.zoom + c.distancePerSpeed * speed
     const x = this.focus.x - Math.sin(h) * distance
     const z = this.focus.z + Math.cos(h) * distance
-    const y = Math.max(this.focus.y + c.height, this.groundAt(x, z) + GROUND_CLEARANCE)
+    const y = Math.max(this.focus.y + view.height * this.zoom, this.groundAt(x, z) + GROUND_CLEARANCE)
     camera.position.set(x, y, z)
-    camera.lookAt(this.focus.x, this.focus.y + c.lookHeight, this.focus.z)
+    camera.lookAt(this.focus.x, this.focus.y + view.lookHeight, this.focus.z)
+  }
+
+  /** Zooms out (positive) or in by scroll wheel clicks, within camera.closest and camera.furthest. */
+  zoomBy(clicks: number): void {
+    const { zoomStep, closest, furthest } = this.config.camera
+    this.zoom = Math.min(Math.max(this.zoom * (1 + zoomStep) ** clicks, closest), furthest)
   }
 
   /** Forget where it was, so the next update starts straight behind the bike. */

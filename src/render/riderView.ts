@@ -213,6 +213,11 @@ export class RiderView {
     }
   }
 
+  /** Where the rider's head is drawn, in world space. */
+  headPosition(target: THREE.Vector3): THREE.Vector3 {
+    return this.head.getWorldPosition(target)
+  }
+
   /** A box limb `thickness` across, stretched between two points by `place`. */
   private limb(thickness: number, material: THREE.Material): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, thickness, 1), material)

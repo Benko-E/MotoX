@@ -11,6 +11,8 @@ import { CrashWatcher } from './physics/crashes'
 import { initPhysics, PhysicsWorld } from './physics/world'
 import { BikeView } from './render/bikeView'
 import { GroundEffects } from './render/groundEffects'
+import { HelmetCamera } from './render/helmetCamera'
+import { nextCameraMode } from './render/cameraViews'
 import { ChaseCamera } from './render/chaseCamera'
 import { FlyCamera } from './render/flyCamera'
 import { createScene } from './render/scene'
@@ -76,7 +78,10 @@ fly.place(
 )
 
 const chase = new ChaseCamera(config, groundAt)
-/** Which camera is showing: the chase camera behind the bike, or the free-fly one. */
+const helmet = new HelmetCamera()
+/** Which camera is showing: a chase view (config.camera.views), 'helmet', or 'fly'. C goes round them. */
+let cameraMode = 'chase'
+/** Flying the free camera: the keys fly it instead of riding. */
 let flying = false
 
 // The panel: one folder per part of config.ts, the bike's feel open at the top,
@@ -131,12 +136,17 @@ let dropPressed = false
 input.onPress('reset', () => (resetPressed = true))
 input.onPress('dropBike', () => (dropPressed = true))
 input.onPress('toggleCamera', () => {
-  flying = !flying
+  cameraMode = nextCameraMode(config, cameraMode)
+  flying = cameraMode === 'fly'
   if (flying) {
-    // start flying from exactly where the chase camera is, looking the same way
+    // start flying from exactly where the camera is, looking the same way
     const ahead = view.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(10).add(view.camera.position)
     fly.place(view.camera.position, ahead)
-  } else chase.snap()
+  } else if (cameraMode === 'helmet') helmet.snap()
+  else {
+    chase.view = cameraMode
+    chase.snap()
+  }
 })
 
 const loop = new FixedStepLoop({
@@ -191,14 +201,20 @@ let secondStartedAt = performance.now()
 let rates = ''
 let lastFrameAt = performance.now()
 const lookPoint = new THREE.Vector3()
+const headAt = new THREE.Vector3()
+const bikeForward = new THREE.Vector3()
 
 /** Moves the game on by one screen frame of `frameTime` seconds and draws it. */
 function showFrame(frameTime: number) {
   loop.advance(frameTime)
   bikeView.update(loop.alpha, frameTime)
   groundEffects.update(Math.min(frameTime, 0.1))
+  const wheelClicks = input.takeWheel()
+  if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)
   if (flying) fly.apply(view.camera, loop.alpha)
-  else chase.update(view.camera, Math.min(frameTime, 0.1), bikeView.position, bikeView.heading, bike.speed)
+  else if (cameraMode === 'helmet') {
+    helmet.update(view.camera, Math.min(frameTime, 0.1), bikeView.headPosition(headAt), bikeView.forward(bikeForward))
+  } else chase.update(view.camera, Math.min(frameTime, 0.1), bikeView.position, bikeView.heading, bike.speed)
   view.camera.getWorldDirection(lookPoint).multiplyScalar(20).add(view.camera.position)
   view.focusShadows(lookPoint)
   view.render()
@@ -273,7 +289,7 @@ function readout(): string[] {
   const air = bike.airtime > 0 ? `${bike.airtime.toFixed(2)} s` : 'on the ground'
   const keys = flying
     ? [
-        'free-fly camera (C: back to the bike)',
+        'free-fly camera (C: back to the chase view)',
         'W A S D fly   E / Q up / down   Shift fast',
         'click  look with the mouse (Esc stops), or drag',
         'B   drop the bike ahead of the camera',
@@ -282,7 +298,7 @@ function readout(): string[] {
         'W throttle   S brake   A / D steer   ↑ / ↓ lean forward / back',
         'Space + steer: powerslide (hold, or tap to kick the rear out)',
         'in the air: lean to spin   ↓ + throttle: wheelie   ↑ + brake: stoppie',
-        'C free-fly camera',
+        `C camera views (now: ${cameraMode})   scroll wheel: zoom`,
         'R   bike upright again   B   drop the bike from 6 m',
       ]
   return [

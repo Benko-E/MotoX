@@ -78,6 +78,23 @@ describe('landings', () => {
     }
   })
 
+  it('on the front wheel: a small angle is fine, a steep one sloppy, straight down a crash', () => {
+    // the thirteenth tuning session: "perpendicular to the ground 100% a crash, but soft small angles fine"
+    const at = (pitch: number) => landOn(flat(600), 1, { x: 0, z: -15 }, { x: 0, heading: 0, pitch }).crashes
+    const small = at(-20)
+    expect(small.count).toBe(0)
+    expect(small.lastLanding!.sloppiness).toBe(0)
+    const steep = at(-55)
+    expect(steep.count).toBe(0)
+    expect(steep.lastLanding!.sloppiness).toBeGreaterThan(0.3)
+    expect(at(-85).count).toBe(1)
+    // and the same the other way round, straight down on the back wheel
+    expect(at(30).count).toBe(0)
+    const onTail = at(85)
+    expect(onTail.count).toBe(1)
+    expect(onTail.reason).toMatch(/tail/)
+  })
+
   it('a little sideways is clean, even quite a lot; only near the crash limit is it sloppy', () => {
     const sideways = (kmh: number) => landOn(flat(600), 0.8, { x: kmh * KMH, z: -10 }).crashes
     expect(sideways(30).lastLanding!.sloppiness).toBe(0)

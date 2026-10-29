@@ -170,6 +170,16 @@ export class BikeView {
     return this.root.position
   }
 
+  /** Where the rider's head is drawn this frame, in world space (for the helmet view). */
+  headPosition(target: THREE.Vector3): THREE.Vector3 {
+    return this.rider.headPosition(target)
+  }
+
+  /** The way the bike is drawn pointing this frame, in world space. */
+  forward(target: THREE.Vector3): THREE.Vector3 {
+    return target.set(0, 0, -1).applyQuaternion(this.root.quaternion)
+  }
+
   /** The compass heading the bike is drawn facing, degrees (0 = toward -z, 90 = toward +x). */
   get heading(): number {
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.root.quaternion)

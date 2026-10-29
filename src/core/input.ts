@@ -64,9 +64,18 @@ export class Input {
   private readonly heldKeys = new Set<string>()
   private readonly axisValues = new Map<string, number>()
   private readonly pressCallbacks = new Map<string, Array<() => void>>()
+  private wheelClicks = 0
 
   constructor(config: InputConfig, target: EventTarget) {
     this.config = config
+
+    // The scroll wheel, except over something that scrolls itself (marked
+    // data-own-scroll, like the tuning panel).
+    target.addEventListener('wheel', (event) => {
+      const over = event.target as { closest?: (selector: string) => unknown } | null
+      if (over?.closest?.('[data-own-scroll]')) return
+      this.wheelClicks += Math.sign((event as WheelEvent).deltaY)
+    })
 
     target.addEventListener('keydown', (event) => {
       const e = event as KeyboardEvent
@@ -98,6 +107,13 @@ export class Input {
   get anyHeld(): boolean {
     for (const code of this.heldKeys) if (this.isBound(code)) return true
     return false
+  }
+
+  /** Scroll wheel clicks since the last time they were taken: positive rolled away from you. */
+  takeWheel(): number {
+    const clicks = this.wheelClicks
+    this.wheelClicks = 0
+    return clicks
   }
 
   /** The eased value of an axis, -1 to 1. */

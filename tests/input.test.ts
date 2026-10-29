@@ -117,6 +117,23 @@ describe('Input', () => {
     expect(input.anyHeld).toBe(false)
   })
 
+  it('adds up scroll wheel clicks (away from you counts out) until they are taken', () => {
+    const { input, target } = makeInput()
+    const wheel = (deltaY: number) => Object.assign(new Event('wheel'), { deltaY })
+    target.dispatchEvent(wheel(120))
+    target.dispatchEvent(wheel(120))
+    target.dispatchEvent(wheel(-120))
+    expect(input.takeWheel()).toBe(1)
+    expect(input.takeWheel()).toBe(0) // taken
+  })
+
+  it('ignores the scroll wheel over something that scrolls itself, like the tuning panel', () => {
+    const panel = Object.assign(new EventTarget(), { closest: (selector: string) => (selector === '[data-own-scroll]' ? panel : null) })
+    const input = new Input({ keys: {}, easing: {} }, panel)
+    panel.dispatchEvent(Object.assign(new Event('wheel'), { deltaY: 120 }))
+    expect(input.takeWheel()).toBe(0)
+  })
+
   it('stops the browser using a bound key itself, pressed or released', () => {
     // Space would scroll the page, or press a tuning-panel button left focused (on release)
     const { target } = makeInput({ keys: { powerslide: ['Space'] }, easing: {} })

@@ -152,26 +152,41 @@ export const config = {
     enabled: true,
     /** Seconds before the bike is put back up after a crash. R gets you up straight away. */
     resetDelay: 1.5,
-    /** Landing nose-first or tail-first more than this far off the slope is a crash, degrees. Less just thuds through the suspension. 90 = never (a flip still crashes when the head hits the ground). */
-    worstLandingAngle: 90,
+    /** Landing nose-first or tail-first more than this far off the ground is a crash, degrees (90 = straight down). Past jumps.landing.sloppyAngle it's sloppy on the way there. A flip crashes anyway when the head hits the ground. */
+    worstLandingAngle: 75,
     /** Landing with this much sideways speed or more flings you over, km/h. Below it you slide and ride on. */
     worstSidewaysLanding: 80,
     /** Landing rolling backwards faster than this is a crash, km/h (a spin in the air gone round too far, or not far enough). */
-    worstBackwardsLanding: 20,
+    worstBackwardsLanding: 40,
   },
 
   /** The camera behind the bike. */
   camera: {
     /** How wide the view is, degrees. Wider feels faster but stretches the edges. */
     fov: 65,
-    /** How far behind the bike, metres. */
-    distance: 5.5,
+    /** The views behind the bike. C goes through them in this order, then the helmet view, then the free-fly camera. */
+    views: {
+      /** Behind and a little above: the usual view. */
+      chase: {
+        /** How far behind the bike, metres. */
+        distance: 5.5,
+        /** How high above the bike, metres. */
+        height: 2.0,
+        /** The point it looks at, metres above the bike. */
+        lookHeight: 0.9,
+      },
+      /** Close behind and low: feels faster. */
+      close: { distance: 3.4, height: 1.3, lookHeight: 1.0 },
+      /** Far back and up high: see the whole jump. */
+      high: { distance: 10, height: 5, lookHeight: 0.6 },
+    },
+    /** One click of the scroll wheel zooms in or out this much, as a share of the distance. */
+    zoomStep: 0.1,
+    /** The closest and furthest the scroll wheel zooms, as a share of the view's own distance. */
+    closest: 0.5,
+    furthest: 2.5,
     /** Extra distance per metre per second of speed, so speed feels faster. */
     distancePerSpeed: 0.03,
-    /** How high above the bike, metres. */
-    height: 2.0,
-    /** The point it looks at, metres above the bike. */
-    lookHeight: 0.9,
     /** Seconds it takes to swing round behind the bike after it turns. Lower is snappier, higher is smoother. */
     turnLag: 0.3,
     /** Seconds it takes to follow the bike up and down. Higher keeps jumps and bumps from shaking the view. */
@@ -228,7 +243,7 @@ export const config = {
       reset: ['KeyR'],
       /** Drop the bike from a height (for testing landings). */
       dropBike: ['KeyB'],
-      /** Switch between the chase camera and the free-fly camera. */
+      /** Go through the camera views: the chase views, the helmet view, then the free-fly camera. */
       toggleCamera: ['KeyC'],
       togglePanel: ['Backquote'],
       flyForward: ['KeyW'],
@@ -350,6 +365,12 @@ export const configRanges: Ranges = {
   'jumps.landing.wobble': [0, 2, 0.05],
   'advanced.fallingOver.sideTip': [30, 90, 1],
   'camera.fov': [30, 110, 1],
+  'camera.views.*.distance': [1, 25, 0.1],
+  'camera.views.*.height': [0, 12, 0.1],
+  'camera.views.*.lookHeight': [-1, 3, 0.05],
+  'camera.zoomStep': [0.01, 0.5, 0.01],
+  'camera.closest': [0.2, 1, 0.05],
+  'camera.furthest': [1, 5, 0.1],
   'effects.tyreTracks.lasts': [1, 120, 1],
   'effects.tyreTracks.width': [0.05, 0.4, 0.01],
   'effects.tyreTracks.rolling': [0, 1, 0.01],
