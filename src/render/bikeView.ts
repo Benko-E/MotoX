@@ -9,6 +9,10 @@ import { RiderView } from './riderView'
  * steering; both are only drawn, the physics bike stays upright. It only reads
  * the physics, so swapping in a real model later can't change the handling.
  */
+/** Spinning up in the dirt flat out, the rear tyre's surface runs this much faster than the ground, m/s. */
+const WHEELSPIN_SURFACE = 12
+const UP = { x: 0, y: 1, z: 0 }
+
 export class BikeView {
   /** Follows the physics bike exactly. */
   private readonly root = new THREE.Group()
@@ -30,6 +34,12 @@ export class BikeView {
   private readonly pivot = new THREE.Vector3()
   private readonly leanAxis = new THREE.Vector3()
   private readonly normal = new THREE.Vector3()
+  /** How far each wheel hangs below the top of its suspension this frame, metres. */
+  private drops = [0, 0]
+  /** Extra turns the rear wheel is drawn with while it spins up in the dirt, radians. */
+  private wheelspinTurns = 0
+  /** How hard the rear tyre is spinning up in the dirt, 0 to 1 (set by the ground effects). */
+  rearWheelspin = 0
 
   constructor(
     scene: THREE.Scene,
@@ -96,6 +106,18 @@ export class BikeView {
     return (Math.atan2(forward.x, -forward.z) * 180) / Math.PI
   }
 
+  /**
+   * Where drawn tyre `i` (0 = front) touches the ground this frame, or its
+   * lowest point while it's in the air, in world space.
+   */
+  contactPoint(i: number, target: THREE.Vector3): THREE.Vector3 {
+    const half = this.bike.stats.build.wheelbase / 2
+    this.root.updateMatrixWorld()
+    target.set(0, -this.drops[i], i === 0 ? -half : half).applyMatrix4(this.root.matrixWorld) // the axle
+    const down = this.bike.groundNormal ?? UP
+    return target.addScaledVector(this.normal.set(down.x, down.y, down.z), -this.bike.radius(i))
+  }
+
   /** Draws the bike `alpha` of the way from the previous physics step to the latest; `dt` is the frame time. */
   update(alpha: number, dt: number): void {
     const { previous, current, stats, wheels } = this.bike
@@ -110,13 +132,16 @@ export class BikeView {
 
     const half = stats.build.wheelbase / 2
     const drops = wheels.map((state) => THREE.MathUtils.lerp(state.previousExtension, state.extension, alpha))
+    this.drops = drops
+    // spinning up, the rear tyre's surface runs this much faster than the ground
+    this.wheelspinTurns += (this.rearWheelspin * WHEELSPIN_SURFACE * Math.min(dt, 0.1)) / this.bike.radius(1)
     wheels.forEach((_state, i) => {
       const radius = this.bike.radius(i)
       const along = i === 0 ? 0 : half // the front wheel sits in the front end, already at -half
       const wheel = this.wheels[i]
       wheel.scale.set(1, radius, radius)
       wheel.position.set(0, -drops[i], along)
-      wheel.rotation.x = -wheels[i].spin
+      wheel.rotation.x = -wheels[i].spin - (i === 1 ? this.wheelspinTurns : 0)
 
       // The leg runs from 0.25 m above the top of the travel down to the axle.
       const leg = this.legs[i]

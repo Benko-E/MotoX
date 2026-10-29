@@ -37,6 +37,19 @@ function drawLeaning(bike: Bike, view: BikeView, model: THREE.Object3D, degrees:
   }
 }
 
+describe('where the drawn tyres touch', () => {
+  it('standing still, both drawn tyres sit right on the ground: no hovering', () => {
+    const { bike, run, view } = drawn()
+    bike.placeOnGround(0, 0, 0)
+    run(2)
+    view.update(1, 1 / 60)
+    for (const i of [0, 1]) {
+      const touching = view.contactPoint(i, new THREE.Vector3())
+      expect(Math.abs(touching.y)).toBeLessThan(0.01)
+    }
+  })
+})
+
 describe('drawing the lean', () => {
   it('riding level, leaning tips the drawn bike over without turning it', () => {
     const { bike, run, view, model } = drawn()

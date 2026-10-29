@@ -163,6 +163,38 @@ export const config = {
     positionLag: 0.08,
   },
 
+  /** How the tyres mark and throw the dirt. Only looks: nothing here changes the riding. */
+  effects: {
+    /** Tracks the tyres leave in the dirt. */
+    tyreTracks: {
+      /** Leave tracks at all. */
+      enabled: true,
+      /** Seconds a track takes to fade away. */
+      lasts: 30,
+      /** How wide a track is, metres. */
+      width: 0.14,
+      /** How dark the track from just rolling is, 0 (none) to 1 (black). */
+      rolling: 0.15,
+      /** How dark it gets where the tyre slides, skids or spins, 0 to 1. */
+      skidding: 0.6,
+    },
+    /** Clods of dirt thrown up where a tyre slides, skids or spins. */
+    dirt: {
+      /** Throw dirt at all. */
+      enabled: true,
+      /** Clods thrown per second by a tyre sliding or spinning flat out. */
+      amount: 80,
+      /** How hard they're thrown, metres per second. */
+      throw: 5,
+      /** How big a clod is, metres. */
+      size: 0.07,
+    },
+    /** Below this speed, full throttle spins the rear tyre up in the dirt, km/h. */
+    wheelspinUntil: 25,
+    /** How dark the soft shadow right under each tyre is, 0 (none) to 1. It's what makes the bike sit on the ground. */
+    tyreShadow: 0.5,
+  },
+
   /** Keys, and how quickly key presses ease in and out. */
   controls: {
     /** Which keys do what. Names are keyboard key codes: KeyW is the W key, Backquote the ` key left of 1, ShiftLeft the left Shift. They name the key's position, so they work on any keyboard layout. */
@@ -239,6 +271,7 @@ export type BikeStats = Config['bike']
 export type BikeBody = Config['advanced']['bikeBody']
 export type CrashSettings = Config['crashes']
 export type FallingOverSettings = Config['advanced']['fallingOver']
+export type EffectSettings = Config['effects']
 
 /** Earth's gravity, m/s². */
 export const EARTH_GRAVITY = 9.81
@@ -292,6 +325,15 @@ export const configRanges: Ranges = {
   'crashes.worstSidewaysLanding': [5, 150, 1],
   'advanced.fallingOver.sideTip': [30, 90, 1],
   'camera.fov': [30, 110, 1],
+  'effects.tyreTracks.lasts': [1, 120, 1],
+  'effects.tyreTracks.width': [0.05, 0.4, 0.01],
+  'effects.tyreTracks.rolling': [0, 1, 0.01],
+  'effects.tyreTracks.skidding': [0, 1, 0.01],
+  'effects.dirt.amount': [0, 300, 1],
+  'effects.dirt.throw': [0, 15, 0.1],
+  'effects.dirt.size': [0.02, 0.2, 0.01],
+  'effects.wheelspinUntil': [0, 80, 1],
+  'effects.tyreShadow': [0, 1, 0.01],
   'controls.easing.*.riseTime': [0, 1, 0.01],
   'controls.easing.*.fallTime': [0, 1, 0.01],
   'advanced.physics.stepHz': [30, 240, 1],

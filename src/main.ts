@@ -10,6 +10,7 @@ import { Bike } from './physics/bike'
 import { CrashWatcher } from './physics/crashes'
 import { initPhysics, PhysicsWorld } from './physics/world'
 import { BikeView } from './render/bikeView'
+import { GroundEffects } from './render/groundEffects'
 import { ChaseCamera } from './render/chaseCamera'
 import { FlyCamera } from './render/flyCamera'
 import { createScene } from './render/scene'
@@ -40,6 +41,14 @@ const groundAt = (x: number, z: number) => heightAt(terrain.field, x, z)
 const bike = new Bike(physics, config.bike, config.advanced.bikeBody)
 const crashes = new CrashWatcher(physics, bike, config.crashes, config.advanced.fallingOver)
 const bikeView = new BikeView(view.scene, bike)
+const groundEffects = new GroundEffects(
+  view.scene,
+  bike,
+  bikeView,
+  config.effects,
+  (x, z) => physics.groundHeightAt(x, z, bike.body) ?? groundAt(x, z),
+  () => config.jumps.gravity * EARTH_GRAVITY,
+)
 
 function rebuildTerrain() {
   terrain = generateTerrain(map)
@@ -174,6 +183,7 @@ const lookPoint = new THREE.Vector3()
 function showFrame(frameTime: number) {
   loop.advance(frameTime)
   bikeView.update(loop.alpha, frameTime)
+  groundEffects.update(Math.min(frameTime, 0.1))
   if (flying) fly.apply(view.camera, loop.alpha)
   else chase.update(view.camera, Math.min(frameTime, 0.1), bikeView.position, bikeView.heading, bike.speed)
   view.camera.getWorldDirection(lookPoint).multiplyScalar(20).add(view.camera.position)

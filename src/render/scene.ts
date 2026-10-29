@@ -1,8 +1,9 @@
 import * as THREE from 'three'
 import type { Config } from '../config'
 
-/** How far around the camera the sun draws shadows, metres. */
-const SHADOW_REACH = 60
+/** How far around the camera the sun draws shadows, metres. Spread over the
+ * shadow map's 4096 pixels: about 2 cm each, fine enough for a tyre to show. */
+const SHADOW_REACH = 45
 
 export interface SceneView {
   renderer: THREE.WebGLRenderer
@@ -34,7 +35,7 @@ export function createScene(container: HTMLElement, config: Config): SceneView {
   const sunOffset = new THREE.Vector3(45, 35, 25)
   const sun = new THREE.DirectionalLight(0xfff2dd, 2.8)
   sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
+  sun.shadow.mapSize.set(4096, 4096)
   sun.shadow.camera.left = -SHADOW_REACH
   sun.shadow.camera.right = SHADOW_REACH
   sun.shadow.camera.top = SHADOW_REACH
