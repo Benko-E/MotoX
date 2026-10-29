@@ -26,6 +26,10 @@ export class BikeView {
   private readonly blend = new THREE.Quaternion()
   private readonly from = new THREE.Quaternion()
   private readonly to = new THREE.Quaternion()
+  private readonly inverse = new THREE.Quaternion()
+  private readonly pivot = new THREE.Vector3()
+  private readonly leanAxis = new THREE.Vector3()
+  private readonly normal = new THREE.Vector3()
 
   constructor(
     scene: THREE.Scene,
@@ -122,11 +126,22 @@ export class BikeView {
     })
     this.frontEnd.rotation.y = (-this.bike.steerAngle * Math.PI) / 180
 
-    // Lean about the line where the tyres touch the ground.
-    const groundBelow = (drops[0] + drops[1] + this.bike.radius(0) + this.bike.radius(1)) / 2
-    this.leanPivot.position.y = -groundBelow
-    this.model.position.y = groundBelow
-    this.leanPivot.rotation.z = -this.bike.lean
+    // Lean about the line where the tyres touch the ground: through the rear
+    // tyre (in a wheelie the only one down), along the ground the way the bike
+    // points. Not along the bike itself: up in a wheelie that line points up
+    // too, and leaning about it would twist the bike off where it's going.
+    this.pivot.set(0, -(drops[1] + this.bike.radius(1)), half)
+    this.leanPivot.position.copy(this.pivot)
+    this.model.position.copy(this.pivot).negate()
+    this.leanAxis.set(0, 0, -1)
+    const ground = this.bike.groundNormal
+    if (ground) {
+      const forward = this.leanAxis.applyQuaternion(this.root.quaternion)
+      const normal = this.normal.set(ground.x, ground.y, ground.z)
+      forward.addScaledVector(normal, -forward.dot(normal)).normalize()
+      forward.applyQuaternion(this.inverse.copy(this.root.quaternion).invert()) // back into the bike's own space
+    }
+    this.leanPivot.quaternion.setFromAxisAngle(this.leanAxis, this.bike.lean)
 
     this.riderLean += (this.bike.controls.lean - this.riderLean) * (1 - Math.exp(-Math.min(dt, 0.1) / 0.08))
     const squash = (wheels[0].compressionRatio + wheels[1].compressionRatio) / 2

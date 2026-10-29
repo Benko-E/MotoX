@@ -203,6 +203,21 @@ describe('powerslides', () => {
     expect(held).toEqual(fly(false))
   })
 
+  it('no powerslide while the front wheel is up in a wheelie', () => {
+    const { bike, run } = rolling(40)
+    bike.stats.rider.wheelieSteering = 0.1
+    bike.controls.lean = -1
+    bike.controls.throttle = 1
+    bike.controls.brake = 0
+    run(1)
+    bike.controls.steer = 1
+    bike.controls.powerslide = true
+    let most = 0
+    run(1, () => (most = Math.max(most, Math.abs(bike.heading - bike.travelHeading))))
+    expect(bike.wheels[0].onGround).toBe(false) // still up
+    expect(most).toBeLessThan(1)
+  })
+
   it('braking (S) while turning never swings the rear out', () => {
     const { bike, run } = rolling(60)
     bike.controls.steer = 1

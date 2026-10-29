@@ -100,12 +100,14 @@ export const config = {
       airSpinResponse: 0.12,
       /** Leaning back with the throttle open lifts the front wheel up to this angle, degrees. 0 = no wheelies. */
       wheelieAngle: 40,
+      /** A wheelie pulls harder: seconds from 0 to 60 km/h when up on the back wheel (on both wheels it's speed.secondsTo60). Lower = a stronger pull. */
+      wheelieSecondsTo60: 0.8,
       /** Leaning forward with the brake on lifts the rear wheel up to this angle, degrees. 0 = no stoppies. */
       stoppieAngle: 15,
       /** Seconds a wheelie or stoppie takes to reach its angle. Lower pops up faster. */
       liftResponse: 0.18,
       /** How much you can still steer with the front wheel in the air during a wheelie, 0 to 1. */
-      wheelieSteering: 0,
+      wheelieSteering: 0.1,
       /** On the ground without throttle or brake, how far leaning tips the bike forward or back on its suspension, degrees. The feel of moving your body; wheelies and stoppies have their own angles above. */
       weightShiftAngle: 4,
     },
@@ -273,6 +275,7 @@ export const configRanges: Ranges = {
   'bike.rider.airSpin': [0, 400, 1],
   'bike.rider.airSpinResponse': [0, 0.5, 0.01],
   'bike.rider.wheelieAngle': [0, 60, 1],
+  'bike.rider.wheelieSecondsTo60': [0.3, 3, 0.05],
   'bike.rider.stoppieAngle': [0, 45, 1],
   'bike.rider.liftResponse': [0.05, 1, 0.01],
   'bike.rider.wheelieSteering': [0, 1, 0.01],

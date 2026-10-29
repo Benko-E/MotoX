@@ -20,6 +20,15 @@ function cruise(bike: Bike, target: number) {
   bike.controls.brake = clamp((speed - target - 1) / 2, 0, 1)
 }
 
+/** Speed over the ground, m/s (forwardSpeed is along the bike, which points up in a wheelie). */
+const groundSpeed = (bike: Bike) => Math.hypot(bike.body.linvel().x, bike.body.linvel().z)
+
+/** On flat ground, moves the bike back when it nears the edge (speed and direction kept), for long runs. */
+function keepOnMap(bike: Bike) {
+  const p = bike.body.translation()
+  if (Math.abs(p.x) > 250 || Math.abs(p.z) > 250) bike.body.setTranslation({ x: 0, y: p.y, z: 0 }, true)
+}
+
 /** How fast the bike spins nose up (positive) or down, degrees per second. */
 function noseUpRate(bike: Bike) {
   const right = rotate(bike.body.rotation(), { x: 1, y: 0, z: 0 })
@@ -172,6 +181,78 @@ describe('leaning on the ground', () => {
       return Math.abs(bike.body.angvel().y)
     }
     expect(turnRate(true)).toBeLessThan(turnRate(false) * (rider.wheelieSteering + 0.2))
+  })
+
+  it('steering a little in a wheelie turns the bike where it points: no crabbing sideways', () => {
+    const { bike, run } = rolling(20)
+    bike.stats.rider.wheelieSteering = 0.1
+    bike.controls.lean = -1
+    bike.controls.throttle = 1
+    run(1)
+    const heading = bike.heading
+    bike.controls.steer = 1
+    run(1.5, () => keepOnMap(bike))
+    expect(bike.wheels[0].onGround).toBe(false) // still up
+    expect(bike.heading - heading).toBeGreaterThan(5) // it turned right
+    expect(Math.abs(bike.heading - bike.travelHeading)).toBeLessThan(1)
+  })
+
+  it('a wheelie pulls harder: 0 to 60 km/h in about wheelieSecondsTo60', () => {
+    const timeTo60 = (wheelie: boolean) => {
+      const { bike, run } = setup(flat(600))
+      bike.placeOnGround(0, 250, 0)
+      run(1)
+      bike.controls.throttle = 1
+      bike.controls.lean = wheelie ? -1 : 0
+      let time = 0
+      run(4, () => {
+        if (groundSpeed(bike) < 60 * KMH) time += 1 / 120
+      })
+      return time
+    }
+    // the front takes a moment to come up, pulling only partly harder until it's up
+    expect(timeTo60(true)).toBeGreaterThan(rider.wheelieSecondsTo60 - 0.05)
+    expect(timeTo60(true)).toBeLessThan(rider.wheelieSecondsTo60 + 0.3)
+    expect(timeTo60(false)).toBeGreaterThan(config.bike.speed.secondsTo60 * 0.9) // on both wheels as before
+  })
+
+  it('popping a wheelie at speed pulls harder than staying on both wheels, but no faster than topSpeed', () => {
+    const gained = (wheelie: boolean) => {
+      const { bike, run } = rolling(50)
+      const before = groundSpeed(bike)
+      bike.controls.lean = wheelie ? -1 : 0
+      bike.controls.throttle = 1
+      bike.controls.brake = 0
+      run(1)
+      return groundSpeed(bike) - before
+    }
+    expect(gained(true)).toBeGreaterThan(gained(false) * 1.2) // the front takes part of that second to come up
+
+    const { bike, run } = rolling(50)
+    bike.controls.lean = -1
+    bike.controls.throttle = 1
+    bike.controls.brake = 0
+    run(15, () => keepOnMap(bike))
+    expect(groundSpeed(bike) / KMH).toBeLessThan(config.bike.speed.topSpeed * 1.01)
+  })
+
+  it('the front wheel is drawn turned all the way in a wheelie, whatever the speed', () => {
+    const { bike, run } = rolling(50)
+    bike.controls.lean = -1
+    bike.controls.throttle = 1
+    run(1)
+    bike.controls.steer = 1
+    run(0.5)
+    expect(bike.wheels[0].onGround).toBe(false)
+    const fullLock = Math.atan(config.bike.build.wheelbase / config.bike.turning.tightestTurnSlow) / DEG
+    expect(bike.steerAngle).toBeGreaterThan(fullLock - 2)
+    expect(bike.steerAngle).toBeLessThan(fullLock + 2)
+
+    // front wheel back down at speed: only as far as the turn needs again
+    bike.controls.lean = 0
+    run(1.5, () => cruise(bike, 50 * KMH))
+    expect(bike.wheels[0].onGround).toBe(true)
+    expect(bike.steerAngle).toBeLessThan(fullLock / 2)
   })
 
   it('leaning shifts weight between the suspensions without lifting a wheel', () => {

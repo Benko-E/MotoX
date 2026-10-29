@@ -57,6 +57,8 @@ const MIN_JUMP = 0.15
 const SLIDE_FOLLOW = 0.05
 /** In a powerslide the rear may wander this far past the slide angle before grip catches it, degrees. */
 const SLIDE_MARGIN = 10
+/** How quickly the drawn front wheel swings to full lock as it lifts in a wheelie, and back as it lands, seconds. */
+const FRONT_WHEEL_SWING = 0.1
 
 export interface Pose {
   position: Vec3
@@ -115,6 +117,8 @@ export class Bike {
   private massKey = ''
   /** How fast the slide angle was changing in the last step, radians per second. */
   private slideRate = 0
+  /** How far the drawn front wheel has gone to full lock for a wheelie, 0 to 1. */
+  private frontUpDrawn = 0
 
   constructor(
     private readonly physics: PhysicsWorld,
@@ -159,7 +163,7 @@ export class Bike {
     })
     this.airtime = 0
     this.lean = 0
-    this.powersliding = this.slideAngle = this.slideRate = 0
+    this.powersliding = this.slideAngle = this.slideRate = this.frontUpDrawn = 0
     this.current = this.readPose()
     this.previous = this.current
   }
@@ -313,20 +317,23 @@ export class Bike {
       const toRear = stats.build.wheelbase / 2 + stats.weight.forward
       const slideNow = dot(linvel, side) + dot(angvel, n) * toRear
 
+      // with the front wheel up in a wheelie there's less to steer with
+      const frontUp = !this.wheels[0].onGround && this.wheels[1].onGround
+      const steering = steer * (frontUp ? clamp(rider.wheelieSteering, 0, 1) : 1)
+
       // Powerslide: holding Space eases into it over kickOut, letting go eases
-      // out over hookUp. Only rolling forward on the rear wheel, above minSpeed.
+      // out over hookUp. Only rolling forward on both wheels (not in a
+      // wheelie), above minSpeed.
       const { powerslide } = stats
       const rolling = Math.hypot(speedAhead, slideNow)
-      const wantSlide =
-        this.controls.powerslide && speedAhead > 0 && rolling * 3.6 >= powerslide.minSpeed && this.wheels[1].onGround
-          ? 1
-          : 0
+      const bothDown = this.wheels[0].onGround && this.wheels[1].onGround
+      const wantSlide = this.controls.powerslide && bothDown && speedAhead > 0 && rolling * 3.6 >= powerslide.minSpeed ? 1 : 0
       const slideTime = wantSlide > this.powersliding ? powerslide.kickOut : powerslide.hookUp
       this.powersliding += (wantSlide - this.powersliding) * ease(dt, slideTime)
       if (this.powersliding < 1e-4) this.powersliding = 0
       const sliding = this.powersliding
       // the slide angle steering asks for: the nose into the turn, the rear out
-      const slideTo = -steer * powerslide.angle * DEG * sliding
+      const slideTo = -steering * powerslide.angle * DEG * sliding
       // The rails the bike runs on are turned by the slide angle: in a
       // powerslide the rear rolls along them at an angle to where the bike
       // points. Anywhere between straight and the slide angle asked for (plus
@@ -353,7 +360,14 @@ export class Bike {
       // of it pushes you along the slide, and the sliding tyre scrubs speed.
       const slip = Math.atan2(Math.abs(slideAcross), Math.abs(speedAlong))
       const traction = Math.cos(slip) ** 2
-      const drive = this.wheels[1].onGround ? throttle * driveAcceleration(speed, speedAlong) * traction * railCos : 0
+      // Up on the back wheel the bike pulls harder: 0 to 60 in wheelieSecondsTo60
+      // instead of secondsTo60, more the higher the front is (fully at wheelieAngle).
+      const noseUp = Math.asin(clamp(dot(forward, n), -1, 1))
+      const wheelieUp = frontUp ? clamp(noseUp / (Math.max(rider.wheelieAngle, 5) * DEG), 0, 1) : 0
+      const onBoth = driveAcceleration(speed, speedAlong)
+      const onBack = driveAcceleration({ ...speed, secondsTo60: rider.wheelieSecondsTo60 }, speedAlong)
+      const pull = onBoth + (onBack - onBoth) * wheelieUp
+      const drive = this.wheels[1].onGround ? throttle * pull * traction * railCos : 0
       const braking = brake * brakeDeceleration(speed)
       const coasting = (1 - throttle) * coastDeceleration(speed) + (sliding * powerslide.scrub) / 3.6
       const nextSpeed = speedAlong + (drive - gravity * dot(UP, along)) * dt
@@ -380,8 +394,6 @@ export class Bike {
       // powerslide the bike also swings toward the slide angle on top of that.
       const normalRadius = turnRadiusAt(turning, speed, speedAlong)
       this.turnRadius = normalRadius * (1 + (powerslide.tighterTurn - 1) * sliding)
-      // with the front wheel up in a wheelie there's less to steer with
-      const steering = steer * (this.wheels[0].onGround ? 1 : clamp(rider.wheelieSteering, 0, 1))
       // sliding tyres can't turn hard either: steering bites again as the bike straightens out
       const wantedTurnRate = (-steering * speedAlong * traction) / this.turnRadius
       const turnNow = dot(angvel, n)
@@ -431,6 +443,12 @@ export class Bike {
       const frontAcross = speedAlong * Math.sin(railAfter) - newTurn * stats.build.wheelbase
       const slideSteer = Math.atan2(frontAcross, Math.max(speedAlong * Math.cos(railAfter), 0.1)) / DEG
       this.steerAngle = normalSteer + (slideSteer - normalSteer) * sliding
+      // In a wheelie the front wheel is in the air, free to turn all the way:
+      // as far as at a standstill, whatever the speed (eased, so it doesn't
+      // snap as the front lifts or lands).
+      this.frontUpDrawn += ((frontUp ? 1 : 0) - this.frontUpDrawn) * ease(dt, FRONT_WHEEL_SWING)
+      const fullLock = (steer * Math.atan(stats.build.wheelbase / turning.tightestTurnSlow)) / DEG
+      this.steerAngle += (fullLock - this.steerAngle) * this.frontUpDrawn
 
       // Leaning tips the bike toward an angle, measured from the ground, and
       // holds it there, so it can never loop over:
@@ -438,7 +456,6 @@ export class Bike {
       //   up into a wheelie
       // - lean forward: a few degrees forward; with the brake on, up into a stoppie
       // Let go and gravity brings it back down.
-      const noseUp = Math.asin(clamp(dot(forward, n), -1, 1))
       const shift = rider.weightShiftAngle * DEG
       let liftTo = 0
       let lifting = 0
