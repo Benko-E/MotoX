@@ -93,6 +93,7 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const length = along[count - 1] + Math.hypot(xs[0] - xs[count - 1], zs[0] - zs[count - 1])
   const land = new Float64Array(count)
   for (let k = 0; k < count; k++) land[k] = heightAt(xs[k], zs[k])
+  field.trackLine = Array.from(xs, (x, k) => ({ x, z: zs[k] }))
 
   // the floor: the land evened out round the loop, keeping (1 - flatness) of its gentler rolls; then the jumps
   const even = evenOut(land, ch.smoothing / CHANNEL_STEP)

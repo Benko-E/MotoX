@@ -12,6 +12,12 @@
 import { ANCHORS, type Anchor } from './hud/layout'
 import type { Choices, Ranges } from './ui/tunables'
 
+/** What the AI riders can do, and which way round a track. */
+export const AI_BEHAVIOURS = ['freeRoam', 'followTrack'] as const
+export type AiBehaviour = (typeof AI_BEHAVIOURS)[number]
+export const TRACK_WAYS = ['clockwise', 'counterclockwise'] as const
+export type TrackWay = (typeof TRACK_WAYS)[number]
+
 export const config = {
   /** The bike you ride. */
   bike: {
@@ -277,6 +283,10 @@ export const config = {
   ai: {
     /** Their names, floating above their heads, the first rider's first. */
     names: ['Helga'],
+    /** What they do: roam free (taking a jump now and then), or follow the track round. */
+    behaviour: 'followTrack' as AiBehaviour,
+    /** Following the track, which way round. The track's jumps face clockwise: the other way they're steep step-ups. */
+    trackWay: 'counterclockwise' as TrackWay,
     /** How fast they ride when just getting about, km/h. */
     cruiseSpeed: 45,
     /** They stay within this far of the middle of the map, metres, going round every quarter of it. */
@@ -416,6 +426,8 @@ export const EARTH_GRAVITY = 9.81
 /** Settings that are picked from a list: a dropdown in the tuning panel. */
 export const configChoices: Choices = {
   'hud.*.anchor': ANCHORS,
+  'ai.behaviour': AI_BEHAVIOURS,
+  'ai.trackWay': TRACK_WAYS,
 }
 
 export const configRanges: Ranges = {

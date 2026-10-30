@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { sampleCoord, type Heightfield } from '../terrain/heightfield'
 
-/** The ground texture repeats every this many metres; its faint lines mark the squares. */
+/** The ground texture's speckle repeats every this many metres. */
 const TILE_METRES = 10
 
 const GRASS = new THREE.Color(0x76913f)
@@ -83,7 +83,7 @@ function groundColors(geometry: THREE.BufferGeometry, track?: Float32Array): Flo
   return colors
 }
 
-/** A light speckled tile with faint edges, tinted by the vertex colours. */
+/** A light speckled tile, tinted by the vertex colours. */
 function makeGroundTexture(): THREE.CanvasTexture {
   const size = 256
   const canvas = document.createElement('canvas')
@@ -95,9 +95,6 @@ function makeGroundTexture(): THREE.CanvasTexture {
     image.data.set([shade, shade, shade, 255], i * 4)
   }
   g.putImageData(image, 0, 0)
-  g.strokeStyle = 'rgba(0, 0, 0, 0.12)'
-  g.lineWidth = 2
-  g.strokeRect(0, 0, size, size)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping

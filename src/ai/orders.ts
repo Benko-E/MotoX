@@ -10,8 +10,8 @@ import type { JumpSpot } from '../world/jumpFinder'
 import { turnBetween } from './riding'
 
 export type Order =
-  /** Ride to a spot on the map. */
-  | { kind: 'rideTo'; x: number; z: number }
+  /** Ride to a spot on the map; with `onLine`, straight there over whatever's in the way (a track's jumps, say), not round steep ground. */
+  | { kind: 'rideTo'; x: number; z: number; onLine?: boolean }
   /** Ride on at an easy speed for a while, wherever the ground lets him. */
   | { kind: 'cruise'; seconds: number }
   /** Get lined up on a jump's run-up, hit it at its speed, fly, land and ride out. */
@@ -29,6 +29,8 @@ export interface Behaviour {
   refill(orders: Orders, rider: RiderState): void
   /** Called every physics step, `dt` seconds apart, to add or push orders on the way. */
   watch?(orders: Orders, rider: RiderState, dt: number): void
+  /** How far from the middle he may go, metres, if not his roam radius. */
+  area?(): number | undefined
 }
 
 export class Orders {
@@ -159,5 +161,74 @@ export class FreeRoam implements Behaviour {
       nearestDistance = distance
     }
     return nearest
+  }
+}
+
+/** Following the track, he rides to a point this far on along it each time, metres. */
+const TRACK_AHEAD = 25
+
+/**
+ * Riding round the track: to a point a little further along it, the way he's
+ * set to go, and again. Away from the track, that takes him to it first.
+ */
+export class FollowTrack implements Behaviour {
+  constructor(
+    /** Read live, so the tuning panel applies at once. */
+    readonly settings: { trackWay: string },
+    /** The track's line, its points about a metre apart going round clockwise; none if the map has no track. */
+    private readonly line: () => readonly { x: number; z: number }[] | undefined,
+  ) {}
+
+  refill(orders: Orders, rider: RiderState): void {
+    const line = this.line()
+    if (!line?.length) {
+      orders.add({ kind: 'cruise', seconds: CRUISE_FOR[0] })
+      return
+    }
+    let nearest = 0
+    for (let i = 1; i < line.length; i++) {
+      if (Math.hypot(line[i].x - rider.x, line[i].z - rider.z) < Math.hypot(line[nearest].x - rider.x, line[nearest].z - rider.z)) nearest = i
+    }
+    const step = this.settings.trackWay === 'counterclockwise' ? -1 : 1
+    let at = nearest
+    for (let gone = 0; gone < TRACK_AHEAD && Math.abs(at - nearest) < line.length; ) {
+      const next = (((at + step) % line.length) + line.length) % line.length
+      gone += Math.hypot(line[next].x - line[at].x, line[next].z - line[at].z)
+      at = next
+      if (at === nearest) break
+    }
+    orders.add({ kind: 'rideTo', x: line[at].x, z: line[at].z, onLine: true })
+  }
+
+  area(): number {
+    const line = this.line() ?? []
+    return line.reduce((far, p) => Math.max(far, Math.hypot(p.x, p.z)), 0) + TRACK_AHEAD
+  }
+}
+
+/** Whichever behaviour is chosen right now; when the choice changes he drops his orders and starts on the new one. */
+export class PickBehaviour implements Behaviour {
+  private last: Behaviour | null = null
+
+  constructor(private readonly chosen: () => Behaviour) {}
+
+  refill(orders: Orders, rider: RiderState): void {
+    this.switchIfChanged(orders)
+    this.chosen().refill(orders, rider)
+  }
+
+  watch(orders: Orders, rider: RiderState, dt: number): void {
+    this.switchIfChanged(orders)
+    this.chosen().watch?.(orders, rider, dt)
+  }
+
+  area(): number | undefined {
+    return this.chosen().area?.()
+  }
+
+  private switchIfChanged(orders: Orders): void {
+    const now = this.chosen()
+    if (this.last && now !== this.last) orders.clear()
+    this.last = now
   }
 }

@@ -19,6 +19,15 @@ describe('finding jumps in the hills', () => {
     expect(up!.landing.x).toBeGreaterThan(up!.lip.x + 5) // lands beyond the lip
   })
 
+  it('aims each jump the way its hill throws you, not just one of the 16 ways it first tries', () => {
+    // the kicker turned to face 100 degrees: between the 90 and 112.5 it starts from
+    const toward = 100 * DEG
+    const turned = ground((x, z) => kicker()(x * Math.sin(toward) - z * Math.cos(toward), x * Math.cos(toward) + z * Math.sin(toward)), 300)
+    const up = findJumps(turned).find((jump) => turnBetween(jump.heading, 100) < 20)
+    expect(up).toBeDefined()
+    expect(turnBetween(up!.heading, 100)).toBeLessThanOrEqual(3)
+  })
+
   it('works out a speed to hit it at, and the run-up lane leads up the slope to the lip', () => {
     const up = findJumps(ground(kicker(), 300)).find((jump) => turnBetween(jump.heading, 90) < 15)!
     expect(up.speed).toBeGreaterThanOrEqual(30)

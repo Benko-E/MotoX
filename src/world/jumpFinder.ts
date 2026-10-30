@@ -84,6 +84,10 @@ const LONGEST_FLIGHT = 6
 const MIN_SQUARELY = 0.75
 /** Right after take-off the flight may dip this far into the ground without counting as landed (the height grid isn't exact), metres. */
 const GRID_SLACK = 0.08
+/** Once found, a jump's way is fine-tuned up to this many degrees either side, in steps of this many, starting this far back from its lip, metres. */
+const AIM_WIDE = 10
+const AIM_STEP = 2.5
+const AIM_BACK = 3
 /** The bike's middle sits about this high over the ground as it takes off, metres. */
 const RIDE_HEIGHT = 0.6
 
@@ -129,7 +133,34 @@ export function* findJumpsGradually(field: Heightfield, changes: Partial<FinderS
     }
     yield
   }
-  return keepBest(found, s.separation)
+  // aim each one: try ways either side of the one it was found at, keeping the best
+  const aimed: JumpSpot[] = []
+  for (const jump of keepBest(found, s.separation)) {
+    aimed.push(aim(at, s, jump))
+    if (aimed.length % 25 === 0) yield
+  }
+  return keepBest(aimed, s.separation) // aiming can turn two near ones the same way
+}
+
+/** A jump turned up to AIM_WIDE degrees either way, in AIM_STEP steps: whichever way gives the best jump. */
+function aim(at: (x: number, z: number) => number, s: FinderSettings, jump: JumpSpot): JumpSpot {
+  let best = jump
+  for (let turn = -AIM_WIDE; turn <= AIM_WIDE; turn += AIM_STEP) {
+    if (turn === 0) continue
+    const heading = (jump.heading + turn + 360) % 360
+    const dx = Math.sin(heading * DEG)
+    const dz = -Math.cos(heading * DEG)
+    // from just before its lip, walk up to the top this way, and try it
+    let x = jump.lip.x - dx * AIM_BACK
+    let z = jump.lip.z - dz * AIM_BACK
+    for (let i = 0; i < 40 && at(x + dx, z + dz) > at(x, z); i++) {
+      x += dx
+      z += dz
+    }
+    const spot = tryJump(at, s, x, z, heading, dx, dz)
+    if (typeof spot !== 'string' && spot.score > best.score) best = spot
+  }
+  return best
 }
 
 /**

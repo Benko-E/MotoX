@@ -10,7 +10,7 @@ import { Bike } from './physics/bike'
 import { CrashWatcher } from './physics/crashes'
 import { initPhysics, PhysicsWorld } from './physics/world'
 import { AiRider } from './ai/aiRider'
-import { FreeRoam } from './ai/orders'
+import { FollowTrack, FreeRoam, PickBehaviour } from './ai/orders'
 import { BikeView } from './render/bikeView'
 import { GREEN } from './render/livery'
 import { NameTag, riderName } from './render/nameTag'
@@ -159,7 +159,9 @@ const riderViews: BikeView[] = []
 const riderEffects: GroundEffects[] = []
 const nameTags: NameTag[] = []
 for (let i = 0; i < AI_RIDERS; i++) {
-  const rider = new AiRider(physics, config, groundAt, new FreeRoam(config.ai, () => jumps))
+  const roam = new FreeRoam(config.ai, () => jumps)
+  const follow = new FollowTrack(config.ai, () => field.trackLine)
+  const rider = new AiRider(physics, config, groundAt, new PickBehaviour(() => (config.ai.behaviour === 'followTrack' ? follow : roam)))
   rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
   riders.push(rider)
   const riderView = new BikeView(view.scene, rider.bike, GREEN)

@@ -16,6 +16,8 @@ export interface Heightfield {
   track?: Float32Array
   /** The lips of the jumps shaped into a track, and the compass heading the track runs there, degrees. */
   trackJumps?: { x: number; z: number; heading: number }[]
+  /** The line down the middle of a track, its points about a metre apart, going round clockwise. */
+  trackLine?: { x: number; z: number }[]
 }
 
 export function createHeightfield(size: number, cellSize: number): Heightfield {

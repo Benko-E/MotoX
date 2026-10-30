@@ -110,9 +110,10 @@ export class AiRider {
         target = order.jump.speed / 3.6
       } else {
         let to = order.kind === 'rideTo' ? order : order.kind === 'takeJump' ? approachPoint(order.jump) : null
-        if (Math.hypot(p.x, p.z) > this.settings.ai.roamRadius) to = { x: 0, z: 0 } // out of his area: home first
+        if (Math.hypot(p.x, p.z) > this.area()) to = { x: 0, z: 0 } // out of his area: home first
         const wanted = to ? Math.atan2(to.x - p.x, -(to.z - p.z)) / DEG : bike.heading
-        controls.steer = clamp(turnBetween(this.awayFromSteep(wanted), bike.heading) / TURN_FULL, -1, 1)
+        const way = order.kind === 'rideTo' && order.onLine ? wanted : this.awayFromSteep(wanted)
+        controls.steer = clamp(turnBetween(way, bike.heading) / TURN_FULL, -1, 1)
       }
       controls.throttle = bike.forwardSpeed < target ? 1 : 0
       controls.brake = bike.forwardSpeed > target + 2 ? 0.3 : 0
@@ -191,11 +192,16 @@ export class AiRider {
   private rescueIfLost(): void {
     const p = this.bike.body.translation()
     const out = Math.hypot(p.x, p.z)
-    if (out <= this.settings.ai.roamRadius + RESCUE) return
-    const back = this.settings.ai.roamRadius / 2 / out
+    if (out <= this.area() + RESCUE) return
+    const back = this.area() / 2 / out
     this.bike.placeOnGround(p.x * back, p.z * back, Math.atan2(-p.x, p.z) / DEG)
     this.crashes.recover()
     this.orders.clear()
+  }
+
+  /** How far from the middle he may go: his behaviour's say, else his roam radius, metres. */
+  private area(): number {
+    return this.behaviour.area?.() ?? this.settings.ai.roamRadius
   }
 
   /** Stuck (throttle open, going nowhere): give up on this order. */

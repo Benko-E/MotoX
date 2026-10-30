@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FreeRoam, Orders } from '../src/ai/orders'
+import { FollowTrack, FreeRoam, Orders, PickBehaviour } from '../src/ai/orders'
 import type { JumpSpot } from '../src/world/jumpFinder'
 
 const DEG = Math.PI / 180
@@ -96,5 +96,66 @@ describe('free roam', () => {
     expect(orders.current).toBeUndefined() // 5 s after: still cooling down
     roam.watch(orders, here, 8)
     expect(orders.current).toEqual({ kind: 'takeJump', jump: second }) // 13 s after
+  })
+})
+
+describe('following the track', () => {
+  /** A round track 100 m out, its points about 1 m apart, going round clockwise from north. */
+  const line = Array.from({ length: 628 }, (_, i) => {
+    const bearing = (i / 628) * Math.PI * 2
+    return { x: Math.sin(bearing) * 100, z: -Math.cos(bearing) * 100 }
+  })
+  /** On the track, at its north point. */
+  const onTrack = { x: 0, z: -100, heading: 90 }
+  const bearingOf = (p: { x: number; z: number }) => (Math.atan2(p.x, -p.z) * 180) / Math.PI
+
+  it('rides on to a point a little further round the track, the way he is set to go', () => {
+    for (const [way, sign] of [['clockwise', 1], ['counterclockwise', -1]] as const) {
+      const follow = new FollowTrack({ trackWay: way }, () => line)
+      const orders = new Orders()
+      follow.refill(orders, onTrack)
+      const order = orders.current!
+      if (order.kind !== 'rideTo') throw new Error('expected a ride to a spot')
+      const round = bearingOf(order) * sign // degrees on round the way he goes
+      expect(round).toBeGreaterThan(10) // about 25 m on, 100 m out: 14 degrees
+      expect(round).toBeLessThan(20)
+    }
+  })
+
+  it('heads for the nearest bit of track when he is away from it', () => {
+    const follow = new FollowTrack({ trackWay: 'clockwise' }, () => line)
+    const orders = new Orders()
+    follow.refill(orders, { x: 0, z: -40, heading: 0 }) // inside the loop, south of its north point
+    const order = orders.current!
+    if (order.kind !== 'rideTo') throw new Error('expected a ride to a spot')
+    expect(Math.abs(bearingOf(order))).toBeLessThan(35)
+  })
+
+  it('may go as far out as the track does', () => {
+    expect(new FollowTrack({ trackWay: 'clockwise' }, () => line).area?.()).toBeGreaterThanOrEqual(100)
+  })
+
+  it('with no track on the map, he just cruises', () => {
+    const orders = new Orders()
+    new FollowTrack({ trackWay: 'clockwise' }, () => undefined).refill(orders, onTrack)
+    expect(orders.current?.kind).toBe('cruise')
+  })
+})
+
+describe('picking a behaviour', () => {
+  it('uses whichever is chosen, and starts afresh when the choice changes', () => {
+    let choice = 'a'
+    const calls: string[] = []
+    const a = { refill: () => calls.push('a') }
+    const b = { refill: () => calls.push('b') }
+    const pick = new PickBehaviour(() => (choice === 'a' ? a : b))
+    const orders = new Orders()
+    pick.refill(orders, here)
+    orders.add({ kind: 'cruise', seconds: 5 })
+    choice = 'b'
+    pick.watch(orders, here, 1/60)
+    expect(orders.current).toBeUndefined() // the old orders are dropped
+    pick.refill(orders, here)
+    expect(calls).toEqual(['a', 'b'])
   })
 })
