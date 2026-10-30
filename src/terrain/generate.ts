@@ -71,12 +71,17 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const jumpSizes = Array.from({ length: Math.max(0, ch.jumps) }, (_, j) => 1 + ch.jumpVary * fractalNoise(noise, 211 + j * 3.7, 5, 2, 0.5))
   const loopLength = along[count - 1] + Math.hypot(xs[0] - xs[count - 1], zs[0] - zs[count - 1])
   const jumpFeet = jumpSizes.map((_, j) => nearestAlong(along, ((j + 0.5) / ch.jumps) * loopLength))
+  // the line runs round clockwise; ridden the other way, everything about the jumps is turned round
+  const way = ch.way === 'counterclockwise' ? -1 : 1
   // straight round each jump, so you land back on the track: from before its face to well past its lip
   const stretches = ch.landingStraight > 0
     ? jumpSizes.map((size, j) => {
         const jumpLength = ch.jumpLength * size
         const ease = jumpLength * STRAIGHT_EASE
-        return { at: jumpFeet[j], before: Math.max(STRAIGHT_RUN_IN, jumpLength) + ease, after: jumpLength * (JUMP_FACE + ch.landingStraight) + ease, ease }
+        const runIn = Math.max(STRAIGHT_RUN_IN, jumpLength) + ease
+        const landing = jumpLength * (JUMP_FACE + ch.landingStraight) + ease
+        // before and after along the line, which runs clockwise
+        return { at: jumpFeet[j], before: way > 0 ? runIn : landing, after: way > 0 ? landing : runIn, ease }
       })
     : []
   for (const stretch of stretches) {
@@ -108,17 +113,17 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
     const jumpLength = ch.jumpLength * size
     const start = along[jumpFeet[j]]
     for (let k = 0; k < count; k++) {
-      const u = (along[k] - start + length) % length // metres past the foot of its face
+      const u = ((along[k] - start) * way + length) % length // metres past the foot of its face, the way it's ridden
       if (u >= jumpLength) continue
       const face = jumpLength * JUMP_FACE
       // up a curved face to the lip, steepest at the top; then a quick drop, easing out at the bottom
       bumps[k] += u <= face ? height * (u / face) ** 2 : height * (1 - (u - face) / (jumpLength - face)) ** 2
     }
     // where its lip is, and which way the track runs there
-    const lipAlong = (start + jumpLength * JUMP_FACE) % length
+    const lipAlong = (start + way * jumpLength * JUMP_FACE + length) % length
     let lip = 0
     for (let k = 1; k < count; k++) if (Math.abs(along[k] - lipAlong) < Math.abs(along[lip] - lipAlong)) lip = k
-    const next = (lip + 1) % count
+    const next = (lip + way + count) % count
     field.trackJumps.push({ x: xs[lip], z: zs[lip], heading: (Math.atan2(xs[next] - xs[lip], -(zs[next] - zs[lip])) * 180) / Math.PI })
   }
   // lips rounded a little, as dirt ones are: a sharp crease saw-tooths across the ground's grid

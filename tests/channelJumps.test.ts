@@ -30,10 +30,11 @@ describe('the channel jumps, ridden by the ghost', () => {
       const ghost = new GhostRider(field, structuredClone(config))
       const line = field.trackLine!
       for (const lip of field.trackJumps!) {
-        // the track's own line into the kicker (it runs clockwise, the way the jumps face): 30 m of run-up to its lip
+        // the track's own line into the kicker, the way it's ridden (the line itself runs clockwise): 30 m of run-up to its lip
+        const way = map.channel.way === 'counterclockwise' ? -1 : 1
         let at = 0
         for (let i = 1; i < line.length; i++) if (Math.hypot(line[i].x - lip.x, line[i].z - lip.z) < Math.hypot(line[at].x - lip.x, line[at].z - lip.z)) at = i
-        const runUp = Array.from({ length: 31 }, (_, i) => line[(at - 30 + i + line.length) % line.length]).map((p) => ({ x: p.x, y: 0, z: p.z }))
+        const runUp = Array.from({ length: 31 }, (_, i) => line[(at - way * (30 - i) + 2 * line.length) % line.length]).map((p) => ({ x: p.x, y: 0, z: p.z }))
         const spot: JumpSpot = { lip: { x: lip.x, y: 0, z: lip.z }, heading: lip.heading, runUp, lipAngle: 0, speed: 80, airtime: 2, landing: { x: lip.x, y: 0, z: lip.z }, score: 0 }
         const ride = ghost.ride(spot)
         const down = ride.flight.at(-1)

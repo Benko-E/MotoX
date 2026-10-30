@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { config, configChoices, configRanges, EARTH_GRAVITY } from './config'
+import { config, configChoices, configRanges, EARTH_GRAVITY, TRACK_WAYS } from './config'
 import configSource from './config.ts?raw'
 import { Input } from './core/input'
 import { FixedStepLoop } from './core/loop'
@@ -217,6 +217,7 @@ sections.push({
   path: '',
   ranges: mapRanges,
   notes: readNotes(mapTypesSource),
+  choices: { 'channel.way': TRACK_WAYS },
   // Rebuilding the whole map takes a moment, so wait until the slider is let go.
   onChange: (_path, last) => {
     if (!last) return

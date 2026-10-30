@@ -18,7 +18,7 @@ export const freeride: MapDef = {
   clearing: { x: 0, z: 0, radius: 30, blend: 40, calm: 0.85 },
 
   /** A track winding round the clearing, with natural jumps along it. */
-  channel: { show: true, radius: 310, winding: 0.4, width: 8, banks: 10, flatness: 0.05, smoothing: 18, jumps: 4, jumpHeight: 4.4, jumpLength: 33, jumpVary: 0.15, landingStraight: 3 },
+  channel: { show: true, way: 'counterclockwise', radius: 310, winding: 0.4, width: 8, banks: 10, flatness: 0.05, smoothing: 18, jumps: 4, jumpHeight: 4.4, jumpLength: 33, jumpVary: 0.15, landingStraight: 3 },
 
   /** In the clearing, wherever its ground is flattest. */
   spawn: { x: 0, z: 0, heading: 270 },

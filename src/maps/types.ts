@@ -46,6 +46,8 @@ export interface MapDef {
   channel: {
     /** Cut it into the map at all. */
     show: boolean
+    /** Which way round it's ridden (seen from above, north up): its jumps face that way. */
+    way: 'clockwise' | 'counterclockwise'
     /** How far from the clearing's middle it runs, metres. */
     radius: number
     /** How much it wanders in and out, as a share of the radius. 0 is a circle. */
@@ -58,7 +60,7 @@ export interface MapDef {
     flatness: number
     /** How gently its floor rises and falls along the way: the land's ups and downs are evened out over this far, metres. */
     smoothing: number
-    /** Jumps shaped into its floor, facing round the loop clockwise: how many, how high and how long (up the face and down the drop), metres. */
+    /** Jumps shaped into its floor, facing the way it's ridden: how many, how high and how long (up the face and down the drop), metres. */
     jumps: number
     jumpHeight: number
     jumpLength: number

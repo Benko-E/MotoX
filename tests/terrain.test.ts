@@ -14,7 +14,7 @@ function testMap(overrides: Partial<MapDef> = {}): MapDef {
     hills: { seed: 1, height: 0, wavelength: 40, octaves: 3, roughness: 0.5 },
     edge: { start: 50, rise: 0 },
     clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 },
-    channel: { show: false, radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, landingStraight: 0 },
+    channel: { show: false, way: 'clockwise', radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, landingStraight: 0 },
     spawn: { x: 0, z: 0, heading: 0 },
     ...overrides,
   }
@@ -101,7 +101,7 @@ describe('a clearing', () => {
 describe('a loop channel', () => {
   const DEG = Math.PI / 180
   const hills = { seed: 3, height: 10, wavelength: 40, octaves: 3, roughness: 0.5 }
-  const loop = (changes = {}) => ({ show: true, radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, landingStraight: 0, ...changes })
+  const loop = (changes: Partial<MapDef['channel']> = {}): MapDef['channel'] => ({ show: true, way: 'clockwise', radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, landingStraight: 0, ...changes })
   const big = (changes: Partial<MapDef> = {}) => testMap({ size: 200, hills, ...changes })
   /** The steepest the ground gets riding round a circle `r` from the middle, as rise over run. */
   const steepestRound = (field: Heightfield, r: number) => {
@@ -192,17 +192,19 @@ describe('a loop channel', () => {
     expect(off.track).toBeUndefined() // and no track to draw
   })
 
-  it('shapes jumps into its floor that throw you, facing round the loop clockwise', () => {
+  it('shapes jumps into its floor that throw you, facing the way it is ridden', () => {
+    for (const [way, turn] of [['clockwise', 90], ['counterclockwise', -90]] as const) {
     // flat hills, so the only jumps there are are the channel's
-    const field = generateTerrain(testMap({ size: 260, channel: loop({ radius: 80, jumps: 4, jumpHeight: 3 }) }))
+    const field = generateTerrain(testMap({ size: 260, channel: loop({ way, radius: 80, jumps: 4, jumpHeight: 3 }) }))
     const jumps = findJumps(field)
     // on its line (taken at a slant off the bank, the same jumps can be found a few metres inside it too)
     const onLine = jumps.filter((j) => Math.abs(Math.hypot(j.lip.x, j.lip.z) - 80) < 3)
     expect(onLine.length).toBeGreaterThanOrEqual(3)
     for (const j of onLine) {
       const bearing = Math.atan2(j.lip.x, -j.lip.z) / DEG
-      const clockwise = ((bearing + 90 - j.heading + 540) % 360) - 180
-      expect(Math.abs(clockwise)).toBeLessThan(30) // the finder tries 16 headings, 22.5 degrees apart
+      const off = ((bearing + turn - j.heading + 540) % 360) - 180
+      expect(Math.abs(off), way).toBeLessThan(30) // the finder's first try is one of 16 ways round
+    }
     }
   })
 })
