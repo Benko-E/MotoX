@@ -100,13 +100,6 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const gentle = evenOut(land, FLOOR_FINEST / CHANNEL_STEP)
   const floor = new Float64Array(count)
   for (let k = 0; k < count; k++) floor[k] = even[k] + (gentle[k] - even[k]) * (1 - ch.flatness)
-  // and level round each jump, as on a built track: its face then always climbs, and you land on the level
-  for (const stretch of stretches) {
-    const points = stretchPoints(along, stretch)
-    const total = points.reduce((sum, { w }) => sum + w, 0)
-    const level = points.reduce((sum, { k, w }) => sum + floor[k] * w, 0) / (total || 1)
-    for (const { k, w } of points) floor[k] += (level - floor[k]) * w
-  }
   const bumps = new Float64Array(count)
   field.trackJumps = []
   for (let j = 0; j < jumpSizes.length; j++) {
