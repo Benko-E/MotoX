@@ -4,7 +4,8 @@ import type { Behaviour } from '../src/ai/orders'
 import { config } from '../src/config'
 import { initPhysics, PhysicsWorld } from '../src/physics/world'
 import { heightAt, type Heightfield } from '../src/terrain/heightfield'
-import { DEG, DT, flat, ground, tilt } from './physicsSetup'
+import { findJumps } from '../src/world/jumpFinder'
+import { DEG, DT, flat, ground, kicker, tilt } from './physicsSetup'
 
 beforeAll(async () => {
   await initPhysics()
@@ -78,6 +79,57 @@ describe('an AI rider', () => {
     expect(ai.crashes.count).toBeGreaterThan(0)
     expect(ai.crashes.crashed).toBe(false)
     expect(ai.bike.speed).toBeGreaterThan(5)
+  })
+
+  it('takes a jump he is told to: lines up on its run-up from off to the side, flies, lands and rides on', () => {
+    const field = ground(kicker(), 300)
+    const jump = findJumps(field).find((j) => Math.abs(j.heading - 90) < 15)!
+    const { ai, run } = rider(field, 0)
+    ai.bike.placeOnGround(-60, 40, 0) // behind the run-up and off to the side, facing north
+    ai.orders.add({ kind: 'takeJump', jump })
+    ai.orders.add({ kind: 'cruise', seconds: 60 })
+    let longest = 0
+    run(25, () => (longest = Math.max(longest, ai.bike.airtime)))
+    expect(longest).toBeGreaterThan(0.7)
+    expect(ai.crashes.count).toBe(0)
+    expect(ai.orders.current?.kind).toBe('cruise')
+  })
+
+  it('gives up on a jump that never throws him, rather than riding it for ever', () => {
+    const jump = findJumps(ground(kicker(), 300)).find((j) => Math.abs(j.heading - 90) < 15)!
+    const { ai, run } = rider(flat(400), 90)
+    ai.bike.placeOnGround(-40, 0, 90)
+    ai.orders.add({ kind: 'takeJump', jump }) // on flat ground there's nothing there
+    run(20)
+    expect(ai.orders.current).toBeUndefined()
+  })
+
+  it('outside his roam area he heads back toward the middle, whatever he was doing', () => {
+    const { ai, run, settings } = rider(flat(900), 90)
+    settings.ai.roamRadius = 200
+    ai.bike.placeOnGround(250, 0, 90) // past the edge of his area, heading further out
+    ai.orders.add({ kind: 'cruise', seconds: 60 })
+    run(10)
+    expect(Math.hypot(where(ai).x, where(ai).z)).toBeLessThan(200)
+  })
+
+  it('far outside his roam area, he is put back on the ground halfway to the middle', () => {
+    const { ai, run, settings } = rider(flat(900), 90)
+    settings.ai.roamRadius = 200
+    ai.bike.placeOnGround(380, 0, 90)
+    ai.orders.add({ kind: 'cruise', seconds: 60 })
+    run(0.1)
+    expect(Math.hypot(where(ai).x, where(ai).z)).toBeCloseTo(100, -1)
+    expect(ai.orders.current).toBeUndefined() // starting afresh
+  })
+
+  it('gives up riding to a spot he cannot get to', () => {
+    // the spot is on top of a 40 m plateau walled in at 60 degrees
+    const plateau = ground((x) => (x > 40 ? Math.min((x - 40) * Math.tan(60 * DEG), 40) : 0), 400)
+    const { ai, run } = rider(plateau, 90)
+    ai.orders.add({ kind: 'rideTo', x: 120, z: 0 })
+    run(60) // he has 20 s plus three times the 10 s it would take straight
+    expect(ai.orders.current).toBeUndefined()
   })
 
   it('asks his behaviour for more orders when he runs out', () => {

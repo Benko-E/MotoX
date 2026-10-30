@@ -10,7 +10,7 @@ import { Bike } from './physics/bike'
 import { CrashWatcher } from './physics/crashes'
 import { initPhysics, PhysicsWorld } from './physics/world'
 import { AiRider } from './ai/aiRider'
-import { Wander } from './ai/orders'
+import { FreeRoam } from './ai/orders'
 import { BikeView } from './render/bikeView'
 import { GREEN } from './render/livery'
 import { GroundEffects } from './render/groundEffects'
@@ -150,12 +150,12 @@ fly.place(
   { x: start.x, y: startGround + 0.5, z: start.z },
 )
 
-/** The AI riders: bikes like yours, ridden by the computer, starting near you. For now one, and he wanders. */
+/** The AI riders: bikes like yours, ridden by the computer, starting near you. For now one, roaming free. */
 const AI_RIDERS = 1
 const riders: AiRider[] = []
 const riderViews: BikeView[] = []
 for (let i = 0; i < AI_RIDERS; i++) {
-  const rider = new AiRider(physics, config, groundAt, new Wander(config.ai))
+  const rider = new AiRider(physics, config, groundAt, new FreeRoam(config.ai, () => jumps))
   rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
   riders.push(rider)
   riderViews.push(new BikeView(view.scene, rider.bike, GREEN))
@@ -203,7 +203,10 @@ sections.push({
     if (!last) return
     rebuildTerrain()
     crashes.recover()
-    for (const rider of riders) rider.crashes.recover()
+    for (const rider of riders) {
+      rider.orders.clear() // his jumps were on the old map
+      rider.crashes.recover()
+    }
   },
 })
 const panel = createTuningPanel(sections, {
@@ -415,6 +418,7 @@ function orderText(rider: AiRider): string {
   if (rider.crashes.crashed) return `crashed (${rider.crashes.reason}), ${speed}`
   if (!order) return `no orders, ${speed}`
   if (order.kind === 'rideTo') return `riding to ${order.x.toFixed(0)}, ${order.z.toFixed(0)}, ${speed}`
+  if (order.kind === 'takeJump') return `going for a jump (${order.jump.airtime.toFixed(1)} s of air), ${speed}`
   return `cruising, ${speed}`
 }
 

@@ -2,6 +2,7 @@ import type { Config } from '../config'
 import { Bike } from '../physics/bike'
 import { CrashWatcher } from '../physics/crashes'
 import type { PhysicsWorld } from '../physics/world'
+import type { JumpSpot } from '../world/jumpFinder'
 import { Orders, type Behaviour, type Order } from './orders'
 import { clamp, leanToLand, turnBetween } from './riding'
 
@@ -27,6 +28,22 @@ const MAX_STEEP = 35
 const DODGE = [30, -30, 60, -60, 90, -90, 135, -135]
 /** Barely moving this long with the throttle open: stuck, so he gives up on what he was doing, seconds. */
 const STUCK_AFTER = 3
+/** Taking a jump: he first rides to a spot this far back from the start of its run-up, metres, then follows its line. */
+const APPROACH = 25
+/** On the line: full lock this many metres off it, or this many degrees turned off it. */
+const OFF_LINE = 4
+const TURNED_OFF = 20
+/** He gives up on a jump when he's this far off its line, or this far past its lip without flying, metres, or after this long, seconds. */
+const LOST_LINE = 15
+const PAST_LIP = 30
+const JUMP_TIME = 40
+/** A flight this long counts as the jump, seconds; after landing he rides out for this long before the next order. */
+const JUMP_FLIGHT = 0.25
+const RIDE_OUT = 1
+/** Riding to a spot, he gives up after this long plus three times as long as getting there straight would take, seconds. */
+const RIDE_TO_SPARE = 20
+/** This far outside his roam area (or off the map), he's put back on the ground halfway to the middle, metres. */
+const RESCUE = 100
 
 export class AiRider {
   readonly bike: Bike
@@ -37,6 +54,12 @@ export class AiRider {
   private orderTime = 0
   private stuckFor = 0
   private pitchBefore = 0
+  /** Taking a jump: lined up on its run-up yet, how long he's flown, and how long since landing, seconds. */
+  private lined = false
+  private flown = 0
+  private landedFor = 0
+  /** How long he has for the current order before giving up on it, seconds. */
+  private timeLimit = Infinity
 
   constructor(
     physics: PhysicsWorld,
@@ -53,8 +76,11 @@ export class AiRider {
   /** Picks his controls and works out his bike for this physics step. Call before the world steps. */
   beforeStep(dt: number): void {
     const { bike, orders } = this
+    this.rescueIfLost()
     const p = bike.body.translation()
-    if (!orders.current) this.behaviour.refill(orders, { x: p.x, z: p.z, heading: bike.heading })
+    const state = { x: p.x, z: p.z, heading: bike.heading }
+    this.behaviour.watch?.(orders, state, dt)
+    if (!orders.current) this.behaviour.refill(orders, state)
     let order = this.follow(dt)
     // done with it: straight on to the next one
     if (order && this.finished(order, p)) {
@@ -64,6 +90,11 @@ export class AiRider {
 
     const controls = bike.controls
     const inAir = bike.wheels.every((wheel) => !wheel.onGround)
+    if (order?.kind === 'takeJump') {
+      if (inAir) this.flown += dt
+      else if (this.flown >= JUMP_FLIGHT) this.landedFor += dt
+      else this.flown = 0 // only a bump
+    }
     const pitchRate = (bike.pitch - this.pitchBefore) / dt
     this.pitchBefore = bike.pitch
     controls.lean = inAir ? leanToLand(bike, this.groundAt, pitchRate) : 0
@@ -72,9 +103,17 @@ export class AiRider {
       controls.throttle = controls.steer = 0
       controls.brake = 1
     } else {
-      const wanted = order.kind === 'rideTo' ? Math.atan2(order.x - p.x, -(order.z - p.z)) / DEG : bike.heading
-      controls.steer = clamp(turnBetween(this.awayFromSteep(wanted), bike.heading) / TURN_FULL, -1, 1)
-      const target = this.settings.ai.cruiseSpeed / 3.6
+      let target = this.settings.ai.cruiseSpeed / 3.6
+      if (order.kind === 'takeJump' && this.lined) {
+        // on the run-up: keep to its line at the jump's speed, whatever the ground
+        controls.steer = this.steerOnLine(order.jump)
+        target = order.jump.speed / 3.6
+      } else {
+        let to = order.kind === 'rideTo' ? order : order.kind === 'takeJump' ? approachPoint(order.jump) : null
+        if (Math.hypot(p.x, p.z) > this.settings.ai.roamRadius) to = { x: 0, z: 0 } // out of his area: home first
+        const wanted = to ? Math.atan2(to.x - p.x, -(to.z - p.z)) / DEG : bike.heading
+        controls.steer = clamp(turnBetween(this.awayFromSteep(wanted), bike.heading) / TURN_FULL, -1, 1)
+      }
       controls.throttle = bike.forwardSpeed < target ? 1 : 0
       controls.brake = bike.forwardSpeed > target + 2 ? 0.3 : 0
       this.watchForStuck(dt)
@@ -95,14 +134,38 @@ export class AiRider {
       this.onOrder = order
       this.orderTime = 0
       this.stuckFor = 0
+      this.lined = false
+      this.flown = this.landedFor = 0
+      const p = this.bike.body.translation()
+      this.timeLimit =
+        order?.kind === 'rideTo' ? RIDE_TO_SPARE + (3 * Math.hypot(order.x - p.x, order.z - p.z)) / (this.settings.ai.cruiseSpeed / 3.6) : Infinity
     }
     this.orderTime += dt
     return order
   }
 
   private finished(order: Order, p: { x: number; z: number }): boolean {
-    if (order.kind === 'rideTo') return Math.hypot(order.x - p.x, order.z - p.z) < ARRIVED
-    return this.orderTime >= order.seconds
+    if (order.kind === 'rideTo') return Math.hypot(order.x - p.x, order.z - p.z) < ARRIVED || this.orderTime > this.timeLimit
+    if (order.kind === 'cruise') return this.orderTime >= order.seconds
+    const { jump } = order
+    if (!this.lined) {
+      const at = approachPoint(jump)
+      this.lined = Math.hypot(at.x - p.x, at.z - p.z) < ARRIVED
+    }
+    if (this.landedFor >= RIDE_OUT) return true // done it
+    // given up: lost the line, rode past without flying, or too long at it
+    const { along, across } = lineOffset(jump, p)
+    const flew = this.flown >= JUMP_FLIGHT
+    if (this.lined && !flew && Math.abs(across) > LOST_LINE) return true
+    if (!flew && along > PAST_LIP) return true
+    return this.orderTime > JUMP_TIME
+  }
+
+  /** Steering that keeps him on a jump's line, -1 (left) to 1 (right). */
+  private steerOnLine(jump: JumpSpot): number {
+    const { across } = lineOffset(jump, this.bike.body.translation())
+    const turned = turnBetween(this.bike.heading, jump.heading)
+    return clamp(-(across / OFF_LINE + turned / TURNED_OFF), -1, 1)
   }
 
   /** `heading`, or the nearest way off it where the ground ahead is fit to ride. */
@@ -124,10 +187,36 @@ export class AiRider {
     return climb <= MAX_CLIMB && steepest <= MAX_STEEP
   }
 
+  /** Far outside his area (over the edge wall, or thrown off the map): back on the ground halfway to the middle, starting afresh. */
+  private rescueIfLost(): void {
+    const p = this.bike.body.translation()
+    const out = Math.hypot(p.x, p.z)
+    if (out <= this.settings.ai.roamRadius + RESCUE) return
+    const back = this.settings.ai.roamRadius / 2 / out
+    this.bike.placeOnGround(p.x * back, p.z * back, Math.atan2(-p.x, p.z) / DEG)
+    this.crashes.recover()
+    this.orders.clear()
+  }
+
   /** Stuck (throttle open, going nowhere): give up on this order. */
   private watchForStuck(dt: number): void {
     const { bike } = this
     this.stuckFor = !this.crashes.crashed && bike.controls.throttle > 0 && Math.abs(bike.forwardSpeed) < 1 ? this.stuckFor + dt : 0
     if (this.stuckFor >= STUCK_AFTER) this.orders.next()
   }
+}
+
+/** Where he heads first to take a jump: APPROACH metres back from the start of its run-up, on its line. */
+function approachPoint(jump: JumpSpot): { x: number; z: number } {
+  const start = jump.runUp[0]
+  return { x: start.x - Math.sin(jump.heading * DEG) * APPROACH, z: start.z + Math.cos(jump.heading * DEG) * APPROACH }
+}
+
+/** Where `p` is next to a jump's line: metres past its lip (negative: before it), and to the right of the line. */
+function lineOffset(jump: JumpSpot, p: { x: number; z: number }): { along: number; across: number } {
+  const fx = Math.sin(jump.heading * DEG)
+  const fz = -Math.cos(jump.heading * DEG)
+  const dx = p.x - jump.lip.x
+  const dz = p.z - jump.lip.z
+  return { along: dx * fx + dz * fz, across: dx * -fz + dz * fx }
 }

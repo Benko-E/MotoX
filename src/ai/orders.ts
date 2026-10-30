@@ -6,11 +6,16 @@
  * the front; anything can give him orders the same way.
  */
 
+import type { JumpSpot } from '../world/jumpFinder'
+import { turnBetween } from './riding'
+
 export type Order =
   /** Ride to a spot on the map. */
   | { kind: 'rideTo'; x: number; z: number }
   /** Ride on at an easy speed for a while, wherever the ground lets him. */
   | { kind: 'cruise'; seconds: number }
+  /** Get lined up on a jump's run-up, hit it at its speed, fly, land and ride out. */
+  | { kind: 'takeJump'; jump: JumpSpot }
 
 /** Where a rider is, for a behaviour deciding what he does next. Heading in compass degrees. */
 export interface RiderState {
@@ -19,9 +24,11 @@ export interface RiderState {
   heading: number
 }
 
-/** Something that gives a rider orders when he has none left. */
+/** Something that gives a rider orders: when he has none left, and (if it likes) as he goes along. */
 export interface Behaviour {
   refill(orders: Orders, rider: RiderState): void
+  /** Called every physics step, `dt` seconds apart, to add or push orders on the way. */
+  watch?(orders: Orders, rider: RiderState, dt: number): void
 }
 
 export class Orders {
@@ -69,5 +76,88 @@ export class Wander implements Behaviour {
     const bearing = this.random() * Math.PI * 2
     orders.add({ kind: 'rideTo', x: Math.sin(bearing) * distance, z: -Math.cos(bearing) * distance })
     orders.add({ kind: 'cruise', seconds: CRUISE_FOR[0] + this.random() * (CRUISE_FOR[1] - CRUISE_FOR[0]) })
+  }
+}
+
+export interface FreeRoamSettings {
+  roamRadius: number
+  lookAhead: number
+  lookWide: number
+  jumpAppetite: number
+  jumpCooldown: number
+}
+
+const DEG = Math.PI / 180
+/** A jump counts as pointing his way when its run-up is within this many degrees of his heading. */
+const YOUR_WAY = 45
+/** A run-up starting closer than this is too close to line up for, metres. */
+const TOO_CLOSE = 15
+
+/**
+ * Relaxed free riding: he rides off to the quarter of the map he's been to
+ * least (within the roam radius), cruises a bit, and so on round the map.
+ * Now and then, when a jump comes into view ahead of him pointing his way,
+ * he goes for it: he makes up his mind once per jump, with the appetite as
+ * the chance, and after a jump he cruises a while before going for another.
+ */
+export class FreeRoam implements Behaviour {
+  private readonly visits = [0, 0, 0, 0]
+  private readonly considered = new Set<JumpSpot>()
+  private sinceJump = Infinity
+
+  constructor(
+    /** Read live, so the tuning panel applies at once. */
+    readonly settings: FreeRoamSettings,
+    /** The jumps on the map (they change when the map does). */
+    private readonly jumps: () => readonly JumpSpot[],
+    private readonly random: () => number = Math.random,
+  ) {}
+
+  refill(orders: Orders, _rider?: RiderState): void {
+    // quarters: 0 north-west, 1 north-east, 2 south-west, 3 south-east
+    const quarter = this.visits.indexOf(Math.min(...this.visits))
+    this.visits[quarter]++
+    const distance = Math.sqrt(this.random()) * this.settings.roamRadius
+    const angle = this.random() * (Math.PI / 2)
+    const x = (quarter & 1 ? 1 : -1) * Math.sin(angle) * distance
+    const z = (quarter & 2 ? 1 : -1) * Math.cos(angle) * distance
+    orders.add({ kind: 'rideTo', x, z })
+    orders.add({ kind: 'cruise', seconds: CRUISE_FOR[0] + this.random() * (CRUISE_FOR[1] - CRUISE_FOR[0]) })
+  }
+
+  watch(orders: Orders, rider: RiderState, dt: number): void {
+    const { settings } = this
+    if (orders.current?.kind === 'takeJump') {
+      this.sinceJump = 0
+      return
+    }
+    this.sinceJump += dt
+    if (this.sinceJump < settings.jumpCooldown) return
+    const spotted = this.jumpAhead(rider)
+    if (!spotted) return
+    this.considered.add(spotted)
+    if (this.random() >= settings.jumpAppetite) return
+    orders.addFirst({ kind: 'takeJump', jump: spotted })
+    this.sinceJump = 0
+  }
+
+  /** The nearest jump he hasn't made up his mind about yet whose run-up starts in view ahead, pointing his way. */
+  private jumpAhead(rider: RiderState): JumpSpot | null {
+    const { settings } = this
+    let nearest: JumpSpot | null = null
+    let nearestDistance = Infinity
+    for (const jump of this.jumps()) {
+      if (this.considered.has(jump)) continue
+      const start = jump.runUp[0]
+      const distance = Math.hypot(start.x - rider.x, start.z - rider.z)
+      if (distance > settings.lookAhead || distance < TOO_CLOSE || distance >= nearestDistance) continue
+      const bearing = Math.atan2(start.x - rider.x, -(start.z - rider.z)) / DEG
+      if (Math.abs(turnBetween(bearing, rider.heading)) > settings.lookWide) continue
+      if (Math.abs(turnBetween(jump.heading, rider.heading)) > YOUR_WAY) continue
+      if (Math.hypot(jump.landing.x, jump.landing.z) > settings.roamRadius) continue // it would throw him out of his area
+      nearest = jump
+      nearestDistance = distance
+    }
+    return nearest
   }
 }
