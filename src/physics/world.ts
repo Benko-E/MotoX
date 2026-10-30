@@ -1,7 +1,20 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import type { Heightfield } from '../terrain/heightfield'
 
-/** Friction of the ground, for anything that slides on them (not the tyres). */
+/**
+ * Who touches whom, as Rapier collision groups (which groups a shape is in,
+ * in the top 16 bits, and which it touches, in the bottom 16). Bikes touch
+ * the ground but pass through each other, and anything looking for the
+ * ground (a wheel, the rider's head) only ever finds the ground.
+ */
+const GROUND = 0x0001
+const BIKES = 0x0002
+export const GROUND_GROUPS = (GROUND << 16) | 0xffff
+export const BIKE_GROUPS = (BIKES << 16) | GROUND
+/** For a search that should only find the ground. */
+export const FIND_GROUND = (0xffff << 16) | GROUND
+
+/** Friction of the ground, for anything that slides on it (not the tyres). */
 const GROUND_FRICTION = 0.8
 
 /** Loads the physics engine. Must finish before anything else in this folder is used. */
@@ -32,7 +45,7 @@ export class PhysicsWorld {
       columns,
       { x: field.size, y: 1, z: field.size },
       RAPIER.HeightFieldFlags.FIX_INTERNAL_EDGES,
-    ).setFriction(GROUND_FRICTION)
+    ).setFriction(GROUND_FRICTION).setCollisionGroups(GROUND_GROUPS)
     this.ground = [this.world.createCollider(terrain)]
 
     // New shapes only become findable (for wheel casts and groundHeightAt)
@@ -51,7 +64,7 @@ export class PhysicsWorld {
     const radius = 0.01
     const hit = this.world.castShape(
       { x, y: top, z }, { x: 0, y: 0, z: 0, w: 1 }, { x: 0, y: -1, z: 0 }, new RAPIER.Ball(radius),
-      0, 2 * top, true, undefined, undefined, undefined, exclude,
+      0, 2 * top, true, undefined, FIND_GROUND, undefined, exclude,
     )
     return hit ? top - hit.time_of_impact - radius : null
   }

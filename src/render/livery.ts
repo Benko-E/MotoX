@@ -25,6 +25,23 @@ export interface Livery {
   boots: number
 }
 
+/** The first AI rider's: green plastics, a green and black kit. */
+export const GREEN: Livery = {
+  plastics: 0x2fa84f,
+  plates: 0xf1f1ee,
+  trim: 0x1d1d20,
+  metal: 0x9aa0a8,
+  shock: 0x2fa84f,
+  tyres: 0x1c1c1c,
+  rims: 0x2a2a2e,
+  spokes: 0xc9ccd2,
+  jersey: 0x1f8a3d,
+  pants: 0x202226,
+  helmet: 0x1b1b1e,
+  visor: 0x3a3a3a,
+  boots: 0xf2f2f2,
+}
+
 /** The bike as it comes: red plastics, white plates, yellow spokes, a blue jersey. */
 export const FACTORY: Livery = {
   plastics: 0xd8432b,

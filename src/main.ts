@@ -9,7 +9,10 @@ import mapTypesSource from './maps/types.ts?raw'
 import { Bike } from './physics/bike'
 import { CrashWatcher } from './physics/crashes'
 import { initPhysics, PhysicsWorld } from './physics/world'
+import { AiRider } from './ai/aiRider'
+import { Wander } from './ai/orders'
 import { BikeView } from './render/bikeView'
+import { GREEN } from './render/livery'
 import { GroundEffects } from './render/groundEffects'
 import { HelmetCamera } from './render/helmetCamera'
 import { JumpLanes } from './render/jumpLanes'
@@ -147,6 +150,21 @@ fly.place(
   { x: start.x, y: startGround + 0.5, z: start.z },
 )
 
+/** The AI riders: bikes like yours, ridden by the computer, starting near you. For now one, and he wanders. */
+const AI_RIDERS = 1
+const riders: AiRider[] = []
+const riderViews: BikeView[] = []
+for (let i = 0; i < AI_RIDERS; i++) {
+  const rider = new AiRider(physics, config, groundAt, new Wander(config.ai))
+  rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
+  riders.push(rider)
+  riderViews.push(new BikeView(view.scene, rider.bike, GREEN))
+}
+/** Who the camera watches: 0 you, 1 the first AI rider, and so on. */
+let watched = 0
+const watchedBike = () => (watched === 0 ? bike : riders[watched - 1].bike)
+const watchedView = () => (watched === 0 ? bikeView : riderViews[watched - 1])
+
 const chase = new ChaseCamera(config, groundAt)
 const helmet = new HelmetCamera()
 /** Which camera is showing: a chase view (config.camera.views), 'helmet', or 'fly'. C goes round them. */
@@ -185,6 +203,7 @@ sections.push({
     if (!last) return
     rebuildTerrain()
     crashes.recover()
+    for (const rider of riders) rider.crashes.recover()
   },
 })
 const panel = createTuningPanel(sections, {
@@ -213,6 +232,14 @@ let resetPressed = false
 let dropPressed = false
 input.onPress('reset', () => (resetPressed = true))
 input.onPress('dropBike', () => (dropPressed = true))
+for (let i = 0; i < 4; i++) {
+  input.onPress(`watch${i + 1}`, () => {
+    if (i > riders.length || i === watched) return
+    watched = i
+    chase.snap()
+    helmet.snap()
+  })
+}
 input.onPress('toggleCamera', () => {
   cameraMode = nextCameraMode(config, cameraMode)
   flying = cameraMode === 'fly'
@@ -254,9 +281,11 @@ const loop = new FixedStepLoop({
     bike.controls.lean = flying ? 0 : input.axis('lean')
     bike.controls.powerslide = !flying && input.isDown('powerslide')
     bike.update(dt)
+    for (const rider of riders) rider.beforeStep(dt)
     physics.step(dt, config.jumps.gravity * EARTH_GRAVITY)
     bike.record()
     crashes.step(dt)
+    for (const rider of riders) rider.afterStep(dt)
     if (flying) fly.step(dt, input)
     stepsThisSecond++
   },
@@ -265,7 +294,7 @@ const loop = new FixedStepLoop({
 // For measuring and debugging from the browser console: `moto.bike`, `moto.config`, ...
 Object.assign(window, {
   moto: {
-    ...{ config, map, view, fly, chase, bike, crashes, physics, input, rebuildTerrain },
+    ...{ config, map, view, fly, chase, bike, crashes, physics, input, rebuildTerrain, riders },
     terrain: () => field,
     jumps: () => jumps,
     letters: () => letterSpots,
@@ -289,6 +318,7 @@ const bikeForward = new THREE.Vector3()
 function showFrame(frameTime: number) {
   loop.advance(frameTime)
   bikeView.update(loop.alpha, frameTime)
+  for (const riderView of riderViews) riderView.update(loop.alpha, frameTime)
   groundEffects.update(Math.min(frameTime, 0.1))
   if (jumpSearch) {
     const until = performance.now() + JUMP_SEARCH_BUDGET
@@ -325,8 +355,8 @@ function showFrame(frameTime: number) {
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)
   if (flying) fly.apply(view.camera, loop.alpha)
   else if (cameraMode === 'helmet') {
-    helmet.update(view.camera, Math.min(frameTime, 0.1), bikeView.headPosition(headAt), bikeView.forward(bikeForward))
-  } else chase.update(view.camera, Math.min(frameTime, 0.1), bikeView.position, bikeView.heading, bike.speed)
+    helmet.update(view.camera, Math.min(frameTime, 0.1), watchedView().headPosition(headAt), watchedView().forward(bikeForward))
+  } else chase.update(view.camera, Math.min(frameTime, 0.1), watchedView().position, watchedView().heading, watchedBike().speed)
   view.camera.getWorldDirection(lookPoint).multiplyScalar(20).add(view.camera.position)
   view.focusShadows(lookPoint)
   view.render()
@@ -378,6 +408,16 @@ function frame(now: number) {
   requestAnimationFrame(frame)
 }
 
+/** What an AI rider is doing, for the readout. */
+function orderText(rider: AiRider): string {
+  const order = rider.orders.current
+  const speed = `${(rider.bike.speed * 3.6).toFixed(0)} km/h`
+  if (rider.crashes.crashed) return `crashed (${rider.crashes.reason}), ${speed}`
+  if (!order) return `no orders, ${speed}`
+  if (order.kind === 'rideTo') return `riding to ${order.x.toFixed(0)}, ${order.z.toFixed(0)}, ${speed}`
+  return `cruising, ${speed}`
+}
+
 /** How the last landing went, for the readout. */
 function landingReadout(): string {
   const last = crashes.lastLanding
@@ -412,12 +452,14 @@ function readout(): string[] {
         'in the air: lean to spin   ↓ + throttle: wheelie   ↑ + brake: stoppie',
         `C camera views (now: ${cameraMode})   scroll wheel: zoom`,
         'R   bike upright again   B   drop the bike from 6 m',
+        `1 2 watch you or the AI rider (now: ${watched === 0 ? 'you' : `AI ${watched}`})`,
       ]
   return [
     'MotoX · readout (` hides it)',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
+    ...riders.map((rider, i) => `AI ${i + 1}      ${orderText(rider)}`),
     `throttle  ${bar(throttle)}   brake ${bar(brake, 5)}`,
     `steer     ${steering}  tightest turn here ${bike.turnRadius.toFixed(1)} m`,
     `lean      ${sides(bike.controls.lean)}  (back | forward)`,

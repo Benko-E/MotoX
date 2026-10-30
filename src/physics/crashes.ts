@@ -2,7 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat'
 import type { CrashSettings, FallingOverSettings, LandingSettings } from '../config'
 import type { Bike } from './bike'
 import { add, dot, rotate, vec, type Vec3 } from './vec'
-import type { PhysicsWorld } from './world'
+import { FIND_GROUND, type PhysicsWorld } from './world'
 
 /**
  * Watches the bike for crashes, and puts it back up afterwards. It also
@@ -152,7 +152,7 @@ export class CrashWatcher {
     const head = add(body.translation(), rotate(body.rotation(), headPosition(controls.lean)))
     const hit = this.physics.world.intersectionWithShape(
       head, { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Ball(HEAD_RADIUS),
-      undefined, undefined, undefined, body,
+      undefined, FIND_GROUND, undefined, body,
     )
     if (hit !== null) return true
     // Under the ground counts too: the head can go right through the

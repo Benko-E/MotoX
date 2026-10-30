@@ -273,6 +273,14 @@ export const config = {
     ],
   },
 
+  /** AI riders: bikes like yours, ridden by the computer. For now one, wandering the map. 1 on the keyboard watches you, 2 the first AI rider. */
+  ai: {
+    /** How fast they ride when just getting about, km/h. */
+    cruiseSpeed: 45,
+    /** They stay within this far of the middle of the map, metres. */
+    roamRadius: 350,
+  },
+
   /** How the tyres mark and throw the dirt. Only looks: nothing here changes the riding. */
   effects: {
     /** Tracks the tyres leave in the dirt. */
@@ -323,6 +331,11 @@ export const config = {
       dropBike: ['KeyB'],
       /** Go through the camera views: the chase views, the helmet view, then the free-fly camera. */
       toggleCamera: ['KeyC'],
+      /** Which rider the camera watches (for now, while the AI rider is tuned): 1 you, 2 the first AI rider, and so on. Your keys always ride your own bike. */
+      watch1: ['Digit1'],
+      watch2: ['Digit2'],
+      watch3: ['Digit3'],
+      watch4: ['Digit4'],
       togglePanel: ['Backquote'],
       flyForward: ['KeyW'],
       flyBack: ['KeyS'],
@@ -406,6 +419,8 @@ export const configRanges: Ranges = {
   'letters.each.*.grabSize': [0.5, 10, 0.1],
   'letters.each.*.airGap': [0, 10, 0.25],
   'letters.respawnAfter': [1, 60, 1],
+  'ai.cruiseSpeed': [10, 100, 1],
+  'ai.roamRadius': [50, 450, 10],
   'hud.*.x': [-50, 50, 0.5],
   'hud.*.y': [-50, 50, 0.5],
   'bike.speed.topSpeed': [40, 200, 1],

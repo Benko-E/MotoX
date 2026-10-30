@@ -1,3 +1,4 @@
+import { clamp, leanToLand } from '../ai/riding'
 import { EARTH_GRAVITY, type Config } from '../config'
 import { Bike } from '../physics/bike'
 import { CrashWatcher } from '../physics/crashes'
@@ -42,11 +43,6 @@ const STILL_ROLLING = 3
 /** Steering back onto the line: full lock this many metres off it, or this many degrees turned off it. */
 const OFF_LINE = 4
 const TURNED_OFF = 20
-/** Leaning in the air: full lean this many degrees off the ground's slope, and how much it eases off for the spin it already has (seconds). */
-const PITCH_OFF = 15
-const SPIN_EASE = 0.25
-/** In the air it lines up with the ground this far ahead of where it is, seconds. */
-const LOOK_AHEAD = 0.3
 /** Riding a bit at a time, it pauses after this many physics steps (a few milliseconds' work). */
 const STEPS_PER_PAUSE = 60
 
@@ -120,7 +116,7 @@ export class GhostRider {
       const controls = bike.controls
       controls.throttle = !inAir && bike.forwardSpeed < target ? 1 : 0
       controls.steer = this.steerBack(jump, forward)
-      controls.lean = inAir ? this.leanToLand(pitch, pitchRate) : 0
+      controls.lean = inAir ? leanToLand(bike, (x, z) => heightAt(this.field, x, z), pitchRate) : 0
 
       bike.update(dt)
       this.physics.step(dt, gravity)
@@ -162,23 +158,4 @@ export class GhostRider {
     const turnedRight = ((this.bike.heading - jump.heading + 540) % 360) - 180
     return clamp(-(offRight / OFF_LINE + turnedRight / TURNED_OFF), -1, 1)
   }
-
-  /** Leaning that keeps the bike lined up with the slope it's about to land on, -1 (back) to 1 (forward). */
-  private leanToLand(pitch: number, pitchRate: number): number {
-    const { bike, field } = this
-    const p = bike.body.translation()
-    const v = bike.body.linvel()
-    const ahead = { x: p.x + v.x * LOOK_AHEAD, z: p.z + v.z * LOOK_AHEAD }
-    const across = Math.hypot(v.x, v.z) || 1
-    const step = 2
-    const dx = (v.x / across) * step
-    const dz = (v.z / across) * step
-    const slope = Math.atan((heightAt(field, ahead.x + dx, ahead.z + dz) - heightAt(field, ahead.x - dx, ahead.z - dz)) / (2 * step))
-    // nose higher than the slope: lean forward; already turning that way: ease off
-    return clamp(((pitch - slope) / DEG) / PITCH_OFF + pitchRate * SPIN_EASE, -1, 1)
-  }
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
 }

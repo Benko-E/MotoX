@@ -10,7 +10,7 @@ import {
   turnRadiusAt,
 } from './bikeTuning'
 import { add, cross, dot, normalize, rotate, rotateAround, scale, sub, vec, yawRotation, type Quat, type Vec3 } from './vec'
-import type { PhysicsWorld } from './world'
+import { BIKE_GROUPS, FIND_GROUND, type PhysicsWorld } from './world'
 
 /**
  * The bike's physics, arcade style, the way the 90s games did it.
@@ -161,7 +161,7 @@ export class Bike {
     const frame = RAPIER.ColliderDesc.cuboid(FRAME_HALF.x, FRAME_HALF.y, FRAME_HALF.z)
       .setDensity(0) // the mass is set from the stats instead
       .setFriction(0.6)
-    physics.world.createCollider(frame, this.body)
+    physics.world.createCollider(frame.setCollisionGroups(BIKE_GROUPS), this.body)
     this.applyMass()
 
     this.wheels = [0, 1].map((i) => ({
@@ -263,7 +263,7 @@ export class Bike {
       const sweepFrom = add(top, scale(up, SWEEP_ABOVE))
       const hit = this.physics.world.castShape(
         sweepFrom, rotation, down, new RAPIER.Ball(this.radius(i)), 0, SWEEP_ABOVE + travel, true,
-        undefined, undefined, undefined, body,
+        undefined, FIND_GROUND, undefined, body,
       )
 
       const before = wheel.compression

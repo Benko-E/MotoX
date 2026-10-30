@@ -1,6 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { initPhysics, PhysicsWorld } from '../src/physics/world'
-import { DEG, flat, ground, setup, slope, tilt } from './physicsSetup'
+import { config } from '../src/config'
+import { Bike } from '../src/physics/bike'
+import { CrashWatcher } from '../src/physics/crashes'
+import { DEG, DT, flat, ground, setup, slope, tilt } from './physicsSetup'
 
 beforeAll(async () => {
   await initPhysics()
@@ -20,6 +23,27 @@ describe('physics ground', () => {
     const physics = new PhysicsWorld()
     physics.setGround(ground((x) => -x * Math.tan(15 * DEG)))
     expect(physics.groundHeightAt(80.74, -1e-16)).toBeCloseTo(-80.74 * Math.tan(15 * DEG), 1)
+  })
+})
+
+describe('two bikes', () => {
+  it('pass through each other: one dropped onto the other lands on the ground, not on it, and nobody crashes', () => {
+    const physics = new PhysicsWorld()
+    physics.setGround(flat())
+    const settings = structuredClone(config)
+    const below = new Bike(physics, settings.bike, settings.advanced.bikeBody)
+    const above = new Bike(physics, settings.bike, settings.advanced.bikeBody)
+    const crashes = [below, above].map((b) => new CrashWatcher(physics, b, settings.crashes, settings.advanced.fallingOver, settings.jumps.landing))
+    below.placeOnGround(0, 0, 0)
+    above.place(0, 3, 0, 0)
+    for (let i = 0; i < 360; i++) {
+      for (const b of [below, above]) b.update(DT)
+      physics.step(DT, 9.81)
+      for (const b of [below, above]) b.record()
+      crashes.forEach((c) => c.step(DT))
+    }
+    expect(Math.abs(above.body.translation().y - below.body.translation().y)).toBeLessThan(0.05) // both on the ground
+    expect(crashes.map((c) => c.count)).toEqual([0, 0])
   })
 })
 
