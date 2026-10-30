@@ -129,8 +129,22 @@ describe('a loop channel', () => {
     }
   })
 
+  it('marks its floor, for drawing it as a dirt track: fully across its width, fading out just past it', () => {
+    const field = generateTerrain(big({ channel: loop() }))
+    const track = (x: number, z: number) => {
+      const n = field.samples
+      return field.track![Math.round((z + field.size / 2) / field.cellSize) * n + Math.round((x + field.size / 2) / field.cellSize)]
+    }
+    expect(track(0, -60)).toBe(1) // on its line
+    expect(track(0, -57)).toBe(1) // across its floor
+    expect(track(0, -50)).toBeLessThan(0.5) // on the bank
+    expect(track(0, 0)).toBe(0) // the middle of the map
+  })
+
   it('switched off, leaves the ground alone', () => {
-    expect(generateTerrain(big({ channel: loop({ show: false }) })).heights).toEqual(generateTerrain(big()).heights)
+    const off = generateTerrain(big({ channel: loop({ show: false }) }))
+    expect(off.heights).toEqual(generateTerrain(big()).heights)
+    expect(off.track).toBeUndefined() // and no track to draw
   })
 
   it('shapes jumps into its floor that throw you, facing round the loop clockwise', () => {

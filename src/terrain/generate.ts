@@ -6,6 +6,8 @@ import { createPerlin, fractalNoise, type Noise2D } from './noise'
 const RAGGED = 0.2
 /** A channel's line is followed in steps this long, metres. */
 const CHANNEL_STEP = 1
+/** A channel's floor is drawn as a dirt track, fading out over this far past its width, metres. */
+const TRACK_EDGE = 3
 /** A channel jump climbs over this share of its length, and drops away over the rest. */
 const JUMP_FACE = 0.7
 
@@ -91,8 +93,9 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
     }
   }
 
-  // shape the ground near the line
-  const reach = ch.width / 2 + ch.banks
+  // shape the ground near the line, and mark its floor as track
+  const track = (field.track ??= new Float32Array(n * n))
+  const reach = ch.width / 2 + Math.max(ch.banks, TRACK_EDGE)
   const outer = ch.radius * (1 + ch.winding) + reach
   const toIndex = (w: number) => (w + field.size / 2) / field.cellSize
   // the nearest point of the line is within this many points of the one at the same bearing
@@ -122,9 +125,10 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
       const best = at - guess
       for (let d = best - 3; d <= best + 3; d++) look(d)
       const out = nearest - ch.width / 2
+      const i = iz * n + ix
+      track[i] = Math.max(track[i], out <= 0 ? 1 : 1 - smoothstep(out / TRACK_EDGE))
       const weight = out <= 0 ? 1 : ch.banks > 0 ? 1 - smoothstep(out / ch.banks) : 0
       if (weight <= 0) continue
-      const i = iz * n + ix
       field.heights[i] += (floor[at] - field.heights[i]) * weight
     }
   }

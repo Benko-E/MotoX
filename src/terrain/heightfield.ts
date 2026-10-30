@@ -12,6 +12,8 @@ export interface Heightfield {
   /** Distance between samples in metres. */
   cellSize: number
   heights: Float32Array
+  /** How much each sample is the floor of a track, 0 to 1, for drawing it as dirt. Missing when the map has none. */
+  track?: Float32Array
 }
 
 export function createHeightfield(size: number, cellSize: number): Heightfield {

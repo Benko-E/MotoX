@@ -6,6 +6,8 @@ const TILE_METRES = 10
 
 const GRASS = new THREE.Color(0x76913f)
 const DIRT = new THREE.Color(0x9a7b52)
+/** A track's floor: dark, ridden-in dirt. */
+const TRACK_DIRT = new THREE.Color(0x5c4430)
 
 /** Draws the ground. Call `show` again whenever the map changes. */
 export class TerrainView {
@@ -62,12 +64,12 @@ function buildGroundGeometry(field: Heightfield): THREE.BufferGeometry {
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
   geometry.setIndex(new THREE.BufferAttribute(indices, 1))
   geometry.computeVertexNormals()
-  geometry.setAttribute('color', new THREE.BufferAttribute(groundColors(geometry), 3))
+  geometry.setAttribute('color', new THREE.BufferAttribute(groundColors(geometry, field.track), 3))
   return geometry
 }
 
-/** Grass on gentle ground, dirt on slopes and jumps. */
-function groundColors(geometry: THREE.BufferGeometry): Float32Array {
+/** Grass on gentle ground, dirt on slopes and jumps, dark dirt on a track. */
+function groundColors(geometry: THREE.BufferGeometry, track?: Float32Array): Float32Array {
   const position = geometry.getAttribute('position')
   const normal = geometry.getAttribute('normal')
   const colors = new Float32Array(position.count * 3)
@@ -75,6 +77,7 @@ function groundColors(geometry: THREE.BufferGeometry): Float32Array {
   for (let i = 0; i < position.count; i++) {
     const steepness = 1 - normal.getY(i)
     color.copy(GRASS).lerp(DIRT, smoothstep(0.03, 0.12, steepness))
+    if (track) color.lerp(TRACK_DIRT, track[i])
     colors.set([color.r, color.g, color.b], i * 3)
   }
   return colors
