@@ -14,6 +14,9 @@ export const freeride: MapDef = {
 
   edge: { start: 400, rise: 50 },
 
-  /** Near the middle, wherever the ground is flattest. */
+  /** Where you start: calm ground to get going on. */
+  clearing: { x: 0, z: 0, radius: 30, blend: 40, calm: 0.85 },
+
+  /** In the clearing, wherever its ground is flattest. */
   spawn: { x: 0, z: 0, heading: 270 },
 }

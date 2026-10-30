@@ -275,6 +275,8 @@ export const config = {
 
   /** AI riders: bikes like yours, ridden by the computer. For now one, riding round the map and taking a jump now and then. 1 on the keyboard watches you, 2 the AI rider. */
   ai: {
+    /** Their names, floating above their heads, the first rider's first. */
+    names: ['Helga'],
     /** How fast they ride when just getting about, km/h. */
     cruiseSpeed: 45,
     /** They stay within this far of the middle of the map, metres, going round every quarter of it. */

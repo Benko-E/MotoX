@@ -12,6 +12,7 @@ function testMap(overrides: Partial<MapDef> = {}): MapDef {
     cellSize: 1,
     hills: { seed: 1, height: 0, wavelength: 40, octaves: 3, roughness: 0.5 },
     edge: { start: 50, rise: 0 },
+    clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 },
     spawn: { x: 0, z: 0, heading: 0 },
     ...overrides,
   }
@@ -57,6 +58,41 @@ describe('generateTerrain', () => {
     expect(heightAt(field, 29, 0)).toBe(0)
     expect(heightAt(field, 50, 0)).toBeCloseTo(20, 6)
     expect(heightAt(field, 0, -50)).toBeCloseTo(20, 6)
+  })
+})
+
+describe('a clearing', () => {
+  /** How much the ground goes up and down along a line through (x, z), metres from its lowest to its highest. */
+  const bumpiness = (field: Heightfield, x: number, z: number, half: number) => {
+    const heights = Array.from({ length: 21 }, (_, i) => heightAt(field, x - half + (i * 2 * half) / 20, z))
+    return Math.max(...heights) - Math.min(...heights)
+  }
+  const hills = { ...hilly, height: 10 }
+
+  it('calms the hills inside it, without making it dead flat', () => {
+    const plain = generateTerrain(testMap({ hills }))
+    const calmed = generateTerrain(testMap({ hills, clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0.85 } }))
+    const before = bumpiness(plain, 0, 0, 8)
+    const after = bumpiness(calmed, 0, 0, 8)
+    expect(after).toBeLessThan(before * 0.25)
+    expect(after).toBeGreaterThan(0) // still a little natural
+  })
+
+  it('fully calm, its middle is level', () => {
+    const calmed = generateTerrain(testMap({ hills, clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 1 } }))
+    expect(bumpiness(calmed, 0, 0, 8)).toBeLessThan(0.01)
+  })
+
+  it('blends back into the hills: well outside it the ground is untouched', () => {
+    const plain = generateTerrain(testMap({ hills }))
+    const calmed = generateTerrain(testMap({ hills, clearing: { x: -20, z: -20, radius: 10, blend: 8, calm: 1 } }))
+    for (const [x, z] of [[30, 30], [20, -45], [-45, 25]]) expect(heightAt(calmed, x, z)).toBe(heightAt(plain, x, z))
+  })
+
+  it('calm 0 leaves the ground as it was', () => {
+    const plain = generateTerrain(testMap({ hills }))
+    const untouched = generateTerrain(testMap({ hills, clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 } }))
+    expect(untouched.heights).toEqual(plain.heights)
   })
 })
 

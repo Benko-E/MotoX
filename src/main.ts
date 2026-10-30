@@ -13,6 +13,7 @@ import { AiRider } from './ai/aiRider'
 import { FreeRoam } from './ai/orders'
 import { BikeView } from './render/bikeView'
 import { GREEN } from './render/livery'
+import { NameTag, riderName } from './render/nameTag'
 import { GroundEffects } from './render/groundEffects'
 import { HelmetCamera } from './render/helmetCamera'
 import { JumpLanes } from './render/jumpLanes'
@@ -154,14 +155,16 @@ fly.place(
 const AI_RIDERS = 1
 const riders: AiRider[] = []
 const riderViews: BikeView[] = []
-/** Their tyre tracks, dirt and tyre shadows, like yours. */
+/** Their tyre tracks, dirt and tyre shadows, like yours, and their names over their heads. */
 const riderEffects: GroundEffects[] = []
+const nameTags: NameTag[] = []
 for (let i = 0; i < AI_RIDERS; i++) {
   const rider = new AiRider(physics, config, groundAt, new FreeRoam(config.ai, () => jumps))
   rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
   riders.push(rider)
   const riderView = new BikeView(view.scene, rider.bike, GREEN)
   riderViews.push(riderView)
+  nameTags.push(new NameTag(view.scene, riderName(i, config.ai.names)))
   riderEffects.push(
     new GroundEffects(
       view.scene,
@@ -210,7 +213,6 @@ sections.push({
   path: '',
   ranges: mapRanges,
   notes: readNotes(mapTypesSource),
-  notesByName: true,
   // Rebuilding the whole map takes a moment, so wait until the slider is let go.
   onChange: (_path, last) => {
     if (!last) return
@@ -334,7 +336,10 @@ const bikeForward = new THREE.Vector3()
 function showFrame(frameTime: number) {
   loop.advance(frameTime)
   bikeView.update(loop.alpha, frameTime)
-  for (const riderView of riderViews) riderView.update(loop.alpha, frameTime)
+  riderViews.forEach((riderView, i) => {
+    riderView.update(loop.alpha, frameTime)
+    nameTags[i].update(riderView.headPosition(headAt))
+  })
   groundEffects.update(Math.min(frameTime, 0.1))
   for (const effects of riderEffects) effects.update(Math.min(frameTime, 0.1))
   if (jumpSearch) {
@@ -470,14 +475,14 @@ function readout(): string[] {
         'in the air: lean to spin   ↓ + throttle: wheelie   ↑ + brake: stoppie',
         `C camera views (now: ${cameraMode})   scroll wheel: zoom`,
         'R   bike upright again   B   drop the bike from 6 m',
-        `1 2 watch you or the AI rider (now: ${watched === 0 ? 'you' : `AI ${watched}`})`,
+        `1 2 watch you or the AI rider (now: ${watched === 0 ? 'you' : riderName(watched - 1, config.ai.names)})`,
       ]
   return [
     'MotoX · readout (` hides it)',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
-    ...riders.map((rider, i) => `AI ${i + 1}      ${orderText(rider)}`),
+    ...riders.map((rider, i) => `${riderName(i, config.ai.names).padEnd(10)}${orderText(rider)}`),
     `throttle  ${bar(throttle)}   brake ${bar(brake, 5)}`,
     `steer     ${steering}  tightest turn here ${bike.turnRadius.toFixed(1)} m`,
     `lean      ${sides(bike.controls.lean)}  (back | forward)`,

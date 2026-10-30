@@ -30,6 +30,18 @@ export interface MapDef {
     /** How much higher the very edge is, metres. */
     rise: number
   }
+  /** A clearing: a patch of calm, gently rolling ground among the hills. You start in it. */
+  clearing: {
+    /** Its middle, metres. */
+    x: number
+    z: number
+    /** How far out it's calm, metres. Its edge wanders in and out a little, like a natural one. */
+    radius: number
+    /** Then it blends back into the hills over this far, metres. */
+    blend: number
+    /** How calm: 0 leaves the hills as they are, 1 makes it level; in between keeps a little of their roll. */
+    calm: number
+  }
   /** Where the bike starts: on the flattest ground near here, facing `heading`. */
   spawn: { x: number; z: number; heading: number }
 }
