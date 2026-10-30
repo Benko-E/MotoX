@@ -367,7 +367,7 @@ function showFrame(frameTime: number) {
     letterSpots.filter((spot) => config.letters.show && config.letters.each[spot.letter].showRunUp && !hunt.grabbed[spot.letter]).map((spot) => spot.jump),
   )
   jumpLanes.update(bikeView.position, bikeView.heading, Math.min(frameTime, 0.1), goldLanes)
-  hud.update({ speed: bike.speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime)
+  hud.update({ speed: watchedBike().speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime) // the speed of whoever you watch
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)
   if (flying) fly.apply(view.camera, loop.alpha)
