@@ -23,10 +23,12 @@ import { generateTerrain } from './terrain/generate'
 import { heightAt } from './terrain/heightfield'
 import { flattestSpotNear } from './terrain/startingSpot'
 import { Hud } from './hud/hud'
+import { LetterRow } from './hud/letterRow'
 import { Speedometer } from './hud/speedometer'
 import { HelpTimer } from './ui/helpCard'
 import { readNotes } from './ui/notes'
 import { GhostRider, type GhostRide } from './world/ghostRider'
+import { LetterHunt } from './world/letterHunt'
 import { findJumpsGradually, type JumpSpot } from './world/jumpFinder'
 import { placeLettersGradually, sliceTurn, type LetterSpot, type Ride } from './world/letterSpots'
 import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
@@ -55,6 +57,7 @@ const help = document.getElementById('help')!
 /** What's on screen while you ride: placed by config.hud. */
 const hud = new Hud(document.body, config.hud)
 hud.add('speed', new Speedometer())
+hud.add('letters', new LetterRow(config.letters))
 const helpTimer = new HelpTimer(6, 1.5)
 const input = new Input(config.controls, window)
 
@@ -85,6 +88,8 @@ const JUMP_SEARCH_BUDGET = 5
 /** The letters M O T O X over jumps the ghost bike has ridden, placed once the jumps are found. */
 let letterSpots: LetterSpot[] = []
 const letterView = new LetterView(view.scene, config.letters)
+/** Which of them you've grabbed. */
+const hunt = new LetterHunt(config.letters)
 let letterSearch: Generator<void, LetterSpot[]> | null = null
 let ghost: GhostRider | null = null
 /** Every ride the ghost has done on this map, so handing the letters out again needn't ride them again. */
@@ -125,6 +130,7 @@ function rebuildTerrain() {
   letterSearch = null
   letterSpots = []
   letterView.show(letterSpots)
+  hunt.reset()
 }
 rebuildTerrain()
 const start = flattestSpotNear(field, map.spawn.x, map.spawn.z, SPAWN_SEARCH)
@@ -259,6 +265,7 @@ Object.assign(window, {
     terrain: () => field,
     jumps: () => jumps,
     letters: () => letterSpots,
+    hunt,
     simulate: (seconds: number, fps?: number) => simulate(seconds, fps),
   },
 })
@@ -296,12 +303,14 @@ function showFrame(frameTime: number) {
     if (step.done) {
       letterSpots = step.value
       letterView.show(letterSpots)
+      hunt.reset()
       letterSearch = null
     }
   }
-  letterView.update(Math.min(frameTime, 0.1))
+  hunt.update(letterSpots, bike.body.translation(), Math.min(frameTime, 0.1))
+  letterView.update(Math.min(frameTime, 0.1), hunt.grabbed)
   jumpLanes.update(bikeView.position, bikeView.heading, Math.min(frameTime, 0.1))
-  hud.update({ speed: bike.speed, topSpeed: config.bike.speed.topSpeed }, frameTime)
+  hud.update({ speed: bike.speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime)
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)
   if (flying) fly.apply(view.camera, loop.alpha)

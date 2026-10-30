@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { config, configChoices } from '../src/config'
 import { ANCHORS, hudUnit, placeElement } from '../src/hud/layout'
+import { letterRow } from '../src/hud/letterRow'
 import { dialScale, followNeedle, needleAngle } from '../src/hud/speedometer'
 import { choicesFor } from '../src/ui/tunables'
 
@@ -49,6 +50,23 @@ describe('the HUD settings', () => {
       expect(ANCHORS, name).toContain(element.anchor)
       expect(choicesFor(`hud.${name}.anchor`, configChoices)).toEqual(ANCHORS)
     }
+  })
+})
+
+describe('the letter row', () => {
+  it('shows every letter, lit once you have it and grey until then, whatever the order', () => {
+    // grabbed M and T, not the first O
+    expect(letterRow(config.letters, [true, false, true, false, false])).toEqual([
+      { char: 'M', lit: true },
+      { char: 'O', lit: false },
+      { char: 'T', lit: true },
+      { char: 'O', lit: false },
+      { char: 'X', lit: false },
+    ])
+  })
+
+  it('sits in the top left by default', () => {
+    expect(config.hud.letters).toMatchObject({ show: true, anchor: 'topLeft' })
   })
 })
 

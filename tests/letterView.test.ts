@@ -41,6 +41,16 @@ describe('the letters drawn', () => {
     expect(view.letter(2)!.rotation.y).not.toBeCloseTo(before, 2)
   })
 
+  it('a grabbed letter disappears, and shows again when it comes back', () => {
+    const view = new LetterView(new THREE.Scene(), settings())
+    view.show([spot(0), spot(1)])
+    view.update(1 / 60, [true, false, false, false, false])
+    expect(view.letter(0)!.visible).toBe(false)
+    expect(view.letter(1)!.visible).toBe(true)
+    view.update(1 / 60, [false, false, false, false, false])
+    expect(view.letter(0)!.visible).toBe(true)
+  })
+
   it('a new set of spots replaces the old ones, and turned off nothing shows', () => {
     const s = settings()
     const scene = new THREE.Scene()

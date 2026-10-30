@@ -215,6 +215,8 @@ export const config = {
       x: 24,
       y: 1,
     },
+    /** The letters you're hunting, M O T O X: grey until you grab one, gold once you have it. */
+    letters: { show: true, anchor: 'topLeft' as Anchor, x: 3, y: 3 },
   },
 
   /**
@@ -244,6 +246,10 @@ export const config = {
     show: true,
     /** How far from the middle their jumps may be, run-up to landing, metres. (The wall at the edge starts at 400.) */
     spread: 350,
+    /** Grabbed letters come back after a while, for trying them again. */
+    respawn: false,
+    /** How long a grabbed letter takes to come back, seconds. */
+    respawnAfter: 10,
     /** One for each letter, the easiest first. */
     each: [
       {
@@ -253,11 +259,13 @@ export const config = {
         difficulty: 0,
         /** Where on the jump it floats: 0 at lift-off, 0.5 the highest point, 1 at touchdown. */
         along: 0.1,
+        /** How close the middle of the bike has to come to grab it, metres. Bigger is easier. */
+        grabSize: 4,
       },
-      { letter: 'O', difficulty: 0.25, along: 0.3 },
-      { letter: 'T', difficulty: 0.5, along: 0.5 },
-      { letter: 'O', difficulty: 0.75, along: 0.5 },
-      { letter: 'X', difficulty: 1, along: 0.5 },
+      { letter: 'O', difficulty: 0.25, along: 0.3, grabSize: 3 },
+      { letter: 'T', difficulty: 0.5, along: 0.5, grabSize: 2.5 },
+      { letter: 'O', difficulty: 0.75, along: 0.5, grabSize: 2 },
+      { letter: 'X', difficulty: 1, along: 0.5, grabSize: 1.5 },
     ],
   },
 
@@ -391,6 +399,8 @@ export const configRanges: Ranges = {
   'letters.spread': [100, 500, 10],
   'letters.each.*.difficulty': [0, 1, 0.05],
   'letters.each.*.along': [0, 1, 0.01],
+  'letters.each.*.grabSize': [0.5, 10, 0.1],
+  'letters.respawnAfter': [1, 60, 1],
   'hud.*.x': [-50, 50, 0.5],
   'hud.*.y': [-50, 50, 0.5],
   'bike.speed.topSpeed': [40, 200, 1],

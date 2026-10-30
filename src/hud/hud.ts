@@ -6,6 +6,8 @@ export interface HudState {
   speed: number
   /** Its top speed, km/h. */
   topSpeed: number
+  /** Which letters you have, by their place in config.letters.each. */
+  letters: readonly boolean[]
 }
 
 /** One element of the HUD: a box on the page that's given the latest numbers each frame. */

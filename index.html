@@ -114,6 +114,22 @@
       .hud-speed-needle {
         fill: #e0241b;
       }
+      /* not .hud-letters: that's the name of the slot the row sits in */
+      .hud-letter-row {
+        display: flex;
+        gap: 0.35em;
+        font-size: 5em;
+        line-height: 1;
+      }
+      .hud-letter {
+        color: rgba(160, 160, 160, 0.5);
+        -webkit-text-stroke: 0.03em rgba(0, 0, 0, 0.55);
+      }
+      .hud-letter.lit {
+        color: #ffc21a;
+        -webkit-text-stroke: 0.03em #6b4a00;
+        text-shadow: 0 0 0.25em rgba(255, 190, 40, 0.55);
+      }
       .hud-speed-hub {
         fill: #1b130d;
         stroke: #5a4a3a;

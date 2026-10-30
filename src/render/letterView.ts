@@ -52,14 +52,14 @@ export class LetterView {
     }
   }
 
-  /** Call once a frame. */
-  update(dt: number): void {
+  /** Call once a frame. `grabbed` (by place in settings.each) are hidden until they come back. */
+  update(dt: number, grabbed: readonly boolean[] = []): void {
     for (const spot of this.spots) {
       const mesh = this.meshes.get(spot.letter)!
       const at = pointAlong(spot.flight, this.settings.each[spot.letter].along)
       mesh.position.set(at.x, at.y, at.z)
       mesh.rotation.y += SPIN * (Math.PI / 180) * dt
-      mesh.visible = this.settings.show
+      mesh.visible = this.settings.show && !grabbed[spot.letter]
     }
   }
 
