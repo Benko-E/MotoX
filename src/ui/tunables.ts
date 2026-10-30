@@ -4,6 +4,8 @@
  * values changed since the game loaded.
  */
 
+import { humanize } from './notes'
+
 /** Slider ranges by path: [min, max, step?]. A `*` matches any list position. */
 export type Ranges = Record<string, [number, number, number?]>
 /** Lists to pick text settings from (a dropdown), by path; `*` matches any name. */
@@ -18,6 +20,13 @@ export interface Tunable {
 }
 
 /** How far a slider goes. Without an entry in `ranges`: 0 to 4x the file value. */
+/** A folder's title in the panel: the setting's name in words, or for an item in a list its first text ("M"), else its number. */
+export function folderTitle(key: string, value: unknown): string {
+  if (!/^\d+$/.test(key)) return humanize(key)
+  const text = value !== null && typeof value === 'object' ? Object.values(value).find((v) => typeof v === 'string') : undefined
+  return typeof text === 'string' ? text : `#${Number(key) + 1}`
+}
+
 export function rangeFor(path: string, value: number, ranges: Ranges) {
   const listed = ranges[path] ?? Object.entries(ranges).find(([pattern]) => matches(pattern, path))?.[1]
   let min: number

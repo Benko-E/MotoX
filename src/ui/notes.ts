@@ -10,11 +10,12 @@ export type Notes = Record<string, string>
 /**
  * Reads the `/** ... *\/` comment above each `name:` in `source`. The file is
  * expected to be laid out one setting per line (or one small `{ ... }` group
- * per line), the way the settings files are.
+ * per line), the way the settings files are. In a list written over several
+ * lines, the comments on its first item count for every item.
  */
 export function readNotes(source: string): Notes {
   const notes: Notes = {}
-  const path: string[] = [] // names of the open `{` groups; '' for ones that aren't settings
+  const path: string[] = [] // names of the open `{` groups and `[` lists; '' for ones that aren't settings
   let comment: string[] | null = null
   let pending = ''
 
@@ -36,10 +37,10 @@ export function readNotes(source: string): Notes {
       const name = [...path.filter(Boolean), named[1]].join('.')
       if (pending) notes[name] = pending
       pending = ''
-      if (line.endsWith('{')) path.push(named[1])
+      if (line.endsWith('{') || line.endsWith('[')) path.push(named[1])
       continue
     }
-    if (line.startsWith('}')) path.pop()
+    if (line.startsWith('}') || line.startsWith(']')) path.pop()
     else if (line.endsWith('{')) path.push('')
     if (line) pending = '' // a comment only belongs to the very next line
   }
@@ -48,14 +49,16 @@ export function readNotes(source: string): Notes {
 
 /**
  * The note for a setting: its own, else its group's (for settings written
- * on one line like `inertia: { pitch: 70, yaw: 70 }`), but no further up.
- * With `lastNameOnly`, matches on the final name alone ("lips.3.lipAngle" ->
- * "lipAngle").
+ * on one line like `inertia: { pitch: 70, yaw: 70 }`), but no further up. An
+ * item in a list shares the note of that setting on every item
+ * ("letters.each.3.along" -> "letters.each.along"). With `lastNameOnly`,
+ * matches on the final name alone ("jumps.3.height" -> "height").
  */
 export function noteFor(notes: Notes, path: string, options: { lastNameOnly?: boolean } = {}): string | undefined {
   const parts = path.split('.')
   if (options.lastNameOnly) return notes[parts[parts.length - 1]]
-  return notes[path] ?? notes[parts.slice(0, -1).join('.')]
+  const inAnyItem = parts.filter((part) => !/^\d+$/.test(part)).join('.')
+  return notes[path] ?? notes[parts.slice(0, -1).join('.')] ?? notes[inAnyItem]
 }
 
 /** "secondsTo60" -> "seconds to 60". */

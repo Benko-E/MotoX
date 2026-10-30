@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changedValues, choicesFor, collectTunables, rangeFor } from '../src/ui/tunables'
+import { changedValues, choicesFor, collectTunables, folderTitle, rangeFor } from '../src/ui/tunables'
 
 describe('choices', () => {
   it('text settings get a dropdown only where there is a list of choices for them', () => {
@@ -11,6 +11,14 @@ describe('choices', () => {
   it('collects text values only where asked, such as an anchor', () => {
     const paths = collectTunables({ size: 1, name: 'x', speed: { anchor: 'top' } }, '', (path) => path.endsWith('anchor')).map((t) => t.path)
     expect(paths).toEqual(['size', 'speed.anchor'])
+  })
+})
+
+describe('folderTitle', () => {
+  it('names a folder after its setting, and an item in a list after its first text, or its number', () => {
+    expect(folderTitle('bikeBody', {})).toBe('bike body')
+    expect(folderTitle('0', { letter: 'M', difficulty: 0 })).toBe('M')
+    expect(folderTitle('2', { height: 3 })).toBe('#3')
   })
 })
 

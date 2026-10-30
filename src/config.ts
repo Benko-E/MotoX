@@ -234,6 +234,33 @@ export const config = {
     minScore: 2,
   },
 
+  /**
+   * The letters M O T O X, floating over jumps round the map. The game picks
+   * the jumps itself: an invisible ghost bike rides them first, so every
+   * letter is on a jump that can really be done and landed.
+   */
+  letters: {
+    /** Show the letters at all. */
+    show: true,
+    /** How far from the middle their jumps may be, run-up to landing, metres. (The wall at the edge starts at 400.) */
+    spread: 350,
+    /** One for each letter, the easiest first. */
+    each: [
+      {
+        /** The letter. */
+        letter: 'M',
+        /** How hard its jump should be: 0 the easiest jump the ghost landed, 1 the hardest. */
+        difficulty: 0,
+        /** Where on the jump it floats: 0 at lift-off, 0.5 the highest point, 1 at touchdown. */
+        along: 0.1,
+      },
+      { letter: 'O', difficulty: 0.25, along: 0.3 },
+      { letter: 'T', difficulty: 0.5, along: 0.5 },
+      { letter: 'O', difficulty: 0.75, along: 0.5 },
+      { letter: 'X', difficulty: 1, along: 0.5 },
+    ],
+  },
+
   /** How the tyres mark and throw the dirt. Only looks: nothing here changes the riding. */
   effects: {
     /** Tracks the tyres leave in the dirt. */
@@ -345,6 +372,7 @@ export type LandingSettings = Config['jumps']['landing']
 export type FallingOverSettings = Config['advanced']['fallingOver']
 export type EffectSettings = Config['effects']
 export type JumpGuideSettings = Config['jumpGuide']
+export type LetterSettings = Config['letters']
 
 /** Earth's gravity, m/s². */
 export const EARTH_GRAVITY = 9.81
@@ -360,6 +388,9 @@ export const configRanges: Ranges = {
   'jumpGuide.lanes': [1, 20, 1],
   'jumpGuide.showWithin': [50, 600, 10],
   'jumpGuide.minScore': [0, 4, 0.05],
+  'letters.spread': [100, 500, 10],
+  'letters.each.*.difficulty': [0, 1, 0.05],
+  'letters.each.*.along': [0, 1, 0.01],
   'hud.*.x': [-50, 50, 0.5],
   'hud.*.y': [-50, 50, 0.5],
   'bike.speed.topSpeed': [40, 200, 1],

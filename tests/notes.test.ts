@@ -45,6 +45,38 @@ describe('readNotes', () => {
   })
 })
 
+describe('notes for a list of settings', () => {
+  // like the letters: the first item written out with its comments, the rest on one line each
+  const listSource = `export const config = {
+  letters: {
+    /** One for each letter. */
+    each: [
+      {
+        /** The letter. */
+        letter: 'M',
+        /** How hard its jump should be. */
+        difficulty: 0,
+      },
+      { letter: 'O', difficulty: 0.25 },
+    ],
+    /** Seconds to come back. */
+    respawnAfter: 10,
+  },
+}
+`
+  const notes = readNotes(listSource)
+
+  it('reads the comments on the first item as the notes for every item', () => {
+    expect(noteFor(notes, 'letters.each.0.difficulty')).toBe('How hard its jump should be.')
+    expect(noteFor(notes, 'letters.each.1.difficulty')).toBe('How hard its jump should be.')
+  })
+
+  it('the folder of each item gets the note of the list, and settings after the list are read as usual', () => {
+    expect(noteFor(notes, 'letters.each.1')).toBe('One for each letter.')
+    expect(noteFor(notes, 'letters.respawnAfter')).toBe('Seconds to come back.')
+  })
+})
+
 describe('noteFor', () => {
   const notes = readNotes(source)
 

@@ -1,6 +1,6 @@
 import { Pane, type ButtonApi, type FolderApi } from 'tweakpane'
 import { humanize, noteFor, type Notes } from './notes'
-import { changedValues, choicesFor, collectTunables, rangeFor, type Choices, type Ranges } from './tunables'
+import { changedValues, choicesFor, collectTunables, folderTitle, rangeFor, type Choices, type Ranges } from './tunables'
 
 export interface PanelSection {
   title: string
@@ -100,7 +100,7 @@ export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs
       const dot = path.lastIndexOf('.')
       const name = path.slice(dot + 1)
       const folder = folderFor(dot < 0 ? '' : path.slice(0, dot)).addFolder({
-        title: /^\d+$/.test(name) ? `#${Number(name) + 1}` : humanize(name),
+        title: folderTitle(name, valueAt(section.target, path)),
         expanded: isOpen(path),
       })
       hover(folder.element, help(path))
