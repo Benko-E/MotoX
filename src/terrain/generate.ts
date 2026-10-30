@@ -10,6 +10,8 @@ const CHANNEL_STEP = 1
 const FLOOR_FINEST = 12
 /** A channel's floor is drawn as a dirt track, fading out over this far past its width, metres. */
 const TRACK_EDGE = 3
+/** A channel jump's lip is rounded over about this far, metres. */
+const LIP_ROUND = 3
 /** A channel jump climbs over this share of its length, and drops away over the rest. */
 const JUMP_FACE = 0.7
 
@@ -71,6 +73,7 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const gentle = evenOut(land, FLOOR_FINEST / CHANNEL_STEP)
   const floor = new Float64Array(count)
   for (let k = 0; k < count; k++) floor[k] = even[k] + (gentle[k] - even[k]) * (1 - ch.flatness)
+  const bumps = new Float64Array(count)
   for (let j = 0; j < ch.jumps; j++) {
     const size = 1 + ch.jumpVary * fractalNoise(noise, 211 + j * 3.7, 5, 2, 0.5)
     const height = ch.jumpHeight * size
@@ -81,9 +84,12 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
       if (u >= jumpLength) continue
       const face = jumpLength * JUMP_FACE
       // up a curved face to the lip, steepest at the top; then a quick drop, easing out at the bottom
-      floor[k] += u <= face ? height * (u / face) ** 2 : height * (1 - (u - face) / (jumpLength - face)) ** 2
+      bumps[k] += u <= face ? height * (u / face) ** 2 : height * (1 - (u - face) / (jumpLength - face)) ** 2
     }
   }
+  // lips rounded a little, as dirt ones are: a sharp crease saw-tooths across the ground's grid
+  const rounded = ch.jumps > 0 ? evenOut(bumps, LIP_ROUND / CHANNEL_STEP) : bumps
+  for (let k = 0; k < count; k++) floor[k] += rounded[k]
 
   // shape the ground near the line, and mark its floor as track
   const track = (field.track ??= new Float32Array(n * n))
@@ -116,12 +122,25 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
       for (let d = -window; d <= window; d += 4) look(d)
       const best = at - guess
       for (let d = best - 3; d <= best + 3; d++) look(d)
+      // then exactly: onto the stretch of line either side of that point, its floor blended along it
+      // (taking one point's floor alone makes a staircase on every climb)
+      let level = floor[at]
+      for (const other of [(at + count - 1) % count, (at + 1) % count]) {
+        const sx = xs[other] - xs[at]
+        const sz = zs[other] - zs[at]
+        const t = Math.min(Math.max(((x - xs[at]) * sx + (z - zs[at]) * sz) / (sx * sx + sz * sz || 1), 0), 1)
+        const dist = Math.hypot(x - (xs[at] + sx * t), z - (zs[at] + sz * t))
+        if (dist < nearest) {
+          nearest = dist
+          level = floor[at] + (floor[other] - floor[at]) * t
+        }
+      }
       const out = nearest - ch.width / 2
       const i = iz * n + ix
       track[i] = Math.max(track[i], out <= 0 ? 1 : 1 - smoothstep(out / TRACK_EDGE))
       const weight = out <= 0 ? 1 : ch.banks > 0 ? 1 - smoothstep(out / ch.banks) : 0
       if (weight <= 0) continue
-      field.heights[i] += (floor[at] - field.heights[i]) * weight
+      field.heights[i] += (level - field.heights[i]) * weight
     }
   }
 }

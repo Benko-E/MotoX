@@ -155,6 +155,25 @@ describe('a loop channel', () => {
     expect(worst).toBeLessThan(0.3)
   })
 
+  it('on a climb its floor is a smooth ramp, not a staircase of little ridges', () => {
+    // big smooth hills, the floor following them all the way (flatness 0): it climbs and drops
+    const big = { seed: 2, height: 30, wavelength: 120, octaves: 1, roughness: 0.5 }
+    const field = generateTerrain(testMap({ size: 200, hills: big, channel: loop({ flatness: 0 }) }))
+    // how sharply the slope changes from one metre to the next, anywhere on its floor
+    const n = field.samples
+    const h = field.heights
+    let worst = 0
+    for (let i = n + 1; i < n * (n - 1) - 1; i++) {
+      const across = [i - 1, i, i + 1]
+      const down = [i - n, i, i + n]
+      for (const [a, b, c] of [across, down]) {
+        if (field.track![a] < 1 || field.track![b] < 1 || field.track![c] < 1) continue
+        worst = Math.max(worst, Math.abs(h[a] - 2 * h[b] + h[c]))
+      }
+    }
+    expect(worst).toBeLessThan(0.05)
+  })
+
   it('marks its floor, for drawing it as a dirt track: fully across its width, fading out just past it', () => {
     const field = generateTerrain(big({ channel: loop() }))
     const track = (x: number, z: number) => {
