@@ -26,6 +26,8 @@ export interface GhostRide {
   /** How long it flew, seconds, and how fast it was going as it took off, km/h. */
   airtime: number
   speed: number
+  /** How high the middle of the bike rode above the ground on the run-up, metres. */
+  rideHeight: number
 }
 
 const DEG = Math.PI / 180
@@ -103,7 +105,10 @@ export class GhostRider {
     let speed = 0
     let landedFor = 0
     let pitchBefore = bike.pitch
-    const turnedDown = (reason: string): GhostRide => ({ landed: false, reason, flight, airtime: airtime || flight.length * dt, speed })
+    let rideHeights = 0
+    let rideSteps = 0
+    const rideHeight = () => (rideSteps ? rideHeights / rideSteps : 0)
+    const turnedDown = (reason: string): GhostRide => ({ landed: false, reason, flight, airtime: airtime || flight.length * dt, speed, rideHeight: rideHeight() })
 
     for (let t = 0, steps = 0; t < timeLimit; t += dt) {
       if (++steps % STEPS_PER_PAUSE === 0) yield
@@ -127,6 +132,10 @@ export class GhostRider {
       const { x, y, z } = bike.body.translation()
       const pastLip = (x - jump.lip.x) * forward.x + (z - jump.lip.z) * forward.z
       if (phase === 'runUp') {
+        if (!nowInAir) {
+          rideHeights += y - heightAt(this.field, x, z)
+          rideSteps++
+        }
         if (nowInAir && pastLip > -TAKE_OFF_ZONE) {
           phase = 'flying'
           speed = bike.speed * 3.6
@@ -140,7 +149,7 @@ export class GhostRider {
           airtime = flight.length * dt
         }
       } else if ((landedFor += dt) >= RIDE_OUT) {
-        return bike.forwardSpeed >= STILL_ROLLING ? { landed: true, flight, airtime, speed } : turnedDown('stopped dead after landing')
+        return bike.forwardSpeed >= STILL_ROLLING ? { landed: true, flight, airtime, speed, rideHeight: rideHeight() } : turnedDown('stopped dead after landing')
       }
     }
     return turnedDown(phase === 'runUp' ? 'never took off' : 'still going at the time limit')

@@ -1,20 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import type { GhostRide } from '../src/world/ghostRider'
 import type { JumpSpot } from '../src/world/jumpFinder'
-import { placeLetters, placeLettersGradually, pointAlong, sliceOf, sliceTurn, type LetterPlan } from '../src/world/letterSpots'
+import { placeLetters, placeLettersGradually, pointAlong, reachGap, sliceOf, sliceTurn, type LetterPlan } from '../src/world/letterSpots'
 
 const DEG = Math.PI / 180
 /** M O T O X, getting harder. */
 const targets = [0, 0.25, 0.5, 0.75, 1]
-const plan = (spread = 350): LetterPlan => ({ spread, turn: 0, difficulties: targets })
+/** M O T O X on flat ground at height 0, floating at the top of their jumps; none needs air unless a test says so. */
+const plan = (spread = 350): LetterPlan => ({
+  spread,
+  turn: 0,
+  letters: targets.map((difficulty) => ({ difficulty, along: 0.5, grabSize: 2, airGap: 0 })),
+  groundAt: () => 0,
+})
+/** How high each made-up jump's flight gets at its top, metres (5 unless given). */
+const tops = new WeakMap<JumpSpot, number>()
 
-/** A made-up jump `distance` m out from the middle toward compass `bearing`, ridden outward; `air` is how long the ghost will fly it. */
-function jump(bearing: number, distance: number, air: number): JumpSpot {
+/** A made-up jump `distance` m out from the middle toward compass `bearing`, ridden outward; `air` is how long the ghost will fly it, `top` how high. */
+function jump(bearing: number, distance: number, air: number, top = 5): JumpSpot {
   const x = Math.sin(bearing * DEG) * distance
   const z = -Math.cos(bearing * DEG) * distance
   const dx = Math.sin(bearing * DEG)
   const dz = -Math.cos(bearing * DEG)
-  return {
+  const spot = {
     lip: { x, y: 0, z },
     heading: bearing,
     runUp: [{ x: x - dx * 30, y: 0, z: z - dz * 30 }, { x, y: 0, z }],
@@ -24,6 +32,8 @@ function jump(bearing: number, distance: number, air: number): JumpSpot {
     landing: { x: x + dx * 30, y: 0, z: z + dz * 30 },
     score: air,
   }
+  tops.set(spot, top)
+  return spot
 }
 
 /** A pretend ghost: lands every jump except the ones listed, flying for the jump's airtime. */
@@ -31,9 +41,9 @@ function ghost(refuse: JumpSpot[] = []) {
   const ridden: JumpSpot[] = []
   const ride = (spot: JumpSpot): GhostRide => {
     ridden.push(spot)
-    if (refuse.includes(spot)) return { landed: false, reason: 'crashed: head hit the ground', flight: [], airtime: 0, speed: 70 }
-    const flight = [spot.lip, { ...spot.lip, y: 5 }, spot.landing]
-    return { landed: true, flight, airtime: spot.airtime, speed: spot.speed }
+    if (refuse.includes(spot)) return { landed: false, reason: 'crashed: head hit the ground', flight: [], airtime: 0, speed: 70, rideHeight: 0.66 }
+    const flight = [spot.lip, { ...spot.lip, y: tops.get(spot) ?? 5 }, spot.landing]
+    return { landed: true, flight, airtime: spot.airtime, speed: spot.speed, rideHeight: 0.66 }
   }
   return { ride, ridden }
 }
@@ -109,6 +119,61 @@ describe('handing out the letters', () => {
   it('the letters sit on the path the ghost really flew', () => {
     const spots = placeLetters(jumps, plan(), ghost().ride)
     for (const spot of spots) expect(spot.flight[1].y).toBe(5)
+  })
+})
+
+describe('out of reach from the ground', () => {
+  /** X needs 2 m of air between its grab sphere and a bike riding on the ground. */
+  const needingAir = () => {
+    const p = plan()
+    p.letters[4] = { difficulty: 1, along: 0.5, grabSize: 1.5, airGap: 2 }
+    return p
+  }
+
+  it('measures the gap between the grab sphere of a letter and the middle of a bike riding on the nearest ground', () => {
+    // 8 m above flat ground: 8 - 0.66 riding height - 1.5 grab size
+    expect(reachGap({ x: 0, y: 8, z: 0 }, 1.5, 0.66, () => 0)).toBeCloseTo(5.84, 1)
+  })
+
+  it('a hillside beside the letter counts, not only the ground straight below', () => {
+    // a ledge 7.5 m high starting 2 m off to the side: riding along it, the letter is within reach
+    const ledge = (x: number) => (x > 2 ? 7.5 : 0)
+    expect(reachGap({ x: 0, y: 8, z: 0 }, 1.5, 0.66, ledge)).toBeLessThan(0.2)
+  })
+
+  it('a letter that needs air is not put where you could grab it riding along the ground', () => {
+    // the hardest jump flies only 3 m up; the next hardest, 8 m
+    const jumps = middles.flatMap((b, slice) => [
+      jump(b, 100, slice === 1 ? 1.0 : 1.4, 8),
+      jump(b + 10, 200, 2, 8),
+      jump(b - 10, 300, slice === 3 ? 4.5 : 2.6, slice === 3 ? 3 : 8),
+    ])
+    const x = placeLetters(jumps, needingAir(), ghost().ride).find((spot) => spot.letter === 4)!
+    expect(x.jump.airtime).toBe(2.6)
+  })
+
+  it('with no air gap a letter can go anywhere, however low', () => {
+    const jumps = middles.map((b) => jump(b, 100, 1.2, 1))
+    expect(placeLetters(jumps, plan(), ghost().ride)).toHaveLength(5)
+  })
+
+  it('when nothing ridden is high enough, the ghost rides more jumps, the biggest first', () => {
+    // 40 jumps a slice, all flying low, but for one big one that the first round of rides skips
+    const many = middles.flatMap((b) => Array.from({ length: 40 }, (_, i) => jump(b - 30 + i * 1.5, 60 + i * 6, 1 + i * 0.1, 2)))
+    const high = many[2 * 40 + 37]
+    tops.set(high, 10)
+    const { ride, ridden } = ghost()
+    const x = placeLetters(many, needingAir(), ride).find((spot) => spot.letter === 4)
+    expect(x?.jump).toBe(high)
+    expect(ridden.length).toBeGreaterThan(30)
+  })
+
+  it('leaves a letter out only once the ghost has tried plenty and nothing is high enough', () => {
+    const many = middles.flatMap((b) => Array.from({ length: 40 }, (_, i) => jump(b - 30 + i * 1.5, 60 + i * 6, 1 + i * 0.1, 2)))
+    const { ride, ridden } = ghost()
+    const spots = placeLetters(many, needingAir(), ride)
+    expect(spots.map((spot) => spot.letter)).toEqual([0, 1, 2, 3])
+    expect(ridden.length).toBeLessThanOrEqual(30 + 40)
   })
 })
 

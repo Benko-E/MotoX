@@ -114,7 +114,8 @@ function placeLetters() {
     {
       spread: config.letters.spread,
       turn: sliceTurn(map.hills.seed, config.letters.each.length),
-      difficulties: config.letters.each.map((each) => each.difficulty),
+      letters: config.letters.each.map(({ difficulty, along, grabSize, airGap }) => ({ difficulty, along, grabSize, airGap })),
+      groundAt,
     },
     rideOnce,
   )
@@ -164,11 +165,11 @@ const sections: PanelSection[] = Object.entries(config).map(([name, target]) => 
   choices: configChoices,
   notes: configNotes,
   open: ['bike', 'bike.speed', 'bike.turning', 'jumps'],
-  // a letter's difficulty and the spread decide which jumps they go on
+  // these decide which jumps the letters go on (a letter that needs air only fits a jump that floats it high enough)
   onChange:
     name === 'letters'
       ? (path: string, last: boolean) => {
-          if (last && (path.endsWith('difficulty') || path === 'spread')) placeLetters()
+          if (last && (path === 'spread' || /\.(difficulty|along|grabSize|airGap)$/.test(path))) placeLetters()
         }
       : undefined,
 }))

@@ -261,13 +261,15 @@ export const config = {
         along: 0.1,
         /** How close the middle of the bike has to come to grab it, metres. Bigger is easier. */
         grabSize: 4,
+        /** Out of reach from the ground: how far its grab sphere must stay above a bike riding anywhere near, metres. 0 lets you grab it without leaving the ground; the higher, the bigger the air you need. Only jumps that float it this high get it. */
+        airGap: 0,
         /** Mark the way to its jump with a gold lane, until you grab it. */
         showRunUp: true,
       },
-      { letter: 'O', difficulty: 0.25, along: 0.3, grabSize: 3, showRunUp: false },
-      { letter: 'T', difficulty: 0.5, along: 0.5, grabSize: 2.5, showRunUp: false },
-      { letter: 'O', difficulty: 0.75, along: 0.5, grabSize: 2, showRunUp: false },
-      { letter: 'X', difficulty: 1, along: 0.5, grabSize: 1.5, showRunUp: false },
+      { letter: 'O', difficulty: 0.25, along: 0.3, grabSize: 3, airGap: 0, showRunUp: false },
+      { letter: 'T', difficulty: 0.5, along: 0.5, grabSize: 2.5, airGap: 0, showRunUp: false },
+      { letter: 'O', difficulty: 0.75, along: 0.65, grabSize: 2, airGap: 0.5, showRunUp: false },
+      { letter: 'X', difficulty: 1, along: 0.75, grabSize: 1.5, airGap: 2, showRunUp: false },
     ],
   },
 
@@ -402,6 +404,7 @@ export const configRanges: Ranges = {
   'letters.each.*.difficulty': [0, 1, 0.05],
   'letters.each.*.along': [0, 1, 0.01],
   'letters.each.*.grabSize': [0.5, 10, 0.1],
+  'letters.each.*.airGap': [0, 10, 0.25],
   'letters.respawnAfter': [1, 60, 1],
   'hud.*.x': [-50, 50, 0.5],
   'hud.*.y': [-50, 50, 0.5],

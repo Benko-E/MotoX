@@ -42,6 +42,12 @@ describe('the ghost bike', () => {
     expect(step.value).toEqual(whole)
   })
 
+  it('measures how high the middle of the bike rides above the ground', () => {
+    const ride = new GhostRider(ground(kicker(), 300), settings()).ride(kickerJump())
+    expect(ride.rideHeight).toBeGreaterThan(0.4)
+    expect(ride.rideHeight).toBeLessThan(1)
+  })
+
   it('records the path the bike really flew: up off the lip, over the top and down', () => {
     const ride = new GhostRider(ground(kicker(), 300), settings()).ride(kickerJump())
     const heights = ride.flight.map((p) => p.y)

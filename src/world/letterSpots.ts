@@ -8,15 +8,33 @@ import type { JumpSpot, Point } from './jumpFinder'
  * other. Only then are the letters handed out to the slices, so each letter
  * gets a jump about as hard as it wants: X goes wherever the sickest jump is,
  * not wherever it happened to be dealt.
+ *
+ * A letter that wants air is only put where a bike riding on the ground
+ * can't reach it, from any side: then any way you get there counts, but
+ * every way needs a jump. If none of the rides so far is high enough, the
+ * ghost rides more, the biggest jumps first.
  */
+
+/** What one letter asks for. */
+export interface LetterWish {
+  /** How hard its jump should be, 0 (the easiest landed) to 1 (the hardest). */
+  difficulty: number
+  /** Where on the flight it floats (see pointAlong), and how close the bike's middle must come to grab it, metres. */
+  along: number
+  grabSize: number
+  /** How far its grab sphere must stay above a bike riding on the ground, metres. 0: no need to leave the ground. */
+  airGap: number
+}
 
 export interface LetterPlan {
   /** How far from the middle the letters' jumps may be, run-up to landing, metres. */
   spread: number
   /** How far the slices are turned round from north, degrees. */
   turn: number
-  /** How hard each letter's jump should be, 0 (the easiest landed) to 1 (the hardest). One slice per letter. */
-  difficulties: number[]
+  /** One wish per letter, and one slice per letter. */
+  letters: LetterWish[]
+  /** The ground's height anywhere. */
+  groundAt: (x: number, z: number) => number
 }
 
 export interface LetterSpot {
@@ -43,6 +61,10 @@ const SPEED_PER_SECOND = 40
 const SHARING = 10
 /** A letter left without a jump at all counts as worse still. */
 const MISSING = 100
+/** While a letter has nowhere high enough to go, the ghost rides up to this many more jumps. */
+const MORE_RIDES = 40
+/** The ground round a letter is read this finely, looking for the nearest of it, metres. */
+const REACH_STEP = 0.25
 
 /** Which slice (0 to `slices` - 1) the point (x, z) falls in, counting round from north turned on by `turn` degrees. */
 export function sliceOf(x: number, z: number, turn: number, slices: number): number {
@@ -55,6 +77,26 @@ export function sliceOf(x: number, z: number, turn: number, slices: number): num
 export function sliceTurn(seed: number, slices: number): number {
   const width = 360 / slices
   return (((seed * GOLDEN_ANGLE) % width) + width) % width
+}
+
+/**
+ * How far a letter at `point` with a grab sphere `grabSize` across (radius)
+ * stays out of reach of a bike riding on the ground: from the sphere's edge to
+ * the middle of a bike riding `rideHeight` up on the nearest ground in any
+ * direction, metres. Negative: you can grab it without leaving the ground.
+ * Measured to `upTo` metres; more comes out as at least that.
+ */
+export function reachGap(point: Point, grabSize: number, rideHeight: number, groundAt: (x: number, z: number) => number, upTo = 10): number {
+  let nearest = Math.abs(point.y - groundAt(point.x, point.z))
+  const reach = Math.min(grabSize + rideHeight + upTo, nearest)
+  for (let dz = -reach; dz <= reach; dz += REACH_STEP) {
+    for (let dx = -reach; dx <= reach; dx += REACH_STEP) {
+      const across = Math.hypot(dx, dz)
+      if (across >= nearest) continue // can't be any nearer
+      nearest = Math.min(nearest, Math.hypot(across, groundAt(point.x + dx, point.z + dz) - point.y))
+    }
+  }
+  return nearest - rideHeight - grabSize
 }
 
 /** The point on a flight `along` the way: 0 lift-off, 0.5 the highest point, 1 touchdown. */
@@ -84,7 +126,8 @@ export function placeLetters(jumps: readonly JumpSpot[], plan: LetterPlan, ride:
 
 /** Places the letters, pausing after every ghost ride (and inside it, if it pauses), so the game can run frames in between. */
 export function* placeLettersGradually(jumps: readonly JumpSpot[], plan: LetterPlan, ride: Ride): Generator<void, LetterSpot[]> {
-  const slices = plan.difficulties.length
+  const wishes = plan.letters
+  const slices = wishes.length
   const within = (p: Point) => Math.hypot(p.x, p.z) <= plan.spread
   const bySlice: JumpSpot[][] = Array.from({ length: slices }, () => [])
   for (const jump of jumps) {
@@ -92,28 +135,46 @@ export function* placeLettersGradually(jumps: readonly JumpSpot[], plan: LetterP
   }
 
   const landed: Landed[] = []
+  const tried = new Set<JumpSpot>()
+  /** The ghost tries `jump`; true if it landed it. */
+  const tryJump = function* (jump: JumpSpot, slice: number): Generator<void, boolean> {
+    tried.add(jump)
+    const riding = ride(jump)
+    const result = 'next' in riding ? yield* riding : riding
+    yield
+    if (!result.landed) return false
+    // which letters it could carry: those it leaves out of reach of the ground, if they need to be
+    const fits = wishes.map(
+      (wish) =>
+        wish.airGap <= 0 ||
+        reachGap(pointAlong(result.flight, wish.along), wish.grabSize, result.rideHeight, plan.groundAt, wish.airGap + 0.5) >= wish.airGap,
+    )
+    landed.push({ slice, jump, flight: result.flight, hardness: result.airtime + result.speed / SPEED_PER_SECOND, fits })
+    return true
+  }
+
   for (let slice = 0; slice < slices; slice++) {
     // easiest first, by the jump finder's guess at how much air each gives
     const inSlice = bySlice[slice].sort((a, b) => a.score - b.score)
-    const tried = new Set<number>()
     for (const rung of rungs(inSlice.length)) {
       let tries = 0
       for (const i of outFrom(rung, inSlice.length)) {
         if (tries >= TRIES) break
-        if (tried.has(i)) continue
-        tried.add(i)
+        if (tried.has(inSlice[i])) continue
         tries++
-        const riding = ride(inSlice[i])
-        const result = 'next' in riding ? yield* riding : riding
-        yield
-        if (result.landed) {
-          landed.push({ slice, jump: inSlice[i], flight: result.flight, hardness: result.airtime + result.speed / SPEED_PER_SECOND })
-          break
-        }
+        if (yield* tryJump(inSlice[i], slice)) break
       }
     }
   }
-  return handOut(landed, plan.difficulties, slices)
+
+  // a letter with nowhere high enough to go: ride more, the biggest jumps first
+  let spots = handOut(landed, wishes, slices)
+  const untried = bySlice.flatMap((inSlice, slice) => inSlice.filter((jump) => !tried.has(jump)).map((jump) => ({ jump, slice })))
+  untried.sort((a, b) => b.jump.score - a.jump.score)
+  for (let more = 0; spots.length < wishes.length && more < Math.min(MORE_RIDES, untried.length); more++) {
+    if (yield* tryJump(untried[more].jump, untried[more].slice)) spots = handOut(landed, wishes, slices)
+  }
+  return spots
 }
 
 interface Landed {
@@ -121,6 +182,8 @@ interface Landed {
   jump: JumpSpot
   flight: Point[]
   hardness: number
+  /** Which letters it could carry (by place in the plan). */
+  fits: boolean[]
 }
 
 /** Up to RUNGS places along a list `n` long, from the first to the last, evenly spread. */
@@ -145,7 +208,8 @@ function* outFrom(i: number, n: number): Generator<number> {
  * they come nearest wins, harder letters counting more, so X gets the
  * hardest jump before anything else is settled.
  */
-function handOut(landed: Landed[], targets: number[], slices: number): LetterSpot[] {
+function handOut(landed: Landed[], wishes: LetterWish[], slices: number): LetterSpot[] {
+  const targets = wishes.map((wish) => wish.difficulty)
   const rated = rate(landed)
   const weight = targets.map((target) => 1 + target)
   const order = targets.map((_, i) => i).sort((a, b) => weight[b] - weight[a])
@@ -161,7 +225,7 @@ function handOut(landed: Landed[], targets: number[], slices: number): LetterSpo
     for (const letter of order) {
       let pick: Landed | null = null
       for (const option of rated.keys()) {
-        if (option.slice !== sliceFor[letter] || taken.has(option)) continue
+        if (option.slice !== sliceFor[letter] || taken.has(option) || !option.fits[letter]) continue
         if (!pick || Math.abs(rated.get(option)! - targets[letter]) < Math.abs(rated.get(pick)! - targets[letter])) pick = option
       }
       if (!pick) {
