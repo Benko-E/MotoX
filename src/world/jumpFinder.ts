@@ -34,7 +34,16 @@ export interface JumpSpot {
   landing: Point
   /** How good a jump it is: the longer the flight and the more squarely it climbs the hill, the higher. */
   score: number
+  /** Where it came from: the map feature that built it ('channel', ...), or 'found' searching the hills. Designed ones count first. */
+  source: string
+  /** What it's like: fast (long, low and quick), or big air (high, plenty of airtime). */
+  kind: JumpKind
 }
+
+export type JumpKind = 'fast' | 'bigAir'
+
+/** A found jump with at least this much air is big air, seconds. */
+export const BIG_AIR = 2.5
 
 export interface FinderSettings {
   /** How far apart the spots looked at are, metres, and how many directions are tried at each. */
@@ -88,6 +97,8 @@ const GRID_SLACK = 0.08
 const AIM_WIDE = 10
 const AIM_STEP = 2.5
 const AIM_BACK = 3
+/** A designed jump throws you at the slope of its face's last this many metres. */
+const FACE_END = 2
 /** The bike's middle sits about this high over the ground as it takes off, metres. */
 const RIDE_HEIGHT = 0.6
 
@@ -106,6 +117,7 @@ export function findJumps(field: Heightfield, changes: Partial<FinderSettings> =
 export function* findJumpsGradually(field: Heightfield, changes: Partial<FinderSettings> = {}): Generator<void, JumpSpot[]> {
   const s = { ...FINDER_DEFAULTS, ...changes }
   const at = (x: number, z: number) => heightAt(field, x, z)
+  const owned = ownedBy(field)
   const edge = field.size / 2 - s.runUpLength - 40
   const found: JumpSpot[] = []
   const tried = new Set<string>()
@@ -127,7 +139,7 @@ export function* findJumpsGradually(field: Heightfield, changes: Partial<FinderS
         const key = `${Math.round(lx / 2)},${Math.round(lz / 2)},${k}`
         if (tried.has(key)) continue
         tried.add(key)
-        const spot = tryJump(at, s, lx, lz, heading, dx, dz)
+        const spot = tryJump(at, s, lx, lz, heading, dx, dz, owned)
         if (typeof spot !== 'string') found.push(spot)
       }
     }
@@ -136,14 +148,14 @@ export function* findJumpsGradually(field: Heightfield, changes: Partial<FinderS
   // aim each one: try ways either side of the one it was found at, keeping the best
   const aimed: JumpSpot[] = []
   for (const jump of keepBest(found, s.separation)) {
-    aimed.push(aim(at, s, jump))
+    aimed.push(aim(at, s, jump, owned))
     if (aimed.length % 25 === 0) yield
   }
   return keepBest(aimed, s.separation) // aiming can turn two near ones the same way
 }
 
 /** A jump turned up to AIM_WIDE degrees either way, in AIM_STEP steps: whichever way gives the best jump. */
-function aim(at: (x: number, z: number) => number, s: FinderSettings, jump: JumpSpot): JumpSpot {
+function aim(at: (x: number, z: number) => number, s: FinderSettings, jump: JumpSpot, owned: (x: number, z: number) => boolean): JumpSpot {
   let best = jump
   for (let turn = -AIM_WIDE; turn <= AIM_WIDE; turn += AIM_STEP) {
     if (turn === 0) continue
@@ -157,7 +169,7 @@ function aim(at: (x: number, z: number) => number, s: FinderSettings, jump: Jump
       x += dx
       z += dz
     }
-    const spot = tryJump(at, s, x, z, heading, dx, dz)
+    const spot = tryJump(at, s, x, z, heading, dx, dz, owned)
     if (typeof spot !== 'string' && spot.score > best.score) best = spot
   }
   return best
@@ -174,7 +186,50 @@ export function judgeJump(field: Heightfield, x: number, z: number, heading: num
   const dz = -Math.cos(heading * DEG)
   let along = 0
   while (along < 60 && at(x + dx * (along + 1), z + dz * (along + 1)) > at(x + dx * along, z + dz * along)) along++
-  return tryJump(at, s, x + dx * along, z + dz * along, heading, dx, dz)
+  return tryJump(at, s, x + dx * along, z + dz * along, heading, dx, dz, ownedBy(field))
+}
+
+/**
+ * The jumps map features built (a track's kickers, ...), as the features
+ * registered them: exactly where and which way, the run-up along the
+ * feature's own line, and the speed each is built for; the flight worked
+ * out the same way the finder does. They come first in the stack.
+ */
+export function designedJumps(field: Heightfield, gravity = FINDER_DEFAULTS.gravity): JumpSpot[] {
+  const at = (x: number, z: number) => heightAt(field, x, z)
+  return (field.trackJumps ?? []).map((jump) => {
+    const dx = Math.sin(jump.heading * DEG)
+    const dz = -Math.cos(jump.heading * DEG)
+    // how steeply its face throws you: over its last few metres (the very top is rounded)
+    const lipAngle = Math.atan((at(jump.x, jump.z) - at(jump.x - dx * FACE_END, jump.z - dz * FACE_END)) / FACE_END) / DEG
+    const flight = fly(at, gravity, jump.x, jump.z, at(jump.x, jump.z), lipAngle, jump.speed / 3.6, dx, dz)
+    const lip = { x: jump.x, y: at(jump.x, jump.z), z: jump.z }
+    const airtime = flight?.airtime ?? 0
+    return {
+      lip,
+      heading: jump.heading,
+      runUp: jump.runUp.map((p) => ({ x: p.x, y: at(p.x, p.z), z: p.z })),
+      lipAngle,
+      speed: jump.speed,
+      airtime,
+      landing: flight?.landing ?? lip,
+      score: airtime,
+      source: 'channel',
+      kind: 'fast' as const,
+    }
+  })
+}
+
+/** Whether a map feature owns the ground at (x, z): a track, a clearing... the finder keeps off it. */
+function ownedBy(field: Heightfield): (x: number, z: number) => boolean {
+  const { owned } = field
+  if (!owned) return () => false
+  const n = field.samples
+  return (x, z) => {
+    const ix = Math.round((x + field.size / 2) / field.cellSize)
+    const iz = Math.round((z + field.size / 2) / field.cellSize)
+    return ix >= 0 && iz >= 0 && ix < n && iz < n && owned[iz * n + ix] === 1
+  }
 }
 
 /**
@@ -191,6 +246,8 @@ function tryJump(
   heading: number,
   dx: number,
   dz: number,
+  /** Ground a map feature owns: no jump starts, takes off or flies over it. */
+  owned: (x: number, z: number) => boolean,
 ): JumpSpot | string {
   /** The ground's height `d` metres along the line from the top (negative: before it), on multiples of PROFILE_STEP. */
   const behind = s.runUpLength + 3
@@ -200,6 +257,7 @@ function tryJump(
     profile[i] = at(ax + dx * d, az + dz * d)
   }
   const h = (d: number) => profile[Math.round((d + behind) / PROFILE_STEP)]
+  if (owned(ax, az)) return 'its top is on ground a map feature owns'
   const climb = Math.atan((h(0) - h(-RUN_IN)) / RUN_IN) / DEG
   if (climb < s.minRunUpSlope) return `the run-up hardly climbs (${climb.toFixed(0)} deg)`
   // How squarely it climbs the hill: 1 straight up the slope, less the more it cuts across.
@@ -240,8 +298,15 @@ function tryJump(
   for (let back = s.runUpLength; back >= 0; back -= 1.5) {
     const px = lx - dx * back
     const pz = lz - dz * back
+    if (owned(px, pz)) return 'its run-up is on ground a map feature owns'
     runUp.push({ x: px, y: at(px, pz), z: pz })
   }
+  // nor does it fly over a feature (across a track, say) or land on one
+  const flown = Math.hypot(best.landing.x - lx, best.landing.z - lz)
+  for (let d = 0; d <= flown; d += 2) {
+    if (owned(lx + ((best.landing.x - lx) * d) / (flown || 1), lz + ((best.landing.z - lz) * d) / (flown || 1))) return 'it flies over ground a map feature owns'
+  }
+  if (owned(best.landing.x, best.landing.z)) return 'it lands on ground a map feature owns'
   return {
     lip: { x: lx, y: at(lx, lz), z: lz },
     heading,
@@ -252,6 +317,8 @@ function tryJump(
     landing: best.landing,
     // longer flights, squarely up the hill, a little better onto a downslope
     score: best.good * squarely * squarely,
+    source: 'found',
+    kind: best.airtime >= BIG_AIR ? 'bigAir' : 'fast',
   }
 }
 

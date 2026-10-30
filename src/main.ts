@@ -34,7 +34,7 @@ import { HelpTimer } from './ui/helpCard'
 import { readNotes } from './ui/notes'
 import { GhostRider, type GhostRide } from './world/ghostRider'
 import { LetterHunt } from './world/letterHunt'
-import { findJumpsGradually, type JumpSpot } from './world/jumpFinder'
+import { designedJumps, findJumpsGradually, type JumpSpot } from './world/jumpFinder'
 import { placeLettersGradually, sliceTurn, type LetterSpot, type Ride } from './world/letterSpots'
 import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
 
@@ -87,8 +87,6 @@ const groundEffects = new GroundEffects(
 let jumps: JumpSpot[] = []
 const jumpLanes = new JumpLanes(view.scene, jumps, groundAt, config.jumpGuide)
 let jumpSearch: Generator<void, JumpSpot[]> | null = null
-/** The jumps whose lips are on a track: marked whenever they're ahead, whatever their score. */
-let trackKickers = new Set<JumpSpot>()
 /** Each frame the jump search (and then the letters' ghost rides) gets this long to work on, milliseconds. */
 const JUMP_SEARCH_BUDGET = 5
 
@@ -162,7 +160,7 @@ const riderEffects: GroundEffects[] = []
 const nameTags: NameTag[] = []
 for (let i = 0; i < AI_RIDERS; i++) {
   const roam = new FreeRoam(config.ai, () => jumps)
-  const follow = new FollowTrack(config.ai, () => field.trackLine)
+  const follow = new FollowTrack(config.ai, () => field.trackLine, () => jumps)
   const rider = new AiRider(physics, config, groundAt, new PickBehaviour(() => (config.ai.behaviour === 'followTrack' ? follow : roam)))
   rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
   riders.push(rider)
@@ -352,12 +350,9 @@ function showFrame(frameTime: number) {
     let step = jumpSearch.next()
     while (!step.done && performance.now() < until) step = jumpSearch.next()
     if (step.done) {
-      jumps = step.value
+      // the jump stack: what the map's features built first, then what the finder found in the hills
+      jumps = [...designedJumps(field), ...step.value]
       jumpLanes.replace(jumps)
-      // the track's kickers: their lips on its floor
-      const n = field.samples
-      const onFloor = (x: number, z: number) => (field.track?.[Math.round((z + field.size / 2) / field.cellSize) * n + Math.round((x + field.size / 2) / field.cellSize)] ?? 0) >= 0.5
-      trackKickers = new Set(jumps.filter((jump) => onFloor(jump.lip.x, jump.lip.z)))
       jumpSearch = null
       placeLetters()
     }
@@ -381,7 +376,7 @@ function showFrame(frameTime: number) {
     letterSpots.filter((spot) => config.letters.show && config.letters.each[spot.letter].showRunUp && !hunt.grabbed[spot.letter]).map((spot) => spot.jump),
   )
   // the lanes of whoever you watch: what they would see as they ride
-  jumpLanes.update(watchedView().position, watchedView().heading, Math.min(frameTime, 0.1), goldLanes, trackKickers)
+  jumpLanes.update(watchedView().position, watchedView().heading, Math.min(frameTime, 0.1), goldLanes)
   hud.update({ speed: watchedBike().speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime) // the speed of whoever you watch
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)

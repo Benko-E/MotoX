@@ -226,14 +226,15 @@ export const config = {
   },
 
   /**
-   * Marked jumps: the game finds good jumps in the hills by reading the ground,
-   * and lays a lane with arrows up the run-up of the best few near you, ahead
-   * and pointing your way, plus a ring where you'd land. An experiment: it only
-   * reads the map, nothing about riding changes.
+   * A debug view of the jump stack: a pink lane with arrows up the run-up of
+   * the best few jumps near whoever you're watching, ahead and pointing their
+   * way, plus a ring where they'd land. Jumps the map's features built come
+   * first, then the ones found in the hills. Only drawn: nothing about riding
+   * changes.
    */
   jumpGuide: {
-    /** Show the lanes at all. */
-    show: true,
+    /** Show the lanes (a debug view). */
+    show: false,
     /** How many lanes are shown at once, at most. */
     lanes: 3,
     /** Only jumps whose run-up starts within this distance of you, metres. */

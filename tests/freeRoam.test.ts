@@ -12,10 +12,12 @@ function jump(x: number, z: number, heading: number): JumpSpot {
   const dx = Math.sin(heading * DEG)
   const dz = -Math.cos(heading * DEG)
   const runUp = [{ x, y: 0, z }, { x: x + dx * 30, y: 0, z: z + dz * 30 }]
-  return { lip: runUp[1], heading, runUp, lipAngle: 20, speed: 70, airtime: 2, landing: { x: x + dx * 60, y: 0, z: z + dz * 60 }, score: 2 }
+  return { lip: runUp[1], heading, runUp, lipAngle: 20, speed: 70, airtime: 2, landing: { x: x + dx * 60, y: 0, z: z + dz * 60 }, score: 2, source: 'found', kind: 'fast' }
 }
 /** Him at the middle, heading north (toward -z). */
 const here = { x: 0, z: 0, heading: 0 }
+/** The same jump, as a map feature built it, of a kind. */
+const designed = (spot: JumpSpot, kind: JumpSpot['kind'], source = 'bigAir'): JumpSpot => ({ ...spot, kind, source })
 
 describe('free roam', () => {
   it('rides off to the quarter of the map he has been to least, within the roam radius, then cruises', () => {
@@ -56,6 +58,17 @@ describe('free roam', () => {
     const orders = new Orders()
     roam.watch(orders, here, 1)
     expect(orders.current).toBeUndefined()
+  })
+
+  it('roaming, he goes for big air first, then a jump a feature built, before a nearer found one', () => {
+    const near = jump(0, -40, 0)
+    const fast = designed(jump(10, -70, 0), 'fast', 'channel')
+    const big = designed(jump(-10, -100, 0), 'bigAir')
+    for (const [jumps, wanted] of [[[near, fast, big], big], [[near, fast], fast], [[near], near]] as const) {
+      const orders = new Orders()
+      new FreeRoam(settings(), () => jumps, always(0)).watch(orders, here, 1)
+      expect(orders.current).toEqual({ kind: 'takeJump', jump: wanted })
+    }
   })
 
   it('only goes for jumps that land inside his roam area, so none throws him off the map', () => {
@@ -129,6 +142,23 @@ describe('following the track', () => {
     const order = orders.current!
     if (order.kind !== 'rideTo') throw new Error('expected a ride to a spot')
     expect(Math.abs(bearingOf(order))).toBeLessThan(35)
+  })
+
+  it('takes the track kickers coming up on his line as jumps, lined up at their speed', () => {
+    // a kicker on the track 40 m on round from the north point, the way he's going (clockwise), and one the other way
+    const at = (i: number) => line[(i + line.length) % line.length]
+    const kicker = (from: number, to: number) => {
+      const a = at(from)
+      const b = at(to)
+      const heading = (Math.atan2(b.x - a.x, -(b.z - a.z)) * 180) / Math.PI
+      return designed({ ...jump(a.x, a.z, heading), lip: { x: b.x, y: 0, z: b.z }, runUp: [{ ...a, y: 0 }, { ...b, y: 0 }] }, 'fast', 'channel')
+    }
+    const ahead = kicker(20, 50)
+    const behind = kicker(-20, -50)
+    const follow = new FollowTrack({ trackWay: 'clockwise' }, () => line, () => [behind, ahead])
+    const orders = new Orders()
+    follow.watch(orders, onTrack, 1 / 60)
+    expect(orders.current).toEqual({ kind: 'takeJump', jump: ahead })
   })
 
   it('may go as far out as the track does', () => {

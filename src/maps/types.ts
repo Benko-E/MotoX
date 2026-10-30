@@ -66,6 +66,8 @@ export interface MapDef {
     jumpLength: number
     /** How much each jump's size differs from the next, 0 to 1. */
     jumpVary: number
+    /** The speed its jumps are built to be hit at, km/h: AI riders take them at this. */
+    jumpSpeed: number
     /** Round each jump the track runs straight, so you land back on it: this many jump lengths past the lip (and one before the face). */
     landingStraight: number
   }

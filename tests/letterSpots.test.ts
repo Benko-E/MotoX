@@ -31,7 +31,9 @@ function jump(bearing: number, distance: number, air: number, top = 5): JumpSpot
     airtime: air,
     landing: { x: x + dx * 30, y: 0, z: z + dz * 30 },
     score: air,
-  }
+    source: 'found',
+    kind: air >= 2.5 ? 'bigAir' : 'fast',
+  } as JumpSpot
   tops.set(spot, top)
   return spot
 }
@@ -174,6 +176,17 @@ describe('out of reach from the ground', () => {
     const spots = placeLetters(many, needingAir(), ride)
     expect(spots.map((spot) => spot.letter)).toEqual([0, 1, 2, 3])
     expect(ridden.length).toBeLessThanOrEqual(30 + 40)
+  })
+})
+
+describe('jumps the map built', () => {
+  it('are always among the ghost\'s tries, however low they score', () => {
+    // 40 found jumps a slice; one built by a feature, scoring between two the usual tries pick, in slice 0
+    const many = middles.flatMap((b) => Array.from({ length: 40 }, (_, i) => jump(b - 30 + i * 1.5, 60 + i * 6, 1 + i * 0.1)))
+    const built = { ...jump(20, 150, 1.35), source: 'channel' }
+    const { ride, ridden } = ghost()
+    placeLetters([built, ...many], plan(), ride)
+    expect(ridden).toContain(built)
   })
 })
 

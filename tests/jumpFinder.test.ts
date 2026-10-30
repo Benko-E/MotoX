@@ -28,6 +28,30 @@ describe('finding jumps in the hills', () => {
     expect(turnBetween(up!.heading, 100)).toBeLessThanOrEqual(3)
   })
 
+  it('leaves ground a map feature owns alone: no jump flies over it or starts on it', () => {
+    const field = ground(kicker(), 300)
+    expect(findJumps(field).some((jump) => turnBetween(jump.heading, 90) < 15)).toBe(true)
+    // a strip of owned ground across the kicker's landing (it lands about 80 m on, at x = 110)
+    const n = field.samples
+    field.owned = new Uint8Array(n * n)
+    for (let iz = 0; iz < n; iz++) for (let ix = 0; ix < n; ix++) if (Math.abs(ix * field.cellSize - 150 - 70) < 4) field.owned[iz * n + ix] = 1
+    expect(findJumps(field).some((jump) => turnBetween(jump.heading, 90) < 15)).toBe(false)
+  })
+
+  it('says it was found, and what kind it is from its airtime: fast, or big air from 2.5 s', () => {
+    const up = findJumps(ground(kicker(), 300)).find((jump) => turnBetween(jump.heading, 90) < 15)!
+    expect(up.source).toBe('found')
+    expect(up.kind).toBe(up.airtime >= 2.5 ? 'bigAir' : 'fast')
+    // 40 degrees up to a sharp crest with a 60 degree drop behind: a long flight
+    const steep = ground((x, z) => {
+      const across = Math.max(0, 1 - Math.max(0, Math.abs(z) - 20) / 40)
+      return (x <= 0 ? 0 : x <= 10 ? x * Math.tan(40 * DEG) : Math.max(0, 10 * Math.tan(40 * DEG) - (x - 10) * Math.tan(60 * DEG))) * across
+    }, 400)
+    const big = findJumps(steep).find((jump) => turnBetween(jump.heading, 90) < 15)!
+    expect(big.airtime).toBeGreaterThan(2.5)
+    expect(big.kind).toBe('bigAir')
+  })
+
   it('works out a speed to hit it at, and the run-up lane leads up the slope to the lip', () => {
     const up = findJumps(ground(kicker(), 300)).find((jump) => turnBetween(jump.heading, 90) < 15)!
     expect(up.speed).toBeGreaterThanOrEqual(30)

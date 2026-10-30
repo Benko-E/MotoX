@@ -15,7 +15,17 @@ export interface Heightfield {
   /** How much each sample is the floor of a track, 0 to 1, for drawing it as dirt. Missing when the map has none. */
   track?: Float32Array
   /** The lips of the jumps shaped into a track, and the compass heading the track runs there, degrees. */
-  trackJumps?: { x: number; z: number; heading: number }[]
+  trackJumps?: {
+    x: number
+    z: number
+    heading: number
+    /** The track's line up to the lip, about a metre apart, from where its run-up starts. */
+    runUp: { x: number; z: number }[]
+    /** The speed it's built to be hit at, km/h. */
+    speed: number
+  }[]
+  /** Which samples belong to a map feature (a track, a clearing, ...): 1 if one owns it. The jump finder keeps off them. */
+  owned?: Uint8Array
   /** The line down the middle of a track, its points about a metre apart, going round clockwise. */
   trackLine?: { x: number; z: number }[]
 }

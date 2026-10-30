@@ -13,6 +13,8 @@ const TRACK_EDGE = 3
 /** Round a channel jump the track runs straight at least this far before its face, metres (the jump finder looks this far back), and eases from curve to straight over this share of a jump length. */
 const STRAIGHT_RUN_IN = 30
 const STRAIGHT_EASE = 0.5
+/** A channel jump's run-up, as registered: this many points (metres) of the track's line before its lip. */
+const TRACK_RUN_UP = 30
 /** A channel jump's lip is rounded over about this far, metres. */
 const LIP_ROUND = 3
 /** A channel jump climbs over this share of its length, and drops away over the rest. */
@@ -106,12 +108,13 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const floor = new Float64Array(count)
   for (let k = 0; k < count; k++) floor[k] = even[k] + (gentle[k] - even[k]) * (1 - ch.flatness)
   const bumps = new Float64Array(count)
-  field.trackJumps = []
+  const shaped: { start: number; jumpLength: number }[] = []
   for (let j = 0; j < jumpSizes.length; j++) {
     const size = jumpSizes[j]
     const height = ch.jumpHeight * size
     const jumpLength = ch.jumpLength * size
     const start = along[jumpFeet[j]]
+    shaped.push({ start, jumpLength })
     for (let k = 0; k < count; k++) {
       const u = ((along[k] - start) * way + length) % length // metres past the foot of its face, the way it's ridden
       if (u >= jumpLength) continue
@@ -119,19 +122,29 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
       // up a curved face to the lip, steepest at the top; then a quick drop, easing out at the bottom
       bumps[k] += u <= face ? height * (u / face) ** 2 : height * (1 - (u - face) / (jumpLength - face)) ** 2
     }
-    // where its lip is, and which way the track runs there
-    const lipAlong = (start + way * jumpLength * JUMP_FACE + length) % length
-    let lip = 0
-    for (let k = 1; k < count; k++) if (Math.abs(along[k] - lipAlong) < Math.abs(along[lip] - lipAlong)) lip = k
-    const next = (lip + way + count) % count
-    field.trackJumps.push({ x: xs[lip], z: zs[lip], heading: (Math.atan2(xs[next] - xs[lip], -(zs[next] - zs[lip])) * 180) / Math.PI })
   }
   // lips rounded a little, as dirt ones are: a sharp crease saw-tooths across the ground's grid
   const rounded = ch.jumps > 0 ? evenOut(bumps, LIP_ROUND / CHANNEL_STEP) : bumps
+  // register each jump: its lip where its rounded crest is, the way the track runs there, and its run-up along the line
+  field.trackJumps = shaped.map(({ start, jumpLength }) => {
+    let lip = -1
+    for (let k = 0; k < count; k++) {
+      const u = ((along[k] - start) * way + length) % length
+      if (u < jumpLength && (lip < 0 || rounded[k] > rounded[lip])) lip = k
+    }
+    const next = (lip + way + count) % count
+    const runUp: { x: number; z: number }[] = []
+    for (let back = TRACK_RUN_UP; back >= 0; back--) {
+      const k = (lip - way * back + 2 * count) % count
+      runUp.push({ x: xs[k], z: zs[k] })
+    }
+    return { x: xs[lip], z: zs[lip], heading: (Math.atan2(xs[next] - xs[lip], -(zs[next] - zs[lip])) * 180) / Math.PI, runUp, speed: ch.jumpSpeed }
+  })
   for (let k = 0; k < count; k++) floor[k] += rounded[k]
 
   // shape the ground near the line, and mark its floor as track
   const track = (field.track ??= new Float32Array(n * n))
+  const owned = (field.owned ??= new Uint8Array(n * n))
   const reach = ch.width / 2 + Math.max(ch.banks, TRACK_EDGE)
   const outer = ch.radius * (1 + ch.winding) + reach
   const toIndex = (w: number) => (w + field.size / 2) / field.cellSize
@@ -179,6 +192,7 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
       track[i] = Math.max(track[i], out <= 0 ? 1 : 1 - smoothstep(out / TRACK_EDGE))
       const weight = out <= 0 ? 1 : ch.banks > 0 ? 1 - smoothstep(out / ch.banks) : 0
       if (weight <= 0) continue
+      owned[i] = 1
       field.heights[i] += (level - field.heights[i]) * weight
     }
   }
@@ -225,6 +239,7 @@ function calmClearing(map: MapDef, noise: Noise2D, field: Heightfield): void {
       const inside = out <= 0 ? 1 : clearing.blend > 0 ? 1 - smoothstep(out / clearing.blend) : 0
       if (inside <= 0) continue
       const i = iz * n + ix
+      ;(field.owned ??= new Uint8Array(n * n))[i] = 1
       field.heights[i] += (level - field.heights[i]) * clearing.calm * inside
     }
   }

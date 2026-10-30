@@ -156,6 +156,8 @@ export function* placeLettersGradually(jumps: readonly JumpSpot[], plan: LetterP
   for (let slice = 0; slice < slices; slice++) {
     // easiest first, by the jump finder's guess at how much air each gives
     const inSlice = bySlice[slice].sort((a, b) => a.score - b.score)
+    // jumps a map feature built are always tried: they're there to be used
+    for (const jump of inSlice) if (jump.source !== 'found') yield* tryJump(jump, slice)
     for (const rung of rungs(inSlice.length)) {
       let tries = 0
       for (const i of outFrom(rung, inSlice.length)) {

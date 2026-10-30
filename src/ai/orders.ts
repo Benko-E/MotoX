@@ -143,16 +143,22 @@ export class FreeRoam implements Behaviour {
     this.sinceJump = 0
   }
 
-  /** The nearest jump he hasn't made up his mind about yet whose run-up starts in view ahead, pointing his way. */
+  /**
+   * The jump he'd most like of those he hasn't made up his mind about yet
+   * whose run-up starts in view ahead, pointing his way: big air first, then
+   * one a map feature built, then the nearest.
+   */
   private jumpAhead(rider: RiderState): JumpSpot | null {
     const { settings } = this
+    const appeal = (jump: JumpSpot) => (jump.kind === 'bigAir' ? 2 : 0) + (jump.source !== 'found' ? 1 : 0)
     let nearest: JumpSpot | null = null
     let nearestDistance = Infinity
     for (const jump of this.jumps()) {
       if (this.considered.has(jump)) continue
       const start = jump.runUp[0]
       const distance = Math.hypot(start.x - rider.x, start.z - rider.z)
-      if (distance > settings.lookAhead || distance < TOO_CLOSE || distance >= nearestDistance) continue
+      if (distance > settings.lookAhead || distance < TOO_CLOSE) continue
+      if (nearest && (appeal(jump) < appeal(nearest) || (appeal(jump) === appeal(nearest) && distance >= nearestDistance))) continue
       const bearing = Math.atan2(start.x - rider.x, -(start.z - rider.z)) / DEG
       if (Math.abs(turnBetween(bearing, rider.heading)) > settings.lookWide) continue
       if (Math.abs(turnBetween(jump.heading, rider.heading)) > YOUR_WAY) continue
@@ -166,18 +172,46 @@ export class FreeRoam implements Behaviour {
 
 /** Following the track, he rides to a point this far on along it each time, metres. */
 const TRACK_AHEAD = 25
+/** And takes a kicker as a jump when its run-up starts within this far ahead on his line, metres, not having taken it in the last this many seconds. */
+const KICKER_AHEAD = 60
+const KICKER_AGAIN = 20
+/** On his line: its run-up starts within this many degrees of straight ahead, and it points within this many of his way. */
+const ON_LINE = 35
 
 /**
  * Riding round the track: to a point a little further along it, the way he's
  * set to go, and again. Away from the track, that takes him to it first.
  */
 export class FollowTrack implements Behaviour {
+  private readonly taken = new Map<JumpSpot, number>()
+  private time = 0
+
   constructor(
     /** Read live, so the tuning panel applies at once. */
     readonly settings: { trackWay: string },
     /** The track's line, its points about a metre apart going round clockwise; none if the map has no track. */
     private readonly line: () => readonly { x: number; z: number }[] | undefined,
+    /** The jump stack: the track's own fast kickers are taken as jumps. */
+    private readonly jumps: () => readonly JumpSpot[] = () => [],
   ) {}
+
+  /** Racing the track, a fast kicker coming up on his line is taken as a jump: lined up, at its speed. */
+  watch(orders: Orders, rider: RiderState, dt: number): void {
+    this.time += dt
+    if (orders.current?.kind === 'takeJump') return
+    for (const jump of this.jumps()) {
+      if (jump.source === 'found' || jump.kind !== 'fast') continue
+      if (this.time - (this.taken.get(jump) ?? -Infinity) < KICKER_AGAIN) continue
+      const start = jump.runUp[0]
+      const distance = Math.hypot(start.x - rider.x, start.z - rider.z)
+      if (distance > KICKER_AHEAD) continue
+      const bearing = Math.atan2(start.x - rider.x, -(start.z - rider.z)) / DEG
+      if (Math.abs(turnBetween(bearing, rider.heading)) > ON_LINE || Math.abs(turnBetween(jump.heading, rider.heading)) > ON_LINE) continue
+      this.taken.set(jump, this.time)
+      orders.addFirst({ kind: 'takeJump', jump })
+      return
+    }
+  }
 
   refill(orders: Orders, rider: RiderState): void {
     const line = this.line()
