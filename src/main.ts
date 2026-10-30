@@ -154,11 +154,24 @@ fly.place(
 const AI_RIDERS = 1
 const riders: AiRider[] = []
 const riderViews: BikeView[] = []
+/** Their tyre tracks, dirt and tyre shadows, like yours. */
+const riderEffects: GroundEffects[] = []
 for (let i = 0; i < AI_RIDERS; i++) {
   const rider = new AiRider(physics, config, groundAt, new FreeRoam(config.ai, () => jumps))
   rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
   riders.push(rider)
-  riderViews.push(new BikeView(view.scene, rider.bike, GREEN))
+  const riderView = new BikeView(view.scene, rider.bike, GREEN)
+  riderViews.push(riderView)
+  riderEffects.push(
+    new GroundEffects(
+      view.scene,
+      rider.bike,
+      riderView,
+      config.effects,
+      (x, z) => physics.groundHeightAt(x, z, rider.bike.body) ?? groundAt(x, z),
+      () => config.jumps.gravity * EARTH_GRAVITY,
+    ),
+  )
 }
 /** Who the camera watches: 0 you, 1 the first AI rider, and so on. */
 let watched = 0
@@ -323,6 +336,7 @@ function showFrame(frameTime: number) {
   bikeView.update(loop.alpha, frameTime)
   for (const riderView of riderViews) riderView.update(loop.alpha, frameTime)
   groundEffects.update(Math.min(frameTime, 0.1))
+  for (const effects of riderEffects) effects.update(Math.min(frameTime, 0.1))
   if (jumpSearch) {
     const until = performance.now() + JUMP_SEARCH_BUDGET
     let step = jumpSearch.next()
