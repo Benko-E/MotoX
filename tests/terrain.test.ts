@@ -143,6 +143,18 @@ describe('a loop channel', () => {
     expect(worst).toBeLessThan(0.1)
   })
 
+  it('winding hard, its floor is still smooth everywhere: no steps where the line swings out', () => {
+    const field = generateTerrain(testMap({ size: 260, hills, channel: loop({ radius: 70, winding: 0.5, flatness: 1, smoothing: 200 }) }))
+    // anywhere on its floor, the ground 1 m on is never more than a gentle slope away
+    const n = field.samples
+    let worst = 0
+    for (let i = 0; i < n * (n - 1); i++) {
+      if (field.track![i] < 1 || i % n === n - 1) continue
+      for (const j of [i + 1, i + n]) if (field.track![j] >= 1) worst = Math.max(worst, Math.abs(field.heights[j] - field.heights[i]))
+    }
+    expect(worst).toBeLessThan(0.3)
+  })
+
   it('marks its floor, for drawing it as a dirt track: fully across its width, fading out just past it', () => {
     const field = generateTerrain(big({ channel: loop() }))
     const track = (x: number, z: number) => {
