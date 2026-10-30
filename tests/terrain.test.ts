@@ -14,7 +14,7 @@ function testMap(overrides: Partial<MapDef> = {}): MapDef {
     hills: { seed: 1, height: 0, wavelength: 40, octaves: 3, roughness: 0.5 },
     edge: { start: 50, rise: 0 },
     clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 },
-    channel: { show: false, radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0 },
+    channel: { show: false, radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, landingStraight: 0 },
     spawn: { x: 0, z: 0, heading: 0 },
     ...overrides,
   }
@@ -101,7 +101,7 @@ describe('a clearing', () => {
 describe('a loop channel', () => {
   const DEG = Math.PI / 180
   const hills = { seed: 3, height: 10, wavelength: 40, octaves: 3, roughness: 0.5 }
-  const loop = (changes = {}) => ({ show: true, radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, ...changes })
+  const loop = (changes = {}) => ({ show: true, radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, landingStraight: 0, ...changes })
   const big = (changes: Partial<MapDef> = {}) => testMap({ size: 200, hills, ...changes })
   /** The steepest the ground gets riding round a circle `r` from the middle, as rise over run. */
   const steepestRound = (field: Heightfield, r: number) => {

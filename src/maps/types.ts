@@ -64,6 +64,8 @@ export interface MapDef {
     jumpLength: number
     /** How much each jump's size differs from the next, 0 to 1. */
     jumpVary: number
+    /** Round each jump the track runs straight, so you land back on it: this many jump lengths past the lip (and one before the face). */
+    landingStraight: number
   }
   /** Where the bike starts: on the flattest ground near here, facing `heading`. */
   spawn: { x: number; z: number; heading: number }

@@ -24,6 +24,7 @@ export const mapRanges: Ranges = {
   'channel.jumpHeight': [0, 12, 0.1],
   'channel.jumpLength': [4, 60, 1],
   'channel.jumpVary': [0, 1, 0.05],
+  'channel.landingStraight': [0, 8, 0.25],
   'edge.start': [0, 1000, 5],
   'edge.rise': [0, 200, 1],
 }

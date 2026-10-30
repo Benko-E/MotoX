@@ -10,6 +10,9 @@ const CHANNEL_STEP = 1
 const FLOOR_FINEST = 12
 /** A channel's floor is drawn as a dirt track, fading out over this far past its width, metres. */
 const TRACK_EDGE = 3
+/** Round a channel jump the track runs straight at least this far before its face, metres (the jump finder looks this far back), and eases from curve to straight over this share of a jump length. */
+const STRAIGHT_RUN_IN = 30
+const STRAIGHT_EASE = 0.5
 /** A channel jump's lip is rounded over about this far, metres. */
 const LIP_ROUND = 3
 /** A channel jump climbs over this share of its length, and drops away over the rest. */
@@ -56,29 +59,60 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const radiusAt = (bearing: number) => ch.radius * (1 + ch.winding * fractalNoise(noise, 13 + Math.cos(bearing) * 1.2, 57 + Math.sin(bearing) * 1.2, 3, 0.5))
   const xs = new Float64Array(count)
   const zs = new Float64Array(count)
-  const land = new Float64Array(count)
   for (let k = 0; k < count; k++) {
     const bearing = (k / count) * Math.PI * 2
     const r = radiusAt(bearing)
     xs[k] = middle.x + Math.sin(bearing) * r
     zs[k] = middle.z - Math.cos(bearing) * r
-    land[k] = heightAt(xs[k], zs[k])
   }
-  const along = new Float64Array(count) // metres from the start, round the loop
-  for (let k = 1; k < count; k++) along[k] = along[k - 1] + Math.hypot(xs[k] - xs[k - 1], zs[k] - zs[k - 1])
+  let along = alongLine(xs, zs)
+
+  // the jumps: evenly round the loop, each its own size; where each one's face starts, as a point of the line
+  const jumpSizes = Array.from({ length: Math.max(0, ch.jumps) }, (_, j) => 1 + ch.jumpVary * fractalNoise(noise, 211 + j * 3.7, 5, 2, 0.5))
+  const loopLength = along[count - 1] + Math.hypot(xs[0] - xs[count - 1], zs[0] - zs[count - 1])
+  const jumpFeet = jumpSizes.map((_, j) => nearestAlong(along, ((j + 0.5) / ch.jumps) * loopLength))
+  // straight round each jump, so you land back on the track: from before its face to well past its lip
+  const stretches = ch.landingStraight > 0
+    ? jumpSizes.map((size, j) => {
+        const jumpLength = ch.jumpLength * size
+        const ease = jumpLength * STRAIGHT_EASE
+        return { at: jumpFeet[j], before: Math.max(STRAIGHT_RUN_IN, jumpLength) + ease, after: jumpLength * (JUMP_FACE + ch.landingStraight) + ease, ease }
+      })
+    : []
+  for (const stretch of stretches) {
+    const points = stretchPoints(along, stretch)
+    const [a, b] = [points[0].k, points[points.length - 1].k]
+    const span = stretch.before + stretch.after
+    for (const { k, metres, w } of points) {
+      const t = Math.min(metres / span, 1)
+      xs[k] += (xs[a] + (xs[b] - xs[a]) * t - xs[k]) * w
+      zs[k] += (zs[a] + (zs[b] - zs[a]) * t - zs[k]) * w
+    }
+  }
+  along = alongLine(xs, zs)
   const length = along[count - 1] + Math.hypot(xs[0] - xs[count - 1], zs[0] - zs[count - 1])
+  const land = new Float64Array(count)
+  for (let k = 0; k < count; k++) land[k] = heightAt(xs[k], zs[k])
 
   // the floor: the land evened out round the loop, keeping (1 - flatness) of its gentler rolls; then the jumps
   const even = evenOut(land, ch.smoothing / CHANNEL_STEP)
   const gentle = evenOut(land, FLOOR_FINEST / CHANNEL_STEP)
   const floor = new Float64Array(count)
   for (let k = 0; k < count; k++) floor[k] = even[k] + (gentle[k] - even[k]) * (1 - ch.flatness)
+  // and level round each jump, as on a built track: its face then always climbs, and you land on the level
+  for (const stretch of stretches) {
+    const points = stretchPoints(along, stretch)
+    const total = points.reduce((sum, { w }) => sum + w, 0)
+    const level = points.reduce((sum, { k, w }) => sum + floor[k] * w, 0) / (total || 1)
+    for (const { k, w } of points) floor[k] += (level - floor[k]) * w
+  }
   const bumps = new Float64Array(count)
-  for (let j = 0; j < ch.jumps; j++) {
-    const size = 1 + ch.jumpVary * fractalNoise(noise, 211 + j * 3.7, 5, 2, 0.5)
+  field.trackJumps = []
+  for (let j = 0; j < jumpSizes.length; j++) {
+    const size = jumpSizes[j]
     const height = ch.jumpHeight * size
     const jumpLength = ch.jumpLength * size
-    const start = ((j + 0.5) / ch.jumps) * length // evenly round the loop
+    const start = along[jumpFeet[j]]
     for (let k = 0; k < count; k++) {
       const u = (along[k] - start + length) % length // metres past the foot of its face
       if (u >= jumpLength) continue
@@ -86,6 +120,12 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
       // up a curved face to the lip, steepest at the top; then a quick drop, easing out at the bottom
       bumps[k] += u <= face ? height * (u / face) ** 2 : height * (1 - (u - face) / (jumpLength - face)) ** 2
     }
+    // where its lip is, and which way the track runs there
+    const lipAlong = (start + jumpLength * JUMP_FACE) % length
+    let lip = 0
+    for (let k = 1; k < count; k++) if (Math.abs(along[k] - lipAlong) < Math.abs(along[lip] - lipAlong)) lip = k
+    const next = (lip + 1) % count
+    field.trackJumps.push({ x: xs[lip], z: zs[lip], heading: (Math.atan2(xs[next] - xs[lip], -(zs[next] - zs[lip])) * 180) / Math.PI })
   }
   // lips rounded a little, as dirt ones are: a sharp crease saw-tooths across the ground's grid
   const rounded = ch.jumps > 0 ? evenOut(bumps, LIP_ROUND / CHANNEL_STEP) : bumps
@@ -225,4 +265,38 @@ function evenOut(values: Float64Array, span: number): Float64Array {
     even = next
   }
   return even
+}
+
+/** Metres along a line of points from its first, at each point. */
+function alongLine(xs: Float64Array, zs: Float64Array): Float64Array {
+  const along = new Float64Array(xs.length)
+  for (let k = 1; k < xs.length; k++) along[k] = along[k - 1] + Math.hypot(xs[k] - xs[k - 1], zs[k] - zs[k - 1])
+  return along
+}
+
+/** The point of a line nearest `metres` along it. */
+function nearestAlong(along: Float64Array, metres: number): number {
+  let best = 0
+  for (let k = 1; k < along.length; k++) if (Math.abs(along[k] - metres) < Math.abs(along[best] - metres)) best = k
+  return best
+}
+
+/**
+ * The points of a loop line from `before` metres before point `at` to
+ * `after` metres past it, each with how far it is from the first, metres,
+ * and a weight: 1, but easing in from 0 over the first and last `ease` metres.
+ */
+function stretchPoints(along: Float64Array, stretch: { at: number; before: number; after: number; ease: number }) {
+  const count = along.length
+  const total = along[count - 1] + (along[1] - along[0]) // round the loop, near enough
+  const span = stretch.before + stretch.after
+  const a = nearestAlong(along, (along[stretch.at] - stretch.before + total) % total)
+  const points: { k: number; metres: number; w: number }[] = []
+  for (let d = 0; d < count; d++) {
+    const k = (a + d) % count
+    const metres = (along[k] - along[a] + total) % total
+    if (metres > span || (d > 0 && k === a)) break
+    points.push({ k, metres, w: smoothstep(Math.min(metres, span - metres) / Math.max(stretch.ease, 1e-6)) })
+  }
+  return points
 }

@@ -108,6 +108,8 @@ describe('what counts as a crash', () => {
       bike.controls.brake = clamp((speed - target - 1) / 2, 0, 1)
     }
     run(8, () => cruise(20)) // over the two humps at 72 km/h, onto the flat
+    // however quick the bike's set to be, well past the humps before the wheelie
+    for (let t = 0; t < 20 && bike.body.translation().z > 100; t += 0.5) run(0.5, () => cruise(20))
     bike.controls.lean = -1
     run(1.5, () => (bike.controls.throttle = 1)) // a wheelie
     bike.controls.lean = 0

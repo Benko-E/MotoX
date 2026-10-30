@@ -14,6 +14,8 @@ export interface Heightfield {
   heights: Float32Array
   /** How much each sample is the floor of a track, 0 to 1, for drawing it as dirt. Missing when the map has none. */
   track?: Float32Array
+  /** The lips of the jumps shaped into a track, and the compass heading the track runs there, degrees. */
+  trackJumps?: { x: number; z: number; heading: number }[]
 }
 
 export function createHeightfield(size: number, cellSize: number): Heightfield {

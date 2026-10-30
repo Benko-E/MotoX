@@ -20,9 +20,9 @@ export const config = {
       /** Fastest it goes on flat ground, km/h. */
       topSpeed: 110,
       /** Seconds from standing still to 60 km/h at full throttle. Lower is punchier. */
-      secondsTo60: 1.3,
+      secondsTo60: 2,
       /** Seconds to stop from 60 km/h at full brake. Lower is stronger brakes. */
-      secondsToStopFrom60: 1.1,
+      secondsToStopFrom60: 1.5,
       /** How quickly it slows down with neither throttle nor brake, km/h per second. */
       coastSlowdown: 5,
     },
@@ -108,7 +108,7 @@ export const config = {
       /** Leaning back with the throttle open lifts the front wheel up to this angle, degrees. 0 = no wheelies. */
       wheelieAngle: 40,
       /** A wheelie pulls harder: seconds from 0 to 60 km/h when up on the back wheel (on both wheels it's speed.secondsTo60). Lower = a stronger pull. */
-      wheelieSecondsTo60: 0.8,
+      wheelieSecondsTo60: 1,
       /** Leaning forward with the brake on lifts the rear wheel up to this angle, degrees. 0 = no stoppies. */
       stoppieAngle: 15,
       /** Seconds a wheelie or stoppie takes to reach its angle. Lower pops up faster. */
