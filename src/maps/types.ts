@@ -42,6 +42,29 @@ export interface MapDef {
     /** How calm: 0 leaves the hills as they are, 1 makes it level; in between keeps a little of their roll. */
     calm: number
   }
+  /** A channel: a track of flat-ish ground winding through the hills in a loop round the clearing, with jumps shaped into it. */
+  channel: {
+    /** Cut it into the map at all. */
+    show: boolean
+    /** How far from the clearing's middle it runs, metres. */
+    radius: number
+    /** How much it wanders in and out, as a share of the radius. 0 is a circle. */
+    winding: number
+    /** How wide its flat-ish floor is, metres. */
+    width: number
+    /** Then its sides blend into the hills over this far, metres. */
+    banks: number
+    /** How much of the hills' bumpiness is taken out of its floor: 0 none, 1 all of it (it still rises and falls with the land). */
+    flatness: number
+    /** How gently its floor rises and falls along the way: the land's ups and downs are evened out over this far, metres. */
+    smoothing: number
+    /** Jumps shaped into its floor, facing round the loop clockwise: how many, how high and how long (up the face and down the drop), metres. */
+    jumps: number
+    jumpHeight: number
+    jumpLength: number
+    /** How much each jump's size differs from the next, 0 to 1. */
+    jumpVary: number
+  }
   /** Where the bike starts: on the flattest ground near here, facing `heading`. */
   spawn: { x: number; z: number; heading: number }
 }

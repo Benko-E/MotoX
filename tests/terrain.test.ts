@@ -3,6 +3,7 @@ import type { MapDef } from '../src/maps/types'
 import { heightAt, type Heightfield } from '../src/terrain/heightfield'
 import { generateTerrain } from '../src/terrain/generate'
 import { flattestSpotNear } from '../src/terrain/startingSpot'
+import { findJumps } from '../src/world/jumpFinder'
 import { flat, ground } from './physicsSetup'
 
 /** A small flat test map; each test switches on the one thing it checks. */
@@ -13,6 +14,7 @@ function testMap(overrides: Partial<MapDef> = {}): MapDef {
     hills: { seed: 1, height: 0, wavelength: 40, octaves: 3, roughness: 0.5 },
     edge: { start: 50, rise: 0 },
     clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 },
+    channel: { show: false, radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0 },
     spawn: { x: 0, z: 0, heading: 0 },
     ...overrides,
   }
@@ -93,6 +95,56 @@ describe('a clearing', () => {
     const plain = generateTerrain(testMap({ hills }))
     const untouched = generateTerrain(testMap({ hills, clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 } }))
     expect(untouched.heights).toEqual(plain.heights)
+  })
+})
+
+describe('a loop channel', () => {
+  const DEG = Math.PI / 180
+  const hills = { seed: 3, height: 10, wavelength: 40, octaves: 3, roughness: 0.5 }
+  const loop = (changes = {}) => ({ show: true, radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, ...changes })
+  const big = (changes: Partial<MapDef> = {}) => testMap({ size: 200, hills, ...changes })
+  /** The steepest the ground gets riding round a circle `r` from the middle, as rise over run. */
+  const steepestRound = (field: Heightfield, r: number) => {
+    let steepest = 0
+    for (let a = 0; a < 360; a += 1) {
+      const p = (b: number) => heightAt(field, Math.sin(b * DEG) * r, -Math.cos(b * DEG) * r)
+      steepest = Math.max(steepest, Math.abs(p(a + 1) - p(a)) / (r * DEG))
+    }
+    return steepest
+  }
+
+  it('cuts a loop round the middle: riding along it, the ground rises and falls far more gently than the hills', () => {
+    const plain = generateTerrain(big())
+    const carved = generateTerrain(big({ channel: loop() }))
+    expect(steepestRound(carved, 60)).toBeLessThan(steepestRound(plain, 60) * 0.35)
+  })
+
+  it('is flat-ish across its width, then blends into the hills', () => {
+    const plain = generateTerrain(big())
+    const carved = generateTerrain(big({ channel: loop() }))
+    for (const a of [0, 70, 160, 250]) {
+      const at = (r: number, field: Heightfield) => heightAt(field, Math.sin(a * DEG) * r, -Math.cos(a * DEG) * r)
+      expect(Math.abs(at(57, carved) - at(63, carved))).toBeLessThan(0.3) // across its floor
+      expect(at(80, carved)).toBe(at(80, plain)) // past its banks: the hills
+    }
+  })
+
+  it('switched off, leaves the ground alone', () => {
+    expect(generateTerrain(big({ channel: loop({ show: false }) })).heights).toEqual(generateTerrain(big()).heights)
+  })
+
+  it('shapes jumps into its floor that throw you, facing round the loop clockwise', () => {
+    // flat hills, so the only jumps there are are the channel's
+    const field = generateTerrain(testMap({ size: 260, channel: loop({ radius: 80, jumps: 4, jumpHeight: 3 }) }))
+    const jumps = findJumps(field)
+    // on its line (taken at a slant off the bank, the same jumps can be found a few metres inside it too)
+    const onLine = jumps.filter((j) => Math.abs(Math.hypot(j.lip.x, j.lip.z) - 80) < 3)
+    expect(onLine.length).toBeGreaterThanOrEqual(3)
+    for (const j of onLine) {
+      const bearing = Math.atan2(j.lip.x, -j.lip.z) / DEG
+      const clockwise = ((bearing + 90 - j.heading + 540) % 360) - 180
+      expect(Math.abs(clockwise)).toBeLessThan(30) // the finder tries 16 headings, 22.5 degrees apart
+    }
   })
 })
 
