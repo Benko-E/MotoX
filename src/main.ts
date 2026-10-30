@@ -87,6 +87,8 @@ const groundEffects = new GroundEffects(
 let jumps: JumpSpot[] = []
 const jumpLanes = new JumpLanes(view.scene, jumps, groundAt, config.jumpGuide)
 let jumpSearch: Generator<void, JumpSpot[]> | null = null
+/** The jumps whose lips are on a track: marked whenever they're ahead, whatever their score. */
+let trackKickers = new Set<JumpSpot>()
 /** Each frame the jump search (and then the letters' ghost rides) gets this long to work on, milliseconds. */
 const JUMP_SEARCH_BUDGET = 5
 
@@ -351,6 +353,10 @@ function showFrame(frameTime: number) {
     if (step.done) {
       jumps = step.value
       jumpLanes.replace(jumps)
+      // the track's kickers: their lips on its floor
+      const n = field.samples
+      const onFloor = (x: number, z: number) => (field.track?.[Math.round((z + field.size / 2) / field.cellSize) * n + Math.round((x + field.size / 2) / field.cellSize)] ?? 0) >= 0.5
+      trackKickers = new Set(jumps.filter((jump) => onFloor(jump.lip.x, jump.lip.z)))
       jumpSearch = null
       placeLetters()
     }
@@ -373,7 +379,7 @@ function showFrame(frameTime: number) {
   const goldLanes = new Set(
     letterSpots.filter((spot) => config.letters.show && config.letters.each[spot.letter].showRunUp && !hunt.grabbed[spot.letter]).map((spot) => spot.jump),
   )
-  jumpLanes.update(bikeView.position, bikeView.heading, Math.min(frameTime, 0.1), goldLanes)
+  jumpLanes.update(bikeView.position, bikeView.heading, Math.min(frameTime, 0.1), goldLanes, trackKickers)
   hud.update({ speed: watchedBike().speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime) // the speed of whoever you watch
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)

@@ -32,7 +32,8 @@ const DEG = Math.PI / 180
  * the best few within reach, ahead, pointing much its way, the ones it's
  * heading straight at first. One it's already riding up (in `shown`) stays
  * until it's past the lip. Jumps in `except` are left out (a letter's gold
- * lane marks them instead).
+ * lane marks them instead); jumps in `onTrack` (a track's kickers) are marked
+ * whatever their score, before the rest.
  */
 export function pickLanes(
   jumps: readonly JumpSpot[],
@@ -41,12 +42,14 @@ export function pickLanes(
   settings: JumpGuideSettings,
   shown: ReadonlySet<number>,
   except: ReadonlySet<JumpSpot> = new Set(),
+  onTrack: ReadonlySet<JumpSpot> = new Set(),
 ): number[] {
   const riding: number[] = []
+  const trackAhead: number[] = []
   const ahead: number[] = []
   const relevance = new Map<number, number>()
   jumps.forEach((jump, i) => {
-    if (jump.score < settings.minScore || except.has(jump)) return
+    if ((jump.score < settings.minScore && !onTrack.has(jump)) || except.has(jump)) return
     const dx = Math.sin(jump.heading * DEG)
     const dz = -Math.cos(jump.heading * DEG)
     const fromLip = { x: at.x - jump.lip.x, z: at.z - jump.lip.z }
@@ -65,10 +68,11 @@ export function pickLanes(
     if (turn > YOUR_WAY) return
     // what you're heading straight at comes first: a good jump off to the side counts for less
     relevance.set(i, jump.score * Math.cos(Math.min(facing, AHEAD) * DEG) * Math.cos(turn * DEG))
-    ahead.push(i)
+    if (onTrack.has(jump)) trackAhead.push(i)
+    else ahead.push(i)
   })
-  ahead.sort((a, b) => relevance.get(b)! - relevance.get(a)!)
-  return [...riding, ...ahead].slice(0, Math.max(settings.lanes, riding.length))
+  const byRelevance = (a: number, b: number) => relevance.get(b)! - relevance.get(a)!
+  return [...riding, ...trackAhead.sort(byRelevance), ...ahead.sort(byRelevance)].slice(0, Math.max(settings.lanes, riding.length))
 }
 
 export type Marker = THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
@@ -109,12 +113,12 @@ export class JumpLanes {
     this.build()
   }
 
-  /** Call once a frame with where the bike is and its compass heading; `except` are left to the letters' gold lanes. */
-  update(at: { x: number; z: number }, heading: number, dt: number, except: ReadonlySet<JumpSpot> = new Set()): void {
+  /** Call once a frame with where the bike is and its compass heading; `except` are left to the letters' gold lanes, `onTrack` are a track's kickers. */
+  update(at: { x: number; z: number }, heading: number, dt: number, except: ReadonlySet<JumpSpot> = new Set(), onTrack: ReadonlySet<JumpSpot> = new Set()): void {
     this.untilRepick -= dt
     if (this.untilRepick <= 0) {
       this.untilRepick = REPICK
-      this.shown = this.settings.show ? new Set(pickLanes(this.jumps, at, heading, this.settings, this.shown, except)) : new Set()
+      this.shown = this.settings.show ? new Set(pickLanes(this.jumps, at, heading, this.settings, this.shown, except, onTrack)) : new Set()
     }
     this.lanes.forEach((lane, i) => fadeMarker(lane, this.rings[i], this.shown.has(i), dt))
   }

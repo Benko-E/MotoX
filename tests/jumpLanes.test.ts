@@ -66,6 +66,15 @@ describe('which jumps get marked', () => {
     expect(pickLanes(jumps, here, northward, settings(), new Set(), new Set([jumps[0]]))).toEqual([1])
   })
 
+  it('a jump on the track ahead is always marked, first, however low it scores', () => {
+    const s = settings()
+    s.lanes = 1
+    const kicker = jump(0, -110, 0, s.minScore - 1) // too low to show on its own
+    const big = jump(10, -90, 0, s.minScore + 2)
+    expect(pickLanes([big, kicker], here, northward, s, new Set(), new Set(), new Set([kicker]))).toEqual([1])
+    expect(pickLanes([big, kicker], here, northward, s, new Set(), new Set(), new Set())).toEqual([0]) // not on the track: the big one
+  })
+
   it('a lane you are riding up stays marked until you have passed its lip', () => {
     // its lip 5 m ahead: you're near the top of the run-up, which started 25 m behind you
     const jumps = [jump(0, -5, 0, good)]
