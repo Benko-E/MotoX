@@ -6,6 +6,8 @@ import { createPerlin, fractalNoise, type Noise2D } from './noise'
 const RAGGED = 0.2
 /** A channel's line is followed in steps this long, metres. */
 const CHANNEL_STEP = 1
+/** Whatever of the land a channel's floor keeps, it keeps only rolls longer than this, metres: no short bumps to rattle over. */
+const FLOOR_FINEST = 12
 /** A channel's floor is drawn as a dirt track, fading out over this far past its width, metres. */
 const TRACK_EDGE = 3
 /** A channel jump climbs over this share of its length, and drops away over the rest. */
@@ -64,21 +66,11 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   for (let k = 1; k < count; k++) along[k] = along[k - 1] + Math.hypot(xs[k] - xs[k - 1], zs[k] - zs[k - 1])
   const length = along[count - 1] + Math.hypot(xs[0] - xs[count - 1], zs[0] - zs[count - 1])
 
-  // the floor: the land evened out round the loop (three box passes make a smooth bell), then the jumps
-  let even = land
-  const half = Math.max(1, Math.round(ch.smoothing / CHANNEL_STEP / 2))
-  for (let pass = 0; pass < 3; pass++) {
-    const next = new Float64Array(count)
-    let sum = 0
-    for (let k = -half; k <= half; k++) sum += even[(k + count) % count]
-    for (let k = 0; k < count; k++) {
-      next[k] = sum / (2 * half + 1)
-      sum += even[(k + half + 1) % count] - even[(k - half + count) % count]
-    }
-    even = next
-  }
+  // the floor: the land evened out round the loop, keeping (1 - flatness) of its gentler rolls; then the jumps
+  const even = evenOut(land, ch.smoothing / CHANNEL_STEP)
+  const gentle = evenOut(land, FLOOR_FINEST / CHANNEL_STEP)
   const floor = new Float64Array(count)
-  for (let k = 0; k < count; k++) floor[k] = land[k] + (even[k] - land[k]) * ch.flatness
+  for (let k = 0; k < count; k++) floor[k] = even[k] + (gentle[k] - even[k]) * (1 - ch.flatness)
   for (let j = 0; j < ch.jumps; j++) {
     const size = 1 + ch.jumpVary * fractalNoise(noise, 211 + j * 3.7, 5, 2, 0.5)
     const height = ch.jumpHeight * size
@@ -196,4 +188,22 @@ function edgeRise(map: MapDef, x: number, z: number): number {
 function smoothstep(t: number): number {
   const c = Math.min(Math.max(t, 0), 1)
   return c * c * (3 - 2 * c)
+}
+
+/** `values` round a loop, evened out over about `span` of them (three box passes make a smooth bell). */
+function evenOut(values: Float64Array, span: number): Float64Array {
+  const count = values.length
+  const half = Math.max(1, Math.round(span / 2))
+  let even = values
+  for (let pass = 0; pass < 3; pass++) {
+    const next = new Float64Array(count)
+    let sum = 0
+    for (let k = -half; k <= half; k++) sum += even[((k % count) + count) % count]
+    for (let k = 0; k < count; k++) {
+      next[k] = sum / (2 * half + 1)
+      sum += even[(k + half + 1) % count] - even[(((k - half) % count) + count) % count]
+    }
+    even = next
+  }
+  return even
 }

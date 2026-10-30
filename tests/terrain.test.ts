@@ -129,6 +129,20 @@ describe('a loop channel', () => {
     }
   })
 
+  it('even through rough, steep hills its floor has no short bumps to rattle over, however much of the land it keeps', () => {
+    const rough = { seed: 5, height: 40, wavelength: 60, octaves: 8, roughness: 0.55 }
+    const field = generateTerrain(testMap({ size: 200, hills: rough, channel: loop({ flatness: 0.6 }) }))
+    // riding round its line: how far the floor strays from its own average over a bike length either side
+    const floorAt = (a: number) => heightAt(field, Math.sin(a * DEG) * 60, -Math.cos(a * DEG) * 60)
+    const metre = 1 / (60 * DEG) // degrees per metre round the loop
+    let worst = 0
+    for (let a = 0; a < 360; a += metre) {
+      const around = Array.from({ length: 7 }, (_, i) => floorAt(a + (i - 3) * metre))
+      worst = Math.max(worst, Math.abs(floorAt(a) - around.reduce((x, y) => x + y, 0) / around.length))
+    }
+    expect(worst).toBeLessThan(0.1)
+  })
+
   it('marks its floor, for drawing it as a dirt track: fully across its width, fading out just past it', () => {
     const field = generateTerrain(big({ channel: loop() }))
     const track = (x: number, z: number) => {
