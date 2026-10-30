@@ -261,11 +261,13 @@ export const config = {
         along: 0.1,
         /** How close the middle of the bike has to come to grab it, metres. Bigger is easier. */
         grabSize: 4,
+        /** Mark the way to its jump with a gold lane, until you grab it. */
+        showRunUp: true,
       },
-      { letter: 'O', difficulty: 0.25, along: 0.3, grabSize: 3 },
-      { letter: 'T', difficulty: 0.5, along: 0.5, grabSize: 2.5 },
-      { letter: 'O', difficulty: 0.75, along: 0.5, grabSize: 2 },
-      { letter: 'X', difficulty: 1, along: 0.5, grabSize: 1.5 },
+      { letter: 'O', difficulty: 0.25, along: 0.3, grabSize: 3, showRunUp: false },
+      { letter: 'T', difficulty: 0.5, along: 0.5, grabSize: 2.5, showRunUp: false },
+      { letter: 'O', difficulty: 0.75, along: 0.5, grabSize: 2, showRunUp: false },
+      { letter: 'X', difficulty: 1, along: 0.5, grabSize: 1.5, showRunUp: false },
     ],
   },
 

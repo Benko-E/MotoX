@@ -31,7 +31,8 @@ const DEG = Math.PI / 180
  * Which jumps to mark for a bike at `at` heading `heading` (compass degrees):
  * the best few within reach, ahead, pointing much its way, the ones it's
  * heading straight at first. One it's already riding up (in `shown`) stays
- * until it's past the lip.
+ * until it's past the lip. Jumps in `except` are left out (a letter's gold
+ * lane marks them instead).
  */
 export function pickLanes(
   jumps: readonly JumpSpot[],
@@ -39,12 +40,13 @@ export function pickLanes(
   heading: number,
   settings: JumpGuideSettings,
   shown: ReadonlySet<number>,
+  except: ReadonlySet<JumpSpot> = new Set(),
 ): number[] {
   const riding: number[] = []
   const ahead: number[] = []
   const relevance = new Map<number, number>()
   jumps.forEach((jump, i) => {
-    if (jump.score < settings.minScore) return
+    if (jump.score < settings.minScore || except.has(jump)) return
     const dx = Math.sin(jump.heading * DEG)
     const dz = -Math.cos(jump.heading * DEG)
     const fromLip = { x: at.x - jump.lip.x, z: at.z - jump.lip.z }
@@ -69,7 +71,7 @@ export function pickLanes(
   return [...riding, ...ahead].slice(0, Math.max(settings.lanes, riding.length))
 }
 
-type Marker = THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
+export type Marker = THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
 
 export class JumpLanes {
   private lanes: Marker[] = []
@@ -107,53 +109,57 @@ export class JumpLanes {
     this.build()
   }
 
-  /** Call once a frame with where the bike is and its compass heading. */
-  update(at: { x: number; z: number }, heading: number, dt: number): void {
+  /** Call once a frame with where the bike is and its compass heading; `except` are left to the letters' gold lanes. */
+  update(at: { x: number; z: number }, heading: number, dt: number, except: ReadonlySet<JumpSpot> = new Set()): void {
     this.untilRepick -= dt
     if (this.untilRepick <= 0) {
       this.untilRepick = REPICK
-      this.shown = this.settings.show ? new Set(pickLanes(this.jumps, at, heading, this.settings, this.shown)) : new Set()
+      this.shown = this.settings.show ? new Set(pickLanes(this.jumps, at, heading, this.settings, this.shown, except)) : new Set()
     }
-    const ease = 1 - Math.exp(-dt / FADE)
-    this.lanes.forEach((lane, i) => {
-      const to = this.shown.has(i) ? 1 : 0
-      const opacity = lane.material.opacity + (to - lane.material.opacity) * ease
-      lane.material.opacity = opacity < 0.005 && to === 0 ? 0 : opacity
-      lane.visible = lane.material.opacity > 0
-      this.rings[i].material.opacity = lane.material.opacity * 0.8
-      this.rings[i].visible = lane.visible
-    })
+    this.lanes.forEach((lane, i) => fadeMarker(lane, this.rings[i], this.shown.has(i), dt))
   }
 
   private build(): void {
-    this.lanes = this.jumps.map((jump) => this.marker(laneShape(jump.runUp, this.groundAt), this.arrows))
-    this.rings = this.jumps.map((jump) => this.marker(ringShape(jump.landing, this.groundAt), null))
-  }
-
-  private marker(geometry: THREE.BufferGeometry, map: THREE.Texture | null): Marker {
-    const mesh = new THREE.Mesh(
-      geometry,
-      new THREE.MeshBasicMaterial({
-        color: COLOR,
-        map,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -6,
-      }),
-    )
-    mesh.visible = false
-    mesh.renderOrder = 3
-    this.group.add(mesh)
-    return mesh
+    this.lanes = this.jumps.map((jump) => laneMarker(this.group, laneShape(jump.runUp, this.groundAt), COLOR, this.arrows))
+    this.rings = this.jumps.map((jump) => laneMarker(this.group, ringShape(jump.landing, this.groundAt), COLOR, null))
   }
 }
 
+/** A lane or ring mesh, see-through and starting hidden, added to `group`. */
+export function laneMarker(group: THREE.Group, geometry: THREE.BufferGeometry, color: number, map: THREE.Texture | null): Marker {
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color,
+      map,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -6,
+    }),
+  )
+  mesh.visible = false
+  mesh.renderOrder = 3
+  group.add(mesh)
+  return mesh
+}
+
+/** Fades a lane and its ring a frame further in (`on`) or out. */
+export function fadeMarker(lane: Marker, ring: Marker, on: boolean, dt: number): void {
+  const ease = 1 - Math.exp(-dt / FADE)
+  const to = on ? 1 : 0
+  const opacity = lane.material.opacity + (to - lane.material.opacity) * ease
+  lane.material.opacity = opacity < 0.005 && to === 0 ? 0 : opacity
+  lane.visible = lane.material.opacity > 0
+  ring.material.opacity = lane.material.opacity * 0.8
+  ring.visible = lane.visible
+}
+
 /** A ribbon along the run-up, lying on the ground across its width too, the arrows repeating along it. */
-function laneShape(path: readonly { x: number; z: number }[], groundAt: (x: number, z: number) => number): THREE.BufferGeometry {
+export function laneShape(path: readonly { x: number; z: number }[], groundAt: (x: number, z: number) => number): THREE.BufferGeometry {
   const positions: number[] = []
   const uvs: number[] = []
   let along = 0
@@ -182,7 +188,7 @@ function laneShape(path: readonly { x: number; z: number }[], groundAt: (x: numb
 }
 
 /** A ring lying on the ground around where you'd land. */
-function ringShape(at: { x: number; z: number }, groundAt: (x: number, z: number) => number): THREE.BufferGeometry {
+export function ringShape(at: { x: number; z: number }, groundAt: (x: number, z: number) => number): THREE.BufferGeometry {
   const steps = 40
   const positions: number[] = []
   for (let k = 0; k <= steps; k++) {
@@ -202,7 +208,7 @@ function ringShape(at: { x: number; z: number }, groundAt: (x: number, z: number
 }
 
 /** Arrows pointing along the lane (up the texture), with solid edges and a faint fill between. */
-function arrowTexture(): THREE.DataTexture {
+export function arrowTexture(): THREE.DataTexture {
   const size = 64
   const data = new Uint8Array(size * size * 4)
   for (let y = 0; y < size; y++) {

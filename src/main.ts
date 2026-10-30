@@ -13,6 +13,7 @@ import { BikeView } from './render/bikeView'
 import { GroundEffects } from './render/groundEffects'
 import { HelmetCamera } from './render/helmetCamera'
 import { JumpLanes } from './render/jumpLanes'
+import { LetterLanes } from './render/letterLanes'
 import { LetterView } from './render/letterView'
 import { nextCameraMode } from './render/cameraViews'
 import { ChaseCamera } from './render/chaseCamera'
@@ -88,6 +89,7 @@ const JUMP_SEARCH_BUDGET = 5
 /** The letters M O T O X over jumps the ghost bike has ridden, placed once the jumps are found. */
 let letterSpots: LetterSpot[] = []
 const letterView = new LetterView(view.scene, config.letters)
+const letterLanes = new LetterLanes(view.scene, groundAt, config.letters)
 /** Which of them you've grabbed. */
 const hunt = new LetterHunt(config.letters)
 let letterSearch: Generator<void, LetterSpot[]> | null = null
@@ -130,6 +132,7 @@ function rebuildTerrain() {
   letterSearch = null
   letterSpots = []
   letterView.show(letterSpots)
+  letterLanes.show(letterSpots)
   hunt.reset()
 }
 rebuildTerrain()
@@ -303,13 +306,19 @@ function showFrame(frameTime: number) {
     if (step.done) {
       letterSpots = step.value
       letterView.show(letterSpots)
+      letterLanes.show(letterSpots)
       hunt.reset()
       letterSearch = null
     }
   }
   hunt.update(letterSpots, bike.body.translation(), Math.min(frameTime, 0.1))
   letterView.update(Math.min(frameTime, 0.1), hunt.grabbed)
-  jumpLanes.update(bikeView.position, bikeView.heading, Math.min(frameTime, 0.1))
+  letterLanes.update(hunt.grabbed, Math.min(frameTime, 0.1))
+  // a jump with a letter's gold lane on it isn't marked pink as well
+  const goldLanes = new Set(
+    letterSpots.filter((spot) => config.letters.show && config.letters.each[spot.letter].showRunUp && !hunt.grabbed[spot.letter]).map((spot) => spot.jump),
+  )
+  jumpLanes.update(bikeView.position, bikeView.heading, Math.min(frameTime, 0.1), goldLanes)
   hud.update({ speed: bike.speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime)
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)

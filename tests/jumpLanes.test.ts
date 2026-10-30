@@ -61,6 +61,11 @@ describe('which jumps get marked', () => {
     expect(pickLanes(jumps, here, northward, s, new Set())).toEqual([1])
   })
 
+  it('leaves out a jump that has a letter lane of its own, so the two never lie on top of each other', () => {
+    const jumps = [jump(0, -100, 0, good), jump(20, -150, 0, good)]
+    expect(pickLanes(jumps, here, northward, settings(), new Set(), new Set([jumps[0]]))).toEqual([1])
+  })
+
   it('a lane you are riding up stays marked until you have passed its lip', () => {
     // its lip 5 m ahead: you're near the top of the run-up, which started 25 m behind you
     const jumps = [jump(0, -5, 0, good)]
