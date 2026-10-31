@@ -164,6 +164,26 @@ describe('following the track', () => {
     }
   })
 
+  it('tells him how the track bends ahead of him, the way he rides it', () => {
+    // a D: half way round, then straight back up to the north point (ridden clockwise from there)
+    const d = [...line.slice(0, 315), ...Array.from({ length: 199 }, (_, i) => ({ x: 0, z: 99 - i }))]
+    const follow = new FollowTrack(() => 'clockwise', () => d)
+    const ahead = follow.roadAhead({ x: 0, z: -100, heading: 90 }, 400)
+    for (let i = 1; i < ahead.length; i++) expect(ahead[i].distance).toBeGreaterThanOrEqual(ahead[i - 1].distance)
+    expect(ahead.at(-1)!.distance).toBeGreaterThan(380)
+    expect(ahead.at(-1)!.distance).toBeLessThanOrEqual(400)
+    const round = ahead.filter((bend) => bend.distance > 20 && bend.distance < 290)
+    for (const bend of round) expect(bend.radius).toBeCloseTo(100, -1) // the round part: 100 m out
+    const straight = ahead.filter((bend) => bend.distance > 340)
+    for (const bend of straight) expect(bend.radius).toBeGreaterThan(1000)
+    // ridden the other way, the round part is behind him and the straight comes first
+    const back = new FollowTrack(() => 'counterclockwise', () => d).roadAhead({ x: 0, z: -100, heading: 270 }, 400)
+    expect(back.find((bend) => bend.distance > 30 && bend.distance < 100)!.radius).toBeGreaterThan(1000)
+    expect(new FollowTrack(() => 'clockwise', () => undefined).roadAhead({ x: 0, z: 0, heading: 0 }, 100)).toEqual([])
+    // nor away from the track, on his way to it: there he just rides
+    expect(follow.roadAhead({ x: 50, z: 0, heading: 90 }, 400)).toEqual([])
+  })
+
   it('heads for the nearest bit of track when he is away from it', () => {
     const follow = new FollowTrack(() => 'clockwise', () => line)
     const orders = new Orders()

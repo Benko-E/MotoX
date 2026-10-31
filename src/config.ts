@@ -297,6 +297,15 @@ export const config = {
         job: 'followTrack' as AiJob,
         /** How fast they ride when just getting about, km/h. */
         cruiseSpeed: 45,
+        /** Following the track: flat out on the straights, easing off in time for each bend and winding up for each kicker. */
+        followTrack: {
+          /** How hard they take bends and crests: 1 = right at the limit (the bike's tightest turn; just not thrown off a crest), lower takes them as if that much tighter, slower, with room to spare. */
+          cornering: 0.8,
+          /** How hard they brake for a bend coming up, from 0 to 1 (full brake). Lower brakes gentler and earlier. */
+          braking: 0.6,
+          /** The longest hop they're happy to take off a crest (not a kicker), seconds: they ease off for one that would throw them further. */
+          hops: 0.5,
+        },
         /** Roaming free. */
         freeRoam: {
           /** They stay within this far of the middle of the map, metres, going round every quarter of it. */
@@ -453,6 +462,9 @@ export const configRanges: Ranges = {
   'letters.each.*.airGap': [0, 10, 0.25],
   'letters.respawnAfter': [1, 60, 1],
   'ai.riders.*.cruiseSpeed': [10, 100, 1],
+  'ai.riders.*.followTrack.cornering': [0.3, 1, 0.05],
+  'ai.riders.*.followTrack.braking': [0.1, 1, 0.05],
+  'ai.riders.*.followTrack.hops': [0, 2, 0.05],
   'ai.riders.*.freeRoam.roamRadius': [50, 450, 10],
   'ai.riders.*.freeRoam.lookAhead': [20, 400, 5],
   'ai.riders.*.freeRoam.lookWide': [5, 90, 1],

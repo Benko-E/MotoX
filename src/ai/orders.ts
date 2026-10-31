@@ -31,6 +31,17 @@ export interface Behaviour {
   watch?(orders: Orders, rider: RiderState, dt: number): void
   /** How far from the middle he may go, metres, if not his roam radius. */
   area?(): number | undefined
+  /** How the way bends ahead of him, up to `reach` metres on (for easing off in time), if it knows. */
+  roadAhead?(rider: RiderState, reach: number): Bend[]
+}
+
+/** A bend in his way, `distance` metres on at (`x`, `z`), `radius` metres round (Infinity: straight); `kicker` if it's at a kicker he takes as a jump. */
+export interface Bend {
+  distance: number
+  radius: number
+  x: number
+  z: number
+  kicker?: boolean
 }
 
 export class Orders {
@@ -178,6 +189,13 @@ const KICKER_AHEAD = 60
 const KICKER_AGAIN = 20
 /** On his line: its run-up starts within this many degrees of straight ahead, and it points within this many of his way. */
 const ON_LINE = 35
+/** Reading the bends ahead: one every this many points of the line (about a metre apart), each measured over this many either side (so a little kink doesn't count). */
+const BEND_EVERY = 2
+const BEND_SPAN = 8
+/** He's on the track (and reads its bends) within this far of its middle, metres. */
+const ON_TRACK = 12
+/** A bend within this of a kicker's lip is at the kicker, metres. */
+const AT_KICKER = 15
 
 /**
  * Riding round the track: to a point a little further along it, the way the
@@ -203,7 +221,7 @@ export class FollowTrack implements Behaviour {
     this.time += dt
     if (orders.current?.kind === 'takeJump') return
     for (const jump of this.jumps()) {
-      if (jump.source === 'found' || jump.kind !== 'fast') continue
+      if (!isTrackKicker(jump)) continue
       if (this.time - (this.taken.get(jump) ?? -Infinity) < KICKER_AGAIN) continue
       const start = jump.runUp[0]
       const distance = Math.hypot(start.x - rider.x, start.z - rider.z)
@@ -223,10 +241,7 @@ export class FollowTrack implements Behaviour {
       orders.add({ kind: 'cruise', seconds: CRUISE_FOR[0] })
       return
     }
-    let nearest = 0
-    for (let i = 1; i < line.length; i++) {
-      if (Math.hypot(line[i].x - rider.x, line[i].z - rider.z) < Math.hypot(line[nearest].x - rider.x, line[nearest].z - rider.z)) nearest = i
-    }
+    const nearest = nearestPoint(line, rider)
     const step = this.way() === 'counterclockwise' ? -1 : 1
     let at = nearest
     for (let gone = 0; gone < TRACK_AHEAD && Math.abs(at - nearest) < line.length; ) {
@@ -236,6 +251,30 @@ export class FollowTrack implements Behaviour {
       if (at === nearest) break
     }
     orders.add({ kind: 'rideTo', x: line[at].x, z: line[at].z, onLine: true })
+  }
+
+  /** The track's bends from where he is, the way it's ridden; none without a track, or while he's not on it. */
+  roadAhead(rider: RiderState, reach: number): Bend[] {
+    const line = this.line()
+    if (!line?.length) return []
+    const n = line.length
+    const at = (i: number) => line[(((i % n) + n) % n)]
+    const step = this.way() === 'counterclockwise' ? -1 : 1
+    const bends: Bend[] = []
+    const start = nearestPoint(line, rider)
+    if (Math.hypot(line[start].x - rider.x, line[start].z - rider.z) > ON_TRACK) return []
+    let distance = 0
+    for (let k = 0; k < n; k++) {
+      const i = start + k * step
+      if (k > 0) distance += Math.hypot(at(i).x - at(i - step).x, at(i).z - at(i - step).z)
+      if (distance > reach) break
+      // measured over the points either side, so it starts that far before: told that much sooner
+      if (k % BEND_EVERY !== 0) continue
+      const { x, z } = at(i)
+      const kicker = this.jumps().some((jump) => isTrackKicker(jump) && Math.hypot(jump.lip.x - x, jump.lip.z - z) < AT_KICKER)
+      bends.push({ distance: Math.max(distance - BEND_SPAN, 0), radius: radiusThrough(at(i - BEND_SPAN), at(i), at(i + BEND_SPAN)), x, z, kicker })
+    }
+    return bends
   }
 
   /** No track: his roam radius, as anywhere else. */
@@ -272,4 +311,25 @@ export class PickBehaviour implements Behaviour {
     if (this.last && now !== this.last) orders.clear()
     this.last = now
   }
+}
+
+/** One of the track's own fast kickers (taken as a jump when following the track). */
+function isTrackKicker(jump: JumpSpot): boolean {
+  return jump.source !== 'found' && jump.kind === 'fast'
+}
+
+/** The index of the point of `line` nearest `p`. */
+function nearestPoint(line: readonly { x: number; z: number }[], p: { x: number; z: number }): number {
+  let nearest = 0
+  for (let i = 1; i < line.length; i++) {
+    if (Math.hypot(line[i].x - p.x, line[i].z - p.z) < Math.hypot(line[nearest].x - p.x, line[nearest].z - p.z)) nearest = i
+  }
+  return nearest
+}
+
+/** The radius of the circle through three points, metres (Infinity: in a straight line). */
+function radiusThrough(a: { x: number; z: number }, b: { x: number; z: number }, c: { x: number; z: number }): number {
+  const cross = (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x)
+  if (Math.abs(cross) < 1e-9) return Infinity
+  return (Math.hypot(b.x - a.x, b.z - a.z) * Math.hypot(c.x - b.x, c.z - b.z) * Math.hypot(a.x - c.x, a.z - c.z)) / (2 * Math.abs(cross))
 }

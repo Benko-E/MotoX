@@ -6,6 +6,7 @@ import {
   engineAcceleration,
   engineBraking,
   springRate,
+  tyreGrip,
   turnRadiusAt,
 } from '../src/physics/bikeTuning'
 
@@ -49,6 +50,19 @@ describe('speed settings', () => {
 
   it('brakes hard enough to stop from 60 km/h in secondsToStopFrom60', () => {
     expect(brakeDeceleration(speed)).toBeCloseTo(60 / 3.6 / 2, 9) // 8.33 m/s²
+  })
+})
+
+describe('tyre grip', () => {
+  it('pushes fully rolling straight, less and less as it slides, and not at all side-on', () => {
+    expect(tyreGrip(10, 0)).toBe(1)
+    expect(tyreGrip(10, 10)).toBeCloseTo(0.5, 9)
+    expect(tyreGrip(0.001, 10)).toBeCloseTo(0, 5)
+  })
+
+  it('barely moving, a little drift is no slide: it grips (or it could never pull away)', () => {
+    expect(tyreGrip(-0.011, -0.034)).toBeGreaterThan(0.99)
+    expect(tyreGrip(0, 0.2)).toBeGreaterThan(0.95)
   })
 })
 

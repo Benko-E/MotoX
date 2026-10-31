@@ -8,6 +8,7 @@ import {
   engineBraking,
   springRate,
   topSpeed,
+  tyreGrip,
   turnRadiusAt,
 } from './bikeTuning'
 import { add, cross, dot, normalize, rotate, rotateAround, scale, sub, vec, yawRotation, type Quat, type Vec3 } from './vec'
@@ -404,7 +405,7 @@ export class Bike {
       // nothing. In a powerslide the rear pushes along the bike, so only part
       // of it pushes you along the slide, and the sliding tyre scrubs speed.
       const slip = Math.atan2(Math.abs(slideAcross), Math.abs(speedAlong))
-      const traction = Math.cos(slip) ** 2
+      const traction = tyreGrip(speedAlong, slideAcross)
       // Up on the back wheel the bike pulls harder: 0 to 60 in wheelieSecondsTo60
       // instead of secondsTo60, more the higher the front is (fully at wheelieAngle).
       const noseUp = Math.asin(clamp(dot(forward, n), -1, 1))

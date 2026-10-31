@@ -64,6 +64,20 @@ export function engineBraking(speed: SpeedSettings): number {
   return Math.max(speed.coastSlowdown * KMH - airDrag(speed, SIXTY), 0)
 }
 
+/** Moving slower than this, m/s, a drift sideways is hardly a slide. */
+const BARELY_MOVING = 1
+
+/**
+ * How much of its push a tyre gets onto the ground, 0 to 1, moving `along`
+ * the way it rolls and `across` it, m/s: all of it rolling straight, less and
+ * less as it slides, nothing side-on. Barely moving, a little drift is no
+ * slide (or a bike creeping sideways could never pull away).
+ */
+export function tyreGrip(along: number, across: number): number {
+  const sliding = 1 - Math.cos(Math.atan2(Math.abs(across), Math.abs(along))) ** 2
+  return 1 - sliding * Math.min(Math.hypot(along, across) / BARELY_MOVING, 1) ** 2
+}
+
 /** Full brake, m/s². */
 export function brakeDeceleration(speed: SpeedSettings): number {
   return SIXTY / Math.max(speed.secondsToStopFrom60, 0.1)

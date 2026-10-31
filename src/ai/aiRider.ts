@@ -1,10 +1,11 @@
-import type { AiRiderSettings, Config } from '../config'
+import { EARTH_GRAVITY, type AiRiderSettings, type Config } from '../config'
 import { Bike } from '../physics/bike'
+import { brakeDeceleration } from '../physics/bikeTuning'
 import { CrashWatcher } from '../physics/crashes'
 import type { PhysicsWorld } from '../physics/world'
 import type { JumpSpot } from '../world/jumps'
-import { Orders, type Behaviour, type Order } from './orders'
-import { clamp, leanToLand, steerOntoLine, turnBetween } from './riding'
+import { Orders, type Behaviour, type Order, type RiderState } from './orders'
+import { clamp, cornerSpeed, crestSpeed, hopSpeed, leanToLand, speedToMake, steerOntoLine, turnBetween, windUpSpeed } from './riding'
 
 /**
  * An AI rider: the same bike as yours, in your physics world, with the same
@@ -46,6 +47,14 @@ const RIDE_OUT = 1
 const RIDE_TO_SPARE = 20
 /** This far outside his roam area (or off the map), he's put back on the ground halfway to the middle, metres. */
 const RESCUE = 100
+/** He reads the bends this far ahead, metres (further than he needs to brake from top speed). */
+const BENDS_AHEAD = 150
+/** Reading crests: the slope over this many bends (a couple of metres apart) either side. */
+const CREST_SPAN = 3
+/** Full throttle this far below the speed he wants, and full brake this far above (past a little slack), m/s. */
+const THROTTLE_EASE = 1
+const BRAKE_SLACK = 0.5
+const BRAKE_EASE = 2
 
 export class AiRider {
   readonly bike: Bike
@@ -108,11 +117,12 @@ export class AiRider {
       controls.throttle = controls.steer = 0
       controls.brake = 1
     } else {
-      let target = this.me.cruiseSpeed / 3.6
-      if (order.kind === 'takeJump' && this.lined) {
-        // on the run-up: keep to its line at the jump's speed, whatever the ground
-        controls.steer = steerOntoLine(p, bike.heading, order.jump)
-        target = order.jump.speed / 3.6
+      const jump = order.kind === 'takeJump' ? order.jump : null
+      let target = this.pace(state, jump) ?? this.me.cruiseSpeed / 3.6
+      if (jump && this.lined) {
+        // on the run-up: keep to its line, winding up to leave the lip at the jump's speed, whatever the ground
+        controls.steer = steerOntoLine(p, bike.heading, jump)
+        target = windUpSpeed(jump, this.groundAt(p.x, p.z), this.gravity())
       } else {
         let to = order.kind === 'rideTo' ? order : order.kind === 'takeJump' ? approachPoint(order.jump) : null
         if (Math.hypot(p.x, p.z) > this.area()) to = { x: 0, z: 0 } // out of his area: home first
@@ -120,11 +130,48 @@ export class AiRider {
         const way = order.kind === 'rideTo' && order.onLine ? wanted : this.awayFromSteep(wanted)
         controls.steer = clamp(turnBetween(way, bike.heading) / TURN_FULL, -1, 1)
       }
-      controls.throttle = bike.forwardSpeed < target ? 1 : 0
-      controls.brake = bike.forwardSpeed > target + 2 ? 0.3 : 0
+      if (inAir) controls.steer = 0 // bars straight in the air (steering there spins the bike), to land the way she took off
+      controls.throttle = clamp((target - bike.forwardSpeed) / THROTTLE_EASE, 0, 1)
+      controls.brake = clamp((bike.forwardSpeed - target - BRAKE_SLACK) / BRAKE_EASE, 0, 1)
       this.watchForStuck(dt)
     }
     bike.update(dt)
+  }
+
+  /**
+   * The speed he rides at where his behaviour knows the way ahead (a track),
+   * m/s: flat out, but easing off in time to take each bend coming up as hard
+   * as his cornering says, to come over each crest (as hard) without being thrown
+   * off it further than a hop (bar the kickers he takes), and to come up to a kicker he's going for
+   * wound up for it. Going for a jump anywhere else, he gets up to its wound-up speed
+   * on the way. Otherwise undefined (he cruises).
+   */
+  private pace(state: RiderState, jump: JumpSpot | null): number | undefined {
+    const bends = this.behaviour.roadAhead?.(state, BENDS_AHEAD) ?? []
+    const start = jump?.runUp[0]
+    const windUp = jump && start ? windUpSpeed(jump, this.groundAt(start.x, start.z), this.gravity()) : undefined
+    if (!bends.length) return windUp
+    const { turning, speed } = this.settings.bike
+    const { cornering, braking, hops } = this.me.followTrack
+    const ahead = bends.map((bend) => ({ distance: bend.distance, speed: cornerSpeed(bend.radius * cornering, turning, speed) }))
+    const heights = bends.map((bend) => this.groundAt(bend.x, bend.z))
+    const apart = (from: number, to: number) => Math.max(Math.hypot(bends[to].x - bends[from].x, bends[to].z - bends[from].z), 0.5)
+    const slope = (from: number, to: number) => Math.atan((heights[to] - heights[from]) / apart(from, to))
+    for (let i = CREST_SPAN; i < bends.length - CREST_SPAN; i++) {
+      if (bends[i].kicker) continue
+      const over = (apart(i - CREST_SPAN, i) + apart(i, i + CREST_SPAN)) / 2
+      // he'd leave the ground coming up to the top, so it counts from where it starts to fall away
+      const before = slope(i - CREST_SPAN, i)
+      const after = slope(i, i + CREST_SPAN)
+      const fastest = Math.max(crestSpeed(before, after, over * cornering, this.gravity()), hopSpeed(before, after, hops, this.gravity()))
+      ahead.push({ distance: bends[i - CREST_SPAN].distance, speed: fastest })
+    }
+    if (start && windUp) ahead.push({ distance: Math.hypot(start.x - state.x, start.z - state.z), speed: windUp })
+    return speedToMake(ahead, braking * brakeDeceleration(speed))
+  }
+
+  private gravity(): number {
+    return this.settings.jumps.gravity * EARTH_GRAVITY
   }
 
   /** Records where his bike got to and judges crashes. Call after the world steps. */

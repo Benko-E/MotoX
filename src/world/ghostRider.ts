@@ -1,4 +1,4 @@
-import { leanToLand, steerOntoLine } from '../ai/riding'
+import { leanToLand, steerOntoLine, windUpSpeed } from '../ai/riding'
 import { EARTH_GRAVITY, type Config } from '../config'
 import { Bike } from '../physics/bike'
 import { CrashWatcher } from '../physics/crashes'
@@ -84,9 +84,8 @@ export class GhostRider {
     const gravity = settings.jumps.gravity * EARTH_GRAVITY
     const target = jump.speed / 3.6
     const start = jump.runUp[0]
-    // Climbing to the lip costs speed, the way it does on a real bike, so it
-    // comes in that much faster, to leave the lip at the jump's speed.
-    const wanted = (x: number, z: number) => Math.sqrt(target ** 2 + 2 * gravity * Math.max(jump.lip.y - heightAt(this.field, x, z), 0))
+    // it comes in faster, by what climbing to the lip costs, to leave it at the jump's speed
+    const wanted = (x: number, z: number) => windUpSpeed(jump, heightAt(this.field, x, z), gravity)
     const forward = { x: Math.sin(jump.heading * DEG), z: -Math.cos(jump.heading * DEG) }
 
     bike.setCrashed(false)
