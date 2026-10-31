@@ -18,7 +18,7 @@ const idle: Behaviour = { refill: () => {} }
 function rider(field: Heightfield, heading = 0, settings = structuredClone(config)) {
   const physics = new PhysicsWorld()
   physics.setGround(field)
-  const ai = new AiRider(physics, settings, (x, z) => heightAt(field, x, z), idle)
+  const ai = new AiRider(physics, settings, settings.ai.riders[0], (x, z) => heightAt(field, x, z), idle)
   ai.bike.placeOnGround(0, 0, heading)
   const run = (seconds: number, each?: () => void) => {
     for (let t = 0; t < seconds; t += DT) {
@@ -45,7 +45,7 @@ describe('an AI rider', () => {
 
   it('cruises at his cruise speed', () => {
     const { ai, run, settings } = rider(flat(600), 90)
-    settings.ai.cruiseSpeed = 40
+    settings.ai.riders[0].cruiseSpeed = 40
     ai.orders.add({ kind: 'cruise', seconds: 60 })
     run(6)
     expect(ai.bike.forwardSpeed * 3.6).toBeGreaterThan(36)
@@ -145,7 +145,7 @@ describe('an AI rider', () => {
 
   it('outside his roam area he heads back toward the middle, whatever he was doing', () => {
     const { ai, run, settings } = rider(flat(900), 90)
-    settings.ai.roamRadius = 200
+    settings.ai.riders[0].freeRoam.roamRadius = 200
     ai.bike.placeOnGround(250, 0, 90) // past the edge of his area, heading further out
     ai.orders.add({ kind: 'cruise', seconds: 60 })
     run(10)
@@ -154,7 +154,7 @@ describe('an AI rider', () => {
 
   it('far outside his roam area, he is put back on the ground halfway to the middle', () => {
     const { ai, run, settings } = rider(flat(900), 90)
-    settings.ai.roamRadius = 200
+    settings.ai.riders[0].freeRoam.roamRadius = 200
     ai.bike.placeOnGround(380, 0, 90)
     ai.orders.add({ kind: 'cruise', seconds: 60 })
     run(0.1)
@@ -175,7 +175,8 @@ describe('an AI rider', () => {
     let asked = 0
     const physics = new PhysicsWorld()
     physics.setGround(flat(200))
-    const ai = new AiRider(physics, structuredClone(config), () => 0, { refill: () => asked++ })
+    const settings = structuredClone(config)
+    const ai = new AiRider(physics, settings, settings.ai.riders[0], () => 0, { refill: () => asked++ })
     ai.beforeStep(DT)
     expect(asked).toBe(1)
   })

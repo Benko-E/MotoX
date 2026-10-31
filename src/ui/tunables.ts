@@ -45,6 +45,31 @@ export function choicesFor(path: string, choices: Choices): readonly string[] | 
 }
 
 /**
+ * Whether the setting (or folder) at `path` under `root` does nothing right
+ * now, so the panel hides it: a group whose `show` switch is off hides
+ * everything in it but the switch, and a setting picked from a list (a
+ * rider's job) hides the groups beside it named after the other choices.
+ * `prefix` is where `root` sits in its file, for looking up the choices.
+ */
+export function isHidden(root: object, path: string, choices: Choices, prefix = ''): boolean {
+  const keys = path.split('.')
+  let at: unknown = root
+  for (let i = 0; i < keys.length; i++) {
+    if (at === null || typeof at !== 'object') return false
+    const owner = at as Record<string, unknown>
+    const key = keys[i]
+    if (key !== 'show' && owner.show === false) return true
+    const here = [prefix, ...keys.slice(0, i)].filter(Boolean).join('.')
+    for (const [name, value] of Object.entries(owner)) {
+      const list = typeof value === 'string' ? choicesFor(here ? `${here}.${name}` : name, choices) : undefined
+      if (list?.includes(key) && value !== key) return true
+    }
+    at = owner[key]
+  }
+  return false
+}
+
+/**
  * Every number and on/off switch under `root`, in file order. Text (like key
  * names) is skipped, except where `keepText` says to (settings picked from a list).
  */
@@ -79,6 +104,34 @@ export function changedValues(defaults: unknown, current: unknown): unknown {
     return Object.keys(changed).length > 0 ? changed : undefined
   }
   return Object.is(defaults, current) ? undefined : current
+}
+
+/** A part of a settings file shown in the panel: its values as loaded and now. `exclude` names what another part shows. */
+export interface PanelPart {
+  file: string
+  path: string
+  before: unknown
+  now: unknown
+  exclude?: string[]
+}
+
+/** Every part's changed values, gathered by file at each part's place in it ({ config: { bike: ... }, map: ... }). Undefined when nothing changed. */
+export function changesToCopy(parts: PanelPart[]): Record<string, unknown> | undefined {
+  const out: Record<string, Record<string, unknown>> = {}
+  for (const part of parts) {
+    let diff = changedValues(part.before, part.now)
+    if (diff && isPlainObject(diff) && part.exclude) {
+      diff = Object.fromEntries(Object.entries(diff).filter(([key]) => !part.exclude!.includes(key)))
+      if (Object.keys(diff as object).length === 0) diff = undefined
+    }
+    if (diff === undefined) continue
+    let at = (out[part.file] ??= {})
+    const keys = part.path ? part.path.split('.') : []
+    for (const key of keys.slice(0, -1)) at = (at[key] ??= {}) as Record<string, unknown>
+    if (keys.length) at[keys[keys.length - 1]] = diff
+    else Object.assign(at, diff)
+  }
+  return Object.keys(out).length > 0 ? out : undefined
 }
 
 /** Whether a dotted path fits a pattern in which `*` stands for any one name or list position. */

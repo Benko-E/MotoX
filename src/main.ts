@@ -151,22 +151,22 @@ fly.place(
   { x: start.x, y: startGround + 0.5, z: start.z },
 )
 
-/** The AI riders: bikes like yours, ridden by the computer, starting near you. For now one, roaming free. */
-const AI_RIDERS = 1
+/** The AI riders: bikes like yours, ridden by the computer, starting near you, one for each in config.ai.riders, each doing their job. */
+const riderNames = () => config.ai.riders.map((me) => me.name)
 const riders: AiRider[] = []
 const riderViews: BikeView[] = []
 /** Their tyre tracks, dirt and tyre shadows, like yours, and their names over their heads. */
 const riderEffects: GroundEffects[] = []
 const nameTags: NameTag[] = []
-for (let i = 0; i < AI_RIDERS; i++) {
-  const roam = new FreeRoam(config.ai, () => jumps)
+for (const [i, me] of config.ai.riders.entries()) {
+  const roam = new FreeRoam(me.freeRoam, () => jumps)
   const follow = new FollowTrack(() => map.channel.way, () => field.trackLine, () => jumps)
-  const rider = new AiRider(physics, config, groundAt, new PickBehaviour(() => (config.ai.behaviour === 'followTrack' ? follow : roam)))
+  const rider = new AiRider(physics, config, me, groundAt, new PickBehaviour(() => (me.job === 'followTrack' ? follow : roam)))
   rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
   riders.push(rider)
   const riderView = new BikeView(view.scene, rider.bike, GREEN)
   riderViews.push(riderView)
-  nameTags.push(new NameTag(view.scene, riderName(i, config.ai.names)))
+  nameTags.push(new NameTag(view.scene, riderName(i, riderNames())))
   riderEffects.push(
     new GroundEffects(
       view.scene,
@@ -190,43 +190,71 @@ let cameraMode = 'chase'
 /** Flying the free camera: the keys fly it instead of riding. */
 let flying = false
 
-// The panel: one folder per part of config.ts, the bike's feel open at the top,
-// then the map. Hovering a slider shows the comment written above it in the file.
+// The panel, in groups: your bike first (open), then the riding rules, the
+// map with a folder per feature (its settings, and its debug view if it has
+// one: new features go there), the AI riders, the screen and the rest.
+// Hovering a slider shows the comment written above it in the file.
 const configNotes = readNotes(configSource)
-const sections: PanelSection[] = Object.entries(config).map(([name, target]) => ({
+const mapNotes = readNotes(mapTypesSource)
+type ConfigPart = keyof typeof config
+const fromConfig = (name: ConfigPart, place: string[] = [], extra: Partial<PanelSection> = {}): PanelSection => ({
   title: name,
-  target,
+  place,
+  file: 'config',
+  target: config[name],
   path: name,
   ranges: configRanges,
   choices: configChoices,
   notes: configNotes,
-  open: ['bike', 'bike.speed', 'bike.turning', 'jumps'],
-  // these decide which jumps the letters go on (a letter that needs air only fits a jump that floats it high enough)
-  onChange:
-    name === 'letters'
-      ? (path: string, last: boolean) => {
-          if (last && (path === '' || path === 'show' || path === 'spread' || /\.(difficulty|along|grabSize|airGap)$/.test(path))) placeLetters()
-        }
-      : undefined,
-}))
-sections.push({
-  title: 'map',
-  target: map,
-  path: '',
-  ranges: mapRanges,
-  notes: readNotes(mapTypesSource),
-  choices: { 'channel.way': TRACK_WAYS },
-  // Rebuilding the whole map takes a moment, so wait until the slider is let go.
-  onChange: (_path, last) => {
-    if (!last) return
-    rebuildTerrain()
-    crashes.recover()
-    for (const rider of riders) {
-      rider.orders.clear() // his jumps were on the old map
-      rider.crashes.recover()
-    }
-  },
+  open: ['bike', 'bike.speed', 'bike.turning'],
+  ...extra,
 })
+// Rebuilding the whole map takes a moment, so wait until the slider is let go.
+const rebuildMap = (_path: string, last: boolean) => {
+  if (!last) return
+  rebuildTerrain()
+  crashes.recover()
+  for (const rider of riders) {
+    rider.orders.clear() // his jumps were on the old map
+    rider.crashes.recover()
+  }
+}
+const fromMap = (title: string, part: 'clearing' | 'channel' | '', place: string[], extra: Partial<PanelSection> = {}): PanelSection => ({
+  title,
+  place,
+  file: 'map',
+  target: part ? map[part] : map,
+  path: part,
+  ranges: mapRanges,
+  choices: { 'channel.way': TRACK_WAYS },
+  notes: mapNotes,
+  onChange: rebuildMap,
+  ...extra,
+})
+const sections: PanelSection[] = [
+  fromConfig('bike'),
+  fromConfig('jumps', ['riding rules']),
+  fromConfig('crashes', ['riding rules']),
+  fromMap('land', '', ['map'], { exclude: ['clearing', 'channel'] }),
+  fromMap('clearing', 'clearing', ['map', 'features']),
+  fromMap('track', 'channel', ['map', 'features']),
+  fromConfig('jumpGuide', ['map', 'features', 'track'], { title: 'debug: kicker lanes', shownWhen: () => map.channel.show }),
+  fromConfig('letters', ['map', 'features'], {
+    title: 'letters (off until big air)',
+    // these decide which jumps the letters go on (a letter that needs air only fits a jump that floats it high enough)
+    onChange: (path, last) => {
+      if (last && (path === '' || path === 'show' || path === 'spread' || /\.(difficulty|along|grabSize|airGap)$/.test(path))) placeLetters()
+    },
+  }),
+  fromConfig('ai', [], { title: 'AI riders', target: config.ai.riders, path: 'ai.riders' }), // a folder each
+  fromConfig('camera', ['screen']),
+  fromConfig('hud', ['screen']),
+  fromConfig('effects', ['screen']),
+  fromConfig('controls'),
+  fromConfig('advanced'),
+]
+// anything added to config.ts and not placed above still shows, at the end
+for (const name of Object.keys(config) as ConfigPart[]) if (!sections.some((section) => section.file === 'config' && section.path.split('.')[0] === name)) sections.push(fromConfig(name))
 const panel = createTuningPanel(sections, {
     title: 'suspension (live, 0 = fully out, 1 = fully in)',
     source: {
@@ -464,14 +492,14 @@ function readout(): string[] {
         'in the air: lean to spin   ↓ + throttle: wheelie   ↑ + brake: stoppie',
         `C camera views (now: ${cameraMode})   scroll wheel: zoom`,
         'R   bike upright again   B   drop the bike from 6 m',
-        `1 2 watch you or the AI rider (now: ${watched === 0 ? 'you' : riderName(watched - 1, config.ai.names)})`,
+        `1 2 watch you or the AI rider (now: ${watched === 0 ? 'you' : riderName(watched - 1, riderNames())})`,
       ]
   return [
     'MotoX · readout (` hides it)',
     rates,
     '',
     `speed     ${(bike.speed * 3.6).toFixed(1).padStart(5)} km/h`,
-    ...riders.map((rider, i) => `${riderName(i, config.ai.names).padEnd(10)}${orderText(rider)}`),
+    ...riders.map((rider, i) => `${riderName(i, riderNames()).padEnd(10)}${orderText(rider)}`),
     `throttle  ${bar(throttle)}   brake ${bar(brake, 5)}`,
     `steer     ${steering}  tightest turn here ${bike.turnRadius.toFixed(1)} m`,
     `lean      ${sides(bike.controls.lean)}  (back | forward)`,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changedValues, choicesFor, collectTunables, folderTitle, rangeFor } from '../src/ui/tunables'
+import { changedValues, changesToCopy, choicesFor, collectTunables, folderTitle, isHidden, rangeFor } from '../src/ui/tunables'
 
 describe('choices', () => {
   it('text settings get a dropdown only where there is a list of choices for them', () => {
@@ -83,5 +83,52 @@ describe('changedValues', () => {
     const current = structuredClone(defaults)
     current.lips[1].height = 4
     expect(changedValues(defaults, current)).toEqual({ lips: [null, { height: 4 }] })
+  })
+})
+
+describe('settings that do nothing right now are hidden', () => {
+  const choices = { 'riders.*.job': ['roam', 'track'] }
+  const settings = {
+    track: { show: false, width: 8, debug: { lanes: true } },
+    hud: { show: true, size: 1 },
+    riders: [{ name: 'Helga', job: 'track', speed: 45, roam: { radius: 300 }, track: {} }],
+  }
+
+  it('with its show switch off, the rest of that group (and everything in it) is hidden, but not the switch', () => {
+    expect(isHidden(settings, 'track.show', choices)).toBe(false)
+    expect(isHidden(settings, 'track.width', choices)).toBe(true)
+    expect(isHidden(settings, 'track.debug.lanes', choices)).toBe(true)
+    expect(isHidden(settings, 'track.debug', choices)).toBe(true) // the folder too
+    expect(isHidden(settings, 'hud.size', choices)).toBe(false)
+  })
+
+  it('a job picked from a list shows only that job\'s settings', () => {
+    expect(isHidden(settings, 'riders.0.roam.radius', choices)).toBe(true)
+    expect(isHidden(settings, 'riders.0.roam', choices)).toBe(true)
+    expect(isHidden(settings, 'riders.0.speed', choices)).toBe(false)
+    expect(isHidden(settings, 'riders.0.job', choices)).toBe(false)
+    settings.riders[0].job = 'roam'
+    expect(isHidden(settings, 'riders.0.roam.radius', choices)).toBe(false)
+  })
+
+  it('works on a part of a file, with the part\'s place in the file for the choices', () => {
+    expect(isHidden(settings.riders, '0.roam.radius', choices, 'riders')).toBe(false)
+    expect(isHidden(settings.track, 'width', choices, 'track')).toBe(true)
+  })
+})
+
+describe('copying changed values', () => {
+  it('gathers each part\'s changes into its file, at its place there, leaving out what a part leaves to another', () => {
+    const parts = [
+      { file: 'config', path: 'bike', before: { speed: 1, grip: 2 }, now: { speed: 2, grip: 2 } },
+      { file: 'map', path: '', before: { size: 1, channel: { width: 1 } }, now: { size: 1, channel: { width: 3 } }, exclude: ['channel'] },
+      { file: 'map', path: 'channel', before: { width: 1, show: true }, now: { width: 3, show: true } },
+      { file: 'config', path: 'ai.riders', before: [{ speed: 1 }], now: [{ speed: 1 }] },
+    ]
+    expect(changesToCopy(parts)).toEqual({ config: { bike: { speed: 2 } }, map: { channel: { width: 3 } } })
+  })
+
+  it('nothing changed: nothing to copy', () => {
+    expect(changesToCopy([{ file: 'config', path: 'bike', before: { speed: 1 }, now: { speed: 1 } }])).toBeUndefined()
   })
 })

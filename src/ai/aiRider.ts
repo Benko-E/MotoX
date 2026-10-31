@@ -1,4 +1,4 @@
-import type { Config } from '../config'
+import type { AiRiderSettings, Config } from '../config'
 import { Bike } from '../physics/bike'
 import { CrashWatcher } from '../physics/crashes'
 import type { PhysicsWorld } from '../physics/world'
@@ -67,6 +67,8 @@ export class AiRider {
     physics: PhysicsWorld,
     /** The game's settings, read live: his bike is set up like yours. */
     readonly settings: Config,
+    /** His own: name, job, cruise speed..., read live. */
+    readonly me: AiRiderSettings,
     private readonly groundAt: (x: number, z: number) => number,
     /** Gives him orders when he has none left. */
     public behaviour: Behaviour,
@@ -106,7 +108,7 @@ export class AiRider {
       controls.throttle = controls.steer = 0
       controls.brake = 1
     } else {
-      let target = this.settings.ai.cruiseSpeed / 3.6
+      let target = this.me.cruiseSpeed / 3.6
       if (order.kind === 'takeJump' && this.lined) {
         // on the run-up: keep to its line at the jump's speed, whatever the ground
         controls.steer = steerOntoLine(p, bike.heading, order.jump)
@@ -142,7 +144,7 @@ export class AiRider {
       this.flown = this.landedFor = 0
       const p = this.bike.body.translation()
       this.timeLimit =
-        order?.kind === 'rideTo' ? RIDE_TO_SPARE + (3 * Math.hypot(order.x - p.x, order.z - p.z)) / (this.settings.ai.cruiseSpeed / 3.6) : Infinity
+        order?.kind === 'rideTo' ? RIDE_TO_SPARE + (3 * Math.hypot(order.x - p.x, order.z - p.z)) / (this.me.cruiseSpeed / 3.6) : Infinity
     }
     this.orderTime += dt
     return order
@@ -204,7 +206,7 @@ export class AiRider {
 
   /** How far from the middle he may go: his behaviour's say, else his roam radius, metres. */
   private area(): number {
-    return this.behaviour.area?.() ?? this.settings.ai.roamRadius
+    return this.behaviour.area?.() ?? this.me.freeRoam.roamRadius
   }
 
   /** Stuck (throttle open, going nowhere): give up on this order. */

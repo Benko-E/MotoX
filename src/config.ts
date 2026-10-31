@@ -13,8 +13,8 @@ import { ANCHORS, type Anchor } from './hud/layout'
 import type { Choices, Ranges } from './ui/tunables'
 
 /** What the AI riders can do, and which way round a track. */
-export const AI_BEHAVIOURS = ['freeRoam', 'followTrack'] as const
-export type AiBehaviour = (typeof AI_BEHAVIOURS)[number]
+export const AI_JOBS = ['followTrack', 'freeRoam'] as const
+export type AiJob = (typeof AI_JOBS)[number]
 export const TRACK_WAYS = ['clockwise', 'counterclockwise'] as const
 
 export const config = {
@@ -271,24 +271,32 @@ export const config = {
     ],
   },
 
-  /** AI riders: bikes like yours, ridden by the computer. For now one, riding round the map and taking a jump now and then. 1 on the keyboard watches you, 2 the AI rider. */
+  /** AI riders: bikes like yours, ridden by the computer. 1 on the keyboard watches you, 2 the first AI rider, and so on. */
   ai: {
-    /** Their names, floating above their heads, the first rider's first. */
-    names: ['Helga'],
-    /** What they do: roam free (taking a jump now and then), or follow the track round. */
-    behaviour: 'followTrack' as AiBehaviour,
-    /** How fast they ride when just getting about, km/h. */
-    cruiseSpeed: 45,
-    /** They stay within this far of the middle of the map, metres, going round every quarter of it. */
-    roamRadius: 350,
-    /** They spot jumps whose run-up starts within this far ahead, metres. */
-    lookAhead: 120,
-    /** And within this many degrees either side of the way they're heading. */
-    lookWide: 35,
-    /** The chance they go for a jump they spot, 0 (never) to 1 (every one). They make up their mind once per jump. */
-    jumpAppetite: 0.5,
-    /** After a jump they cruise at least this long before going for another, seconds. */
-    jumpCooldown: 12,
+    /** Each rider, with a job and their own settings for it. */
+    riders: [
+      {
+        /** Floating above their head. */
+        name: 'Helga',
+        /** What they do: follow the track round (taking its kickers), or roam free (taking a jump now and then). */
+        job: 'followTrack' as AiJob,
+        /** How fast they ride when just getting about, km/h. */
+        cruiseSpeed: 45,
+        /** Roaming free. */
+        freeRoam: {
+          /** They stay within this far of the middle of the map, metres, going round every quarter of it. */
+          roamRadius: 350,
+          /** They spot jumps whose run-up starts within this far ahead, metres. */
+          lookAhead: 120,
+          /** And within this many degrees either side of the way they're heading. */
+          lookWide: 35,
+          /** The chance they go for a jump they spot, 0 (never) to 1 (every one). They make up their mind once per jump, for a minute. */
+          jumpAppetite: 0.5,
+          /** After a jump they cruise at least this long before going for another, seconds. */
+          jumpCooldown: 12,
+        },
+      },
+    ],
   },
 
   /** How the tyres mark and throw the dirt. Only looks: nothing here changes the riding. */
@@ -408,6 +416,7 @@ export type FallingOverSettings = Config['advanced']['fallingOver']
 export type EffectSettings = Config['effects']
 export type JumpGuideSettings = Config['jumpGuide']
 export type LetterSettings = Config['letters']
+export type AiRiderSettings = Config['ai']['riders'][number]
 
 /** Earth's gravity, m/s². */
 export const EARTH_GRAVITY = 9.81
@@ -416,7 +425,7 @@ export const EARTH_GRAVITY = 9.81
 /** Settings that are picked from a list: a dropdown in the tuning panel. */
 export const configChoices: Choices = {
   'hud.*.anchor': ANCHORS,
-  'ai.behaviour': AI_BEHAVIOURS,
+  'ai.riders.*.job': AI_JOBS,
 }
 
 export const configRanges: Ranges = {
@@ -427,12 +436,12 @@ export const configRanges: Ranges = {
   'letters.each.*.grabSize': [0.5, 10, 0.1],
   'letters.each.*.airGap': [0, 10, 0.25],
   'letters.respawnAfter': [1, 60, 1],
-  'ai.cruiseSpeed': [10, 100, 1],
-  'ai.roamRadius': [50, 450, 10],
-  'ai.lookAhead': [20, 400, 5],
-  'ai.lookWide': [5, 90, 1],
-  'ai.jumpAppetite': [0, 1, 0.05],
-  'ai.jumpCooldown': [0, 60, 1],
+  'ai.riders.*.cruiseSpeed': [10, 100, 1],
+  'ai.riders.*.freeRoam.roamRadius': [50, 450, 10],
+  'ai.riders.*.freeRoam.lookAhead': [20, 400, 5],
+  'ai.riders.*.freeRoam.lookWide': [5, 90, 1],
+  'ai.riders.*.freeRoam.jumpAppetite': [0, 1, 0.05],
+  'ai.riders.*.freeRoam.jumpCooldown': [0, 60, 1],
   'hud.*.x': [-50, 50, 0.5],
   'hud.*.y': [-50, 50, 0.5],
   'bike.speed.topSpeed': [40, 200, 1],
