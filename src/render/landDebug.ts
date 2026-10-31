@@ -3,7 +3,7 @@ import type { LandDebugSettings } from '../config'
 import type { MapDef } from '../maps/types'
 import type { Heightfield } from '../terrain/heightfield'
 import { flattestSpotNear } from '../terrain/startingSpot'
-import { arrow, circle, DebugView, num, post, ribbon, type GroundAt, type Path } from './debugDraw'
+import { arrow, circle, DebugView, num, post, ribbon, straightPath, type GroundAt, type Path } from './debugDraw'
 
 /**
  * A debug view of the land, drawn on the ground, each part with its own
@@ -68,7 +68,7 @@ export class LandDebug extends DebugView<Part> {
     const { hills } = map
     const bar = { x: start.x - hills.wavelength / 2, z: start.z + BAR_ASIDE }
     const barEnd = { x: bar.x + hills.wavelength, z: bar.z }
-    this.add('hills', 'wavelength', ribbon(straight(bar, barEnd), groundAt, EDGE_WIDTH), COLORS.hills)
+    this.add('hills', 'wavelength', ribbon(straightPath(bar, barEnd, SQUARE_STEP), groundAt, EDGE_WIDTH), COLORS.hills)
     this.add('hills', 'height', post(barEnd.x, barEnd.z, hills.height, groundAt), COLORS.hills)
     this.say(
       `hills: wavelength ${num(hills.wavelength)} m (hilltop to hilltop), height ${num(hills.height)} m\noctaves ${num(hills.octaves)}, roughness ${num(hills.roughness)}, seed ${num(hills.seed)}`,
@@ -86,12 +86,6 @@ function square(out: number): Path {
     { x: out, z: out },
     { x: -out, z: out },
   ]
-  const path = corners.flatMap((corner, i) => straight(corner, corners[(i + 1) % 4]).slice(0, -1))
+  const path = corners.flatMap((corner, i) => straightPath(corner, corners[(i + 1) % 4], SQUARE_STEP).slice(0, -1))
   return [...path, path[0]]
-}
-
-/** Points from `a` to `b` about SQUARE_STEP apart, both ends included. */
-function straight(a: { x: number; z: number }, b: { x: number; z: number }): Path {
-  const steps = Math.max(Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / SQUARE_STEP), 1)
-  return Array.from({ length: steps + 1 }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / steps, z: a.z + ((b.z - a.z) * i) / steps }))
 }

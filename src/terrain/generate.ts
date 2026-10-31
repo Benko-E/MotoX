@@ -1,4 +1,5 @@
 import type { MapDef } from '../maps/types'
+import { shapeBigAirs } from './bigAir'
 import { createHeightfield, sampleCoord, type Heightfield } from './heightfield'
 import { createPerlin, fractalNoise, type Noise2D } from './noise'
 
@@ -21,8 +22,12 @@ const LIP_ROUND = 3
 /** A track jump climbs over this share of its length, and drops away over the rest. */
 const JUMP_FACE = 0.7
 
-/** Turns a map's data into ground: rolling hills, a clearing calmed among them, rising into a wall at the edge. */
-export function generateTerrain(map: MapDef): Heightfield {
+/**
+ * Turns a map's data into ground: rolling hills, a clearing calmed among them,
+ * rising into a wall at the edge, with its features shaped in. Big air is
+ * shaped for jumps under `gravity`, m/s².
+ */
+export function generateTerrain(map: MapDef, gravity = 9.81): Heightfield {
   const field = createHeightfield(map.size, map.cellSize)
   const noise = createPerlin(map.hills.seed)
   const n = field.samples
@@ -35,6 +40,7 @@ export function generateTerrain(map: MapDef): Heightfield {
     }
   }
   carveTrack(map, noise, field)
+  shapeBigAirs(map, field, gravity)
   calmClearing(map, noise, field)
   return field
 }

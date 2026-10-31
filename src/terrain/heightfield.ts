@@ -12,7 +12,7 @@ export interface Heightfield {
   /** Distance between samples in metres. */
   cellSize: number
   heights: Float32Array
-  /** How much each sample is the floor of a track, 0 to 1, for drawing it as dirt. Missing when the map has none. */
+  /** How much each sample is dirt (a track's floor, a big air's), 0 to 1, for drawing it so. Missing when the map has neither. */
   track?: Float32Array
   /** The lips of the jumps shaped into a track, and the compass heading the track runs there, degrees. */
   trackJumps?: {
@@ -35,6 +35,40 @@ export interface Heightfield {
      * curve, where it's fully straight from and to, and where it's eased back out.
      */
     straight?: { easeFrom: { x: number; z: number }; from: { x: number; z: number }; to: { x: number; z: number }; easeTo: { x: number; z: number } }
+  }[]
+  /**
+   * The big air jumps shaped into the hills, smallest first: where each one's
+   * lip is (x, z, and how high, y) and the way it's ridden, compass degrees.
+   */
+  bigAirs?: {
+    x: number
+    y: number
+    z: number
+    heading: number
+    /** The speed it's built to be hit at, km/h, and the air it gives then, seconds. */
+    speed: number
+    airtime: number
+    /** How steep its lip is, degrees; how tall its kicker is, metres. */
+    angle: number
+    faceHeight: number
+    /** Where you touch down at its speed: how far below the lip, metres, on a slope this steep, degrees. */
+    landingDrop: number
+    landingAngle: number
+    /** The most the ground was raised or cut to shape it, metres. */
+    moved: number
+    /**
+     * Down its middle, in the order you ride it: where its level run-in starts,
+     * the foot of its kicker, where you land, where the landing slope ends and
+     * bends out, where that's level again, and its end.
+     */
+    start: { x: number; z: number }
+    foot: { x: number; z: number }
+    landing: { x: number; z: number }
+    zoneEnd: { x: number; z: number }
+    runoutEnd: { x: number; z: number }
+    end: { x: number; z: number }
+    /** Its run-in up to the lip, about a metre apart. */
+    runUp: { x: number; z: number }[]
   }[]
   /** A clearing's calm edge as it really runs, wandering in and out round its radius, all the way round. Missing when the map has none. */
   clearingEdge?: { x: number; z: number }[]

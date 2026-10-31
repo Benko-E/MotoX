@@ -26,6 +26,13 @@ export const mapRanges: Ranges = {
   'track.jumpVary': [0, 1, 0.05],
   'track.landingStraight': [0, 8, 0.25],
   'track.jumpSpeed': [30, 110, 1],
+  'bigAir.count': [0, 8, 1],
+  'bigAir.speed': [50, 110, 1],
+  'bigAir.angle': [15, 45, 1],
+  'bigAir.shaping': [0, 1, 0.01],
+  'bigAir.width': [4, 40, 1],
+  'bigAir.banks': [0, 60, 1],
+  'bigAir.spread': [50, 500, 5],
   'edge.start': [0, 1000, 5],
   'edge.rise': [0, 200, 1],
 }

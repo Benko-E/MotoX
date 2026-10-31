@@ -262,6 +262,23 @@ export const config = {
     labels: true,
   },
 
+  /** A debug view of the big air jumps, drawn on the ground. Only drawn: nothing here changes the map. */
+  bigAirDebug: {
+    show: false,
+    /** Each one's level run-in (green), with an arrow the way it's ridden. */
+    runIn: true,
+    /** Each kicker: its face (orange), a post at its lip as tall as the kicker, and the drop under the flight (red). */
+    kicker: true,
+    /** Where you're meant to land: the landing slope (yellow) with a ring where it was built to put you down, and the runout bending back to level (blue). */
+    landing: true,
+    /** The edges of its floor (yellow) and of its banks (blue). */
+    edges: true,
+    /** The flight off each one at its speed (pink), as measured, and a ring where you land. */
+    flights: true,
+    /** Labels naming each setting, with its number, by the line it draws. */
+    labels: true,
+  },
+
   /** A debug view of the land, drawn on the ground. Only drawn: nothing here changes the map. */
   landDebug: {
     show: false,
@@ -478,6 +495,7 @@ export type JumpGuideSettings = Config['jumpGuide']
 export type TrackDebugSettings = Config['trackDebug']
 export type ClearingDebugSettings = Config['clearingDebug']
 export type LandDebugSettings = Config['landDebug']
+export type BigAirDebugSettings = Config['bigAirDebug']
 export type LetterSettings = Config['letters']
 export type AiRiderSettings = Config['ai']['riders'][number]
 

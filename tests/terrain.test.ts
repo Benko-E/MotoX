@@ -15,6 +15,7 @@ function testMap(overrides: Partial<MapDef> = {}): MapDef {
     edge: { start: 50, rise: 0 },
     clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 },
     track: { show: false, way: 'clockwise', radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, jumpSpeed: 80, landingStraight: 0 },
+    bigAir: { count: 0, speed: 90, angle: 35, shaping: 0.2, width: 14, banks: 15, spread: 300 },
     spawn: { x: 0, z: 0, heading: 0 },
     ...overrides,
   }

@@ -56,6 +56,12 @@ export function circle(x: number, z: number, radius: number | ((angle: number) =
   return [...path, path[0]]
 }
 
+/** Points from `a` to `b` about `step` metres apart, both ends included. */
+export function straightPath(a: { x: number; z: number }, b: { x: number; z: number }, step = 1): Path {
+  const steps = Math.max(Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / step), 1)
+  return Array.from({ length: steps + 1 }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / steps, z: a.z + ((b.z - a.z) * i) / steps }))
+}
+
 /** The loop moved `by` metres to its right (negative: left) all the way round, closed. */
 export function offset(line: Path, by: number): Path {
   const n = line.length

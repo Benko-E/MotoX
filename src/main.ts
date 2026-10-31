@@ -20,6 +20,7 @@ import { JumpLanes } from './render/jumpLanes'
 import { TrackDebug } from './render/trackDebug'
 import { ClearingDebug } from './render/clearingDebug'
 import { LandDebug } from './render/landDebug'
+import { BigAirDebug } from './render/bigAirDebug'
 import { LetterLanes } from './render/letterLanes'
 import { LetterView } from './render/letterView'
 import { nextCameraMode } from './render/cameraViews'
@@ -71,7 +72,7 @@ const input = new Input(config.controls, window)
 
 const physics = new PhysicsWorld()
 const terrainView = new TerrainView(view.scene, view.renderer)
-let field = generateTerrain(map)
+let field = generateTerrain(map, config.jumps.gravity * EARTH_GRAVITY)
 const groundAt = (x: number, z: number) => heightAt(field, x, z)
 
 const bike = new Bike(physics, config.bike, config.advanced.bikeBody)
@@ -95,6 +96,8 @@ const trackDebug = new TrackDebug(view.scene, groundAt, config.trackDebug)
 const clearingDebug = new ClearingDebug(view.scene, groundAt, config.clearingDebug)
 /** The land's debug view: the edge wall, the spawn point and start, and the size of the hills. */
 const landDebug = new LandDebug(view.scene, groundAt, config.landDebug)
+/** The big air's debug view: each one's run-in, kicker, landing, edges and flight. */
+const bigAirDebug = new BigAirDebug(view.scene, groundAt, config.bigAirDebug)
 /** Each frame the letters' ghost rides get this long to work on, milliseconds. */
 const LETTER_BUDGET = 5
 
@@ -134,7 +137,7 @@ function placeLetters() {
 }
 
 function rebuildTerrain() {
-  field = generateTerrain(map)
+  field = generateTerrain(map, config.jumps.gravity * EARTH_GRAVITY)
   terrainView.show(field)
   physics.setGround(field)
   jumps = featureJumps(field, config.jumps.gravity * EARTH_GRAVITY)
@@ -142,6 +145,7 @@ function rebuildTerrain() {
   trackDebug.show(field, map.track, map.clearing, jumps)
   clearingDebug.show(field, map.clearing)
   landDebug.show(field, map, SPAWN_SEARCH)
+  bigAirDebug.show(field, map, jumps)
   ghost?.dispose()
   ghost = new GhostRider(field, config)
   ghostRides = new Map()
@@ -231,7 +235,7 @@ const rebuildMap = (_path: string, last: boolean) => {
     rider.crashes.recover()
   }
 }
-const fromMap = (title: string, part: 'clearing' | 'track' | '', place: string[], extra: Partial<PanelSection> = {}): PanelSection => ({
+const fromMap = (title: string, part: 'clearing' | 'track' | 'bigAir' | '', place: string[], extra: Partial<PanelSection> = {}): PanelSection => ({
   title,
   place,
   file: 'map',
@@ -245,15 +249,18 @@ const fromMap = (title: string, part: 'clearing' | 'track' | '', place: string[]
 })
 const sections: PanelSection[] = [
   fromConfig('bike'),
-  fromConfig('jumps', ['riding rules']),
+  // big air is shaped for the gravity it's jumped under
+  fromConfig('jumps', ['riding rules'], { onChange: (path, last) => path === 'gravity' && rebuildMap(path, last) }),
   fromConfig('crashes', ['riding rules']),
-  fromMap('land', '', ['map'], { exclude: ['clearing', 'track'] }),
+  fromMap('land', '', ['map'], { exclude: ['clearing', 'track', 'bigAir'] }),
   fromConfig('landDebug', ['map', 'land'], { title: 'debug: land lines' }),
   fromMap('clearing', 'clearing', ['map', 'features']),
   fromConfig('clearingDebug', ['map', 'features', 'clearing'], { title: 'debug: clearing lines' }),
   fromMap('track', 'track', ['map', 'features']),
   fromConfig('trackDebug', ['map', 'features', 'track'], { title: 'debug: track lines', shownWhen: () => map.track.show }),
   fromConfig('jumpGuide', ['map', 'features', 'track'], { title: 'debug: kicker lanes', shownWhen: () => map.track.show }),
+  fromMap('big air', 'bigAir', ['map', 'features']),
+  fromConfig('bigAirDebug', ['map', 'features', 'big air'], { title: 'debug: big air lines', shownWhen: () => map.bigAir.count > 0 }),
   fromConfig('letters', ['map', 'features'], {
     title: 'letters (off until big air)',
     // these decide which jumps the letters go on (a letter that needs air only fits a jump that floats it high enough)
@@ -407,6 +414,7 @@ function showFrame(frameTime: number) {
   trackDebug.update(view.camera.position)
   clearingDebug.update(view.camera.position)
   landDebug.update(view.camera.position)
+  bigAirDebug.update(view.camera.position)
   hud.update({ speed: watchedBike().speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime) // the speed of whoever you watch
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)

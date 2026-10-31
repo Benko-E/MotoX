@@ -71,6 +71,32 @@ export interface MapDef {
     /** Round each jump the track runs straight, so you land back on it: this many jump lengths past the lip (and one before the face). */
     landingStraight: number
   }
+  /**
+   * Big air: huge natural kickers shaped into the hillsides that fall away the
+   * most, each as big as the land allows (taller hills give more air).
+   */
+  bigAir: {
+    /** How many, biggest first wherever they fit. 0 for none. */
+    count: number
+    /** The speed they're built to be hit at, km/h: AI riders take them at this. */
+    speed: number
+    /** How steep each kicker is at its lip, degrees: steeper flies higher, flatter flies longer and lower. */
+    angle: number
+    /**
+     * How much the ground may be raised or cut to shape each one's landing hill,
+     * as a share of the hills' height (0.2 = a fifth of it): more makes bigger
+     * jumps, but less natural ones. Taller hills allow more, so they make
+     * bigger jumps too. Its run-in and kicker may be built up or cut by the
+     * kicker's height on top of that.
+     */
+    shaping: number
+    /** How wide each one's run-in, kicker and landing are, metres. */
+    width: number
+    /** Then their sides blend into the hills over this far, metres. */
+    banks: number
+    /** How far from the clearing's middle they may be, metres. */
+    spread: number
+  }
   /** Where the bike starts: on the flattest ground near here, facing `heading`. */
   spawn: { x: number; z: number; heading: number }
 }

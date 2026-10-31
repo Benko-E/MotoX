@@ -17,6 +17,7 @@ const map: MapDef = {
   edge: { start: 150, rise: 0 },
   clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 },
   track,
+  bigAir: { count: 0, speed: 90, angle: 35, shaping: 0.2, width: 14, banks: 15, spread: 300 },
   spawn: { x: 0, z: 0, heading: 0 },
 }
 const field = generateTerrain(map)

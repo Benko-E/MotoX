@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { createHeightfield, sampleCoord } from '../src/terrain/heightfield'
 import { measureJump } from '../src/world/jumps'
 import { flat, ground, kicker } from './physicsSetup'
 
+const DEG = Math.PI / 180
 /** The smallest difference between two compass headings, degrees. */
 const turnBetween = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180)
 
@@ -27,6 +29,20 @@ describe('measuring a jump a feature built', () => {
     expect(Math.max(...flight.map((p) => p.y))).toBeGreaterThan(jump.lip.y + 1) // up over it
     for (let i = 1; i < flight.length; i++) expect(flight[i].x).toBeGreaterThan(flight[i - 1].x) // always onward
     expect(measureJump(flat(300), { x: 0, z: 0 }, 90, 95, 'test', 'fast').flight).toEqual([]) // no flight
+  })
+
+  it('a face curving up to a sharp lip: you leave at the lip itself, at its angle, not where the ground first starts bending away', () => {
+    // a 40 m curve up from level to 30 degrees, ending at a lip at x = 0, then falling away at 45 degrees to 10 m below the start
+    const radius = 40
+    const foot = -radius * Math.sin(30 * DEG)
+    const height = (x: number) => (x <= foot ? 0 : x <= 0 ? radius - Math.sqrt(radius * radius - (x - foot) ** 2) : Math.max(radius * (1 - Math.cos(30 * DEG)) - x, -10))
+    const field = createHeightfield(300, 1)
+    for (let iz = 0; iz < field.samples; iz++) for (let ix = 0; ix < field.samples; ix++) field.heights[iz * field.samples + ix] = height(sampleCoord(field, ix))
+    const jump = measureJump(field, { x: 0, z: 0 }, 90, 80, 'test', 'bigAir')
+    expect(jump.lip.x).toBeGreaterThan(-1)
+    expect(jump.lip.x).toBeLessThanOrEqual(0)
+    const [a, b] = jump.flight
+    expect(Math.atan2(b.y - a.y, b.x - a.x) / DEG).toBeCloseTo(30, -0.5) // within 1.6 degrees
   })
 
   it('a rounded hilltop at speed: you take off before the top, where it bends away', () => {

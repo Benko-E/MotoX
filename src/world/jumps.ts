@@ -1,7 +1,7 @@
 import { heightAt, type Heightfield } from '../terrain/heightfield'
 
 /**
- * Jumps: the ones the map's features build (a track's kickers, later big
+ * Jumps: the ones the map's features build (a track's kickers, big
  * air...). A feature says where each of its jumps is, which way it's ridden
  * and how fast; here each one is measured: where a bike at that speed leaves
  * the ground, and its flight. AI riders, the letters and the debug lanes all
@@ -97,9 +97,12 @@ export function measureJump(
   }
 }
 
-/** The jumps the map's features built, measured: for now the track's kickers. */
+/** The jumps the map's features built, measured: the track's kickers, then its big air (smallest first). */
 export function featureJumps(field: Heightfield, gravity = GRAVITY): JumpSpot[] {
-  return (field.trackJumps ?? []).map((jump) => measureJump(field, jump, jump.heading, jump.speed, 'track', 'fast', jump.runUp, gravity))
+  return [
+    ...(field.trackJumps ?? []).map((jump) => measureJump(field, jump, jump.heading, jump.speed, 'track', 'fast', jump.runUp, gravity)),
+    ...(field.bigAirs ?? []).map((air) => measureJump(field, air, air.heading, air.speed, 'bigAir', 'bigAir', air.runUp, gravity)),
+  ]
 }
 
 /**
@@ -109,11 +112,15 @@ export function featureJumps(field: Heightfield, gravity = GRAVITY): JumpSpot[] 
  * slope). If it never does, it rides right to the top.
  */
 function takeOff(h: (d: number) => number, v: number, gravity: number): number {
+  const slopeAt = (d: number) => (h(d + 0.5) - h(d - 0.5)) / 1
   for (let d = -TAKE_OFF_SEARCH; d < 0; d += PROFILE_STEP) {
-    const slope = (h(d + 0.5) - h(d - 0.5)) / 1
+    const slope = slopeAt(d)
     const curve = (h(d + 2) - 2 * h(d) + h(d - 2)) / 4 // negative where it rolls over
     const bend = -curve / (1 + slope * slope) ** 1.5
-    if (v * v * bend >= gravity / Math.sqrt(1 + slope * slope)) return d
+    if (v * v * bend < gravity / Math.sqrt(1 + slope * slope)) continue
+    // that sees a sharp lip a little early: you can't leave while the ground still steepens under you
+    while (d < 0 && slopeAt(d + PROFILE_STEP) > slopeAt(d)) d += PROFILE_STEP
+    return d
   }
   return 0
 }

@@ -35,3 +35,13 @@ debug views, and the tuning panel gets reorganised so new features slot in.
    kickers, flat out on straights, from what the track knows about itself.
 6. **Big air**: a big natural kicker in the hills for 3+ s of air; the
    letters become part of it.
+   - Agreed with the user: a few big-air jumps (setting), real gravity,
+     each as big as the land allows: a level run-in, a kicker, the ground
+     dropping away under the flight and a landing slope down the hillside,
+     bending out to level. They go where the land falls away the most, and
+     the landing hill may be raised or cut by at most `shaping` × the hills'
+     height, so taller hills give more air. Settings: count, speed, lip
+     angle, shaping, width, banks, spread. Debug view: run-in, kicker, drop,
+     landing, runout, edges, measured flight, labels.
+   - 6a the jumps and their debug view (stop to ride and tune), then 6b the
+     letters move into them: smallest jump for M, biggest for X.
