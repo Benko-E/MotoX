@@ -184,6 +184,20 @@ describe('following the track', () => {
     expect(follow.roadAhead({ x: 50, z: 0, heading: 90 }, 400)).toEqual([])
   })
 
+  it('marks the bends at the track kickers he flies, so he does not ease off for their lip', () => {
+    // a track kicker whose lip is on the line 50 m round from the north point (bearing about 29 degrees)
+    const lip = line[50]
+    const kicker = designed({ ...jump(lip.x, lip.z, 120), lip: { x: lip.x, y: 0, z: lip.z } }, 'fast', 'track')
+    const found = { ...kicker, source: 'found' as const } // one the finder found is not the track's
+    for (const [jumps, marked] of [[[kicker], true], [[found], false]] as const) {
+      const ahead = new FollowTrack(() => 'clockwise', () => line, () => jumps).roadAhead(onTrack, 200)
+      const near = ahead.filter((bend) => Math.hypot(bend.x - lip.x, bend.z - lip.z) < 10)
+      expect(near.length).toBeGreaterThan(0)
+      for (const bend of near) expect(bend.kicker).toBe(marked)
+      for (const bend of ahead.filter((b) => Math.hypot(b.x - lip.x, b.z - lip.z) > 20)) expect(bend.kicker).toBe(false)
+    }
+  })
+
   it('heads for the nearest bit of track when he is away from it', () => {
     const follow = new FollowTrack(() => 'clockwise', () => line)
     const orders = new Orders()
