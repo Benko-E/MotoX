@@ -224,6 +224,19 @@ export const config = {
     letters: { show: true, anchor: 'topLeft' as Anchor, x: 3, y: 3 },
   },
 
+  /** A debug view of the track, drawn on the ground. Only drawn: nothing here changes the map. */
+  trackDebug: {
+    show: false,
+    /** The line down its middle (white). */
+    middle: true,
+    /** The edges of its flat-ish floor (yellow), half its width out. */
+    floor: true,
+    /** Where its banks end and the hills begin (blue). */
+    banks: true,
+    /** Each kicker: its face (orange), its drop (red) and a post at its lip. */
+    kickers: true,
+  },
+
   /**
    * A debug view of the jumps the map's features built: a pink lane with
    * arrows up each run-up and a ring where you'd land. Only drawn: nothing
@@ -415,6 +428,7 @@ export type LandingSettings = Config['jumps']['landing']
 export type FallingOverSettings = Config['advanced']['fallingOver']
 export type EffectSettings = Config['effects']
 export type JumpGuideSettings = Config['jumpGuide']
+export type TrackDebugSettings = Config['trackDebug']
 export type LetterSettings = Config['letters']
 export type AiRiderSettings = Config['ai']['riders'][number]
 

@@ -14,7 +14,7 @@ function testMap(overrides: Partial<MapDef> = {}): MapDef {
     hills: { seed: 1, height: 0, wavelength: 40, octaves: 3, roughness: 0.5 },
     edge: { start: 50, rise: 0 },
     clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0 },
-    channel: { show: false, way: 'clockwise', radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, jumpSpeed: 80, landingStraight: 0 },
+    track: { show: false, way: 'clockwise', radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, jumpSpeed: 80, landingStraight: 0 },
     spawn: { x: 0, z: 0, heading: 0 },
     ...overrides,
   }
@@ -98,10 +98,10 @@ describe('a clearing', () => {
   })
 })
 
-describe('a loop channel', () => {
+describe('a loop track', () => {
   const DEG = Math.PI / 180
   const hills = { seed: 3, height: 10, wavelength: 40, octaves: 3, roughness: 0.5 }
-  const loop = (changes: Partial<MapDef['channel']> = {}): MapDef['channel'] => ({ show: true, way: 'clockwise', radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, jumpSpeed: 80, landingStraight: 0, ...changes })
+  const loop = (changes: Partial<MapDef['track']> = {}): MapDef['track'] => ({ show: true, way: 'clockwise', radius: 60, winding: 0, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 0, jumpHeight: 2.5, jumpLength: 14, jumpVary: 0, jumpSpeed: 80, landingStraight: 0, ...changes })
   const big = (changes: Partial<MapDef> = {}) => testMap({ size: 200, hills, ...changes })
   /** The steepest the ground gets riding round a circle `r` from the middle, as rise over run. */
   const steepestRound = (field: Heightfield, r: number) => {
@@ -115,13 +115,13 @@ describe('a loop channel', () => {
 
   it('cuts a loop round the middle: riding along it, the ground rises and falls far more gently than the hills', () => {
     const plain = generateTerrain(big())
-    const carved = generateTerrain(big({ channel: loop() }))
+    const carved = generateTerrain(big({ track: loop() }))
     expect(steepestRound(carved, 60)).toBeLessThan(steepestRound(plain, 60) * 0.35)
   })
 
   it('is flat-ish across its width, then blends into the hills', () => {
     const plain = generateTerrain(big())
-    const carved = generateTerrain(big({ channel: loop() }))
+    const carved = generateTerrain(big({ track: loop() }))
     for (const a of [0, 70, 160, 250]) {
       const at = (r: number, field: Heightfield) => heightAt(field, Math.sin(a * DEG) * r, -Math.cos(a * DEG) * r)
       expect(Math.abs(at(57, carved) - at(63, carved))).toBeLessThan(0.3) // across its floor
@@ -131,7 +131,7 @@ describe('a loop channel', () => {
 
   it('even through rough, steep hills its floor has no short bumps to rattle over, however much of the land it keeps', () => {
     const rough = { seed: 5, height: 40, wavelength: 60, octaves: 8, roughness: 0.55 }
-    const field = generateTerrain(testMap({ size: 200, hills: rough, channel: loop({ flatness: 0.6 }) }))
+    const field = generateTerrain(testMap({ size: 200, hills: rough, track: loop({ flatness: 0.6 }) }))
     // riding round its line: how far the floor strays from its own average over a bike length either side
     const floorAt = (a: number) => heightAt(field, Math.sin(a * DEG) * 60, -Math.cos(a * DEG) * 60)
     const metre = 1 / (60 * DEG) // degrees per metre round the loop
@@ -144,7 +144,7 @@ describe('a loop channel', () => {
   })
 
   it('winding hard, its floor is still smooth everywhere: no steps where the line swings out', () => {
-    const field = generateTerrain(testMap({ size: 260, hills, channel: loop({ radius: 70, winding: 0.5, flatness: 1, smoothing: 200 }) }))
+    const field = generateTerrain(testMap({ size: 260, hills, track: loop({ radius: 70, winding: 0.5, flatness: 1, smoothing: 200 }) }))
     // anywhere on its floor, the ground 1 m on is never more than a gentle slope away
     const n = field.samples
     let worst = 0
@@ -158,7 +158,7 @@ describe('a loop channel', () => {
   it('on a climb its floor is a smooth ramp, not a staircase of little ridges', () => {
     // big smooth hills, the floor following them all the way (flatness 0): it climbs and drops
     const big = { seed: 2, height: 30, wavelength: 120, octaves: 1, roughness: 0.5 }
-    const field = generateTerrain(testMap({ size: 200, hills: big, channel: loop({ flatness: 0 }) }))
+    const field = generateTerrain(testMap({ size: 200, hills: big, track: loop({ flatness: 0 }) }))
     // how sharply the slope changes from one metre to the next, anywhere on its floor
     const n = field.samples
     const h = field.heights
@@ -175,7 +175,7 @@ describe('a loop channel', () => {
   })
 
   it('marks its floor, for drawing it as a dirt track: fully across its width, fading out just past it', () => {
-    const field = generateTerrain(big({ channel: loop() }))
+    const field = generateTerrain(big({ track: loop() }))
     const track = (x: number, z: number) => {
       const n = field.samples
       return field.track![Math.round((z + field.size / 2) / field.cellSize) * n + Math.round((x + field.size / 2) / field.cellSize)]
@@ -188,7 +188,7 @@ describe('a loop channel', () => {
 
   it('long straights round its jumps pull the line in from the loop: all of it is still carved', () => {
     // four 150 m straights on a loop only 565 m round: they cut its corners, well inside the radius
-    const field = generateTerrain(testMap({ size: 300, channel: loop({ radius: 90, jumps: 4, jumpHeight: 4, jumpLength: 30, landingStraight: 3 }) }))
+    const field = generateTerrain(testMap({ size: 300, track: loop({ radius: 90, jumps: 4, jumpHeight: 4, jumpLength: 30, landingStraight: 3 }) }))
     const n = field.samples
     const line = field.trackLine!
     const nearest = Math.min(...line.map((p) => Math.hypot(p.x, p.z)))
@@ -199,7 +199,7 @@ describe('a loop channel', () => {
   })
 
   it('owns its floor and banks, as the clearing owns its patch', () => {
-    const field = generateTerrain(big({ channel: loop(), clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0.8 } }))
+    const field = generateTerrain(big({ track: loop(), clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0.8 } }))
     const n = field.samples
     const owned = (x: number, z: number) => field.owned![Math.round((z + field.size / 2) / field.cellSize) * n + Math.round((x + field.size / 2) / field.cellSize)]
     expect(owned(0, -60)).toBe(1) // on its line
@@ -209,15 +209,34 @@ describe('a loop channel', () => {
   })
 
   it('switched off, leaves the ground alone', () => {
-    const off = generateTerrain(big({ channel: loop({ show: false }) }))
+    const off = generateTerrain(big({ track: loop({ show: false }) }))
     expect(off.heights).toEqual(generateTerrain(big()).heights)
     expect(off.track).toBeUndefined() // and no track to draw
+  })
+
+  it('registers where each kicker starts and ends: the foot of its face, before the lip, and the bottom of its drop, after it', () => {
+    for (const way of ['clockwise', 'counterclockwise'] as const) {
+      // faces 21 m long (70% of 30), drops 9 m
+      const field = generateTerrain(testMap({ size: 300, track: loop({ way, radius: 90, jumps: 4, jumpHeight: 4, jumpLength: 30, landingStraight: 3 }) }))
+      for (const j of field.trackJumps!) {
+        const dx = Math.sin((j.heading * Math.PI) / 180)
+        const dz = -Math.cos((j.heading * Math.PI) / 180)
+        const ahead = (p: { x: number; z: number }) => (p.x - j.x) * dx + (p.z - j.z) * dz
+        expect(ahead(j.foot), way).toBeLessThan(-15)
+        expect(ahead(j.foot), way).toBeGreaterThan(-25)
+        expect(ahead(j.end), way).toBeGreaterThan(5)
+        expect(ahead(j.end), way).toBeLessThan(14)
+        const top = heightAt(field, j.x, j.z)
+        expect(top - heightAt(field, j.foot.x, j.foot.z)).toBeGreaterThan(2.5) // most of its 4 m (the lip is rounded)
+        expect(top - heightAt(field, j.end.x, j.end.z)).toBeGreaterThan(2.5)
+      }
+    }
   })
 
   it('builds jumps into its floor and registers them: exact, facing the way it is ridden, fast, and they throw you', () => {
     for (const [way, turn] of [['clockwise', 90], ['counterclockwise', -90]] as const) {
       // kickers like the real ones: 4 m up, 30 m from foot to the bottom of the drop
-      const field = generateTerrain(testMap({ size: 300, channel: loop({ way, radius: 90, jumps: 4, jumpHeight: 4, jumpLength: 30, landingStraight: 3 }) }))
+      const field = generateTerrain(testMap({ size: 300, track: loop({ way, radius: 90, jumps: 4, jumpHeight: 4, jumpLength: 30, landingStraight: 3 }) }))
       const jumps = featureJumps(field)
       expect(jumps).toHaveLength(4)
       for (const j of jumps) {

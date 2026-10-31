@@ -77,7 +77,7 @@ describe('free roam', () => {
 
   it('roaming, he goes for big air first, then a jump a feature built, before a nearer found one', () => {
     const near = jump(0, -40, 0)
-    const fast = designed(jump(10, -70, 0), 'fast', 'channel')
+    const fast = designed(jump(10, -70, 0), 'fast', 'track')
     const big = designed(jump(-10, -100, 0), 'bigAir')
     for (const [jumps, wanted] of [[[near, fast, big], big], [[near, fast], fast], [[near], near]] as const) {
       const orders = new Orders()
@@ -180,7 +180,7 @@ describe('following the track', () => {
       const a = at(from)
       const b = at(to)
       const heading = (Math.atan2(b.x - a.x, -(b.z - a.z)) * 180) / Math.PI
-      return designed({ ...jump(a.x, a.z, heading), lip: { x: b.x, y: 0, z: b.z }, runUp: [{ ...a, y: 0 }, { ...b, y: 0 }] }, 'fast', 'channel')
+      return designed({ ...jump(a.x, a.z, heading), lip: { x: b.x, y: 0, z: b.z }, runUp: [{ ...a, y: 0 }, { ...b, y: 0 }] }, 'fast', 'track')
     }
     const ahead = kicker(20, 50)
     const behind = kicker(-20, -50)

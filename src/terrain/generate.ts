@@ -4,20 +4,20 @@ import { createPerlin, fractalNoise, type Noise2D } from './noise'
 
 /** A clearing's edge wanders in and out by up to this share of its radius. */
 const RAGGED = 0.2
-/** A channel's line is followed in steps this long, metres. */
-const CHANNEL_STEP = 1
-/** Whatever of the land a channel's floor keeps, it keeps only rolls longer than this, metres: no short bumps to rattle over. */
+/** A track's line is followed in steps this long, metres. */
+const TRACK_STEP = 1
+/** Whatever of the land a track's floor keeps, it keeps only rolls longer than this, metres: no short bumps to rattle over. */
 const FLOOR_FINEST = 12
-/** A channel's floor is drawn as a dirt track, fading out over this far past its width, metres. */
+/** A track's floor is drawn as a dirt track, fading out over this far past its width, metres. */
 const TRACK_EDGE = 3
-/** Round a channel jump the track runs straight at least this far before its face, metres (the jump finder looks this far back), and eases from curve to straight over this share of a jump length. */
+/** Round a track jump the track runs straight at least this far before its face, metres (the jump finder looks this far back), and eases from curve to straight over this share of a jump length. */
 const STRAIGHT_RUN_IN = 30
 const STRAIGHT_EASE = 0.5
-/** A channel jump's run-up, as registered: this many metres of the track's line before its crest (you take off up to 20 m before it). */
+/** A track jump's run-up, as registered: this many metres of the track's line before its crest (you take off up to 20 m before it). */
 const TRACK_RUN_UP = 50
-/** A channel jump's lip is rounded over about this far, metres. */
+/** A track jump's lip is rounded over about this far, metres. */
 const LIP_ROUND = 3
-/** A channel jump climbs over this share of its length, and drops away over the rest. */
+/** A track jump climbs over this share of its length, and drops away over the rest. */
 const JUMP_FACE = 0.7
 
 /** Turns a map's data into ground: rolling hills, a clearing calmed among them, rising into a wall at the edge. */
@@ -33,23 +33,23 @@ export function generateTerrain(map: MapDef): Heightfield {
       field.heights[iz * n + ix] = hillHeight(map, noise, x, z) + edgeRise(map, x, z)
     }
   }
-  carveChannel(map, noise, field)
+  carveTrack(map, noise, field)
   calmClearing(map, noise, field)
   return field
 }
 
 /**
- * Carves the loop channel. Its line runs round the clearing's middle,
+ * Carves the loop track. Its line runs round the clearing's middle,
  * wandering in and out by noise. Along it, the floor follows the land evened
  * out over `smoothing` metres, `flatness` of the way, with the jumps shaped on
  * top; across it, the ground is drawn to the floor's height fully within half
  * the width of the line and less and less over the banks.
  */
-function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
-  const ch = map.channel
+function carveTrack(map: MapDef, noise: Noise2D, field: Heightfield): void {
+  const ch = map.track
   if (!ch.show || ch.radius <= 0) return
   const middle = { x: map.clearing.x, z: map.clearing.z }
-  const count = Math.max(16, Math.round((2 * Math.PI * ch.radius) / CHANNEL_STEP))
+  const count = Math.max(16, Math.round((2 * Math.PI * ch.radius) / TRACK_STEP))
   const n = field.samples
   const heightAt = (x: number, z: number) => {
     const ix = Math.min(Math.max(Math.round((x + field.size / 2) / field.cellSize), 0), n - 1)
@@ -103,8 +103,8 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   field.trackLine = Array.from(xs, (x, k) => ({ x, z: zs[k] }))
 
   // the floor: the land evened out round the loop, keeping (1 - flatness) of its gentler rolls; then the jumps
-  const even = evenOut(land, ch.smoothing / CHANNEL_STEP)
-  const gentle = evenOut(land, FLOOR_FINEST / CHANNEL_STEP)
+  const even = evenOut(land, ch.smoothing / TRACK_STEP)
+  const gentle = evenOut(land, FLOOR_FINEST / TRACK_STEP)
   const floor = new Float64Array(count)
   for (let k = 0; k < count; k++) floor[k] = even[k] + (gentle[k] - even[k]) * (1 - ch.flatness)
   const bumps = new Float64Array(count)
@@ -124,13 +124,19 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
     }
   }
   // lips rounded a little, as dirt ones are: a sharp crease saw-tooths across the ground's grid
-  const rounded = ch.jumps > 0 ? evenOut(bumps, LIP_ROUND / CHANNEL_STEP) : bumps
-  // register each jump: its lip where its rounded crest is, the way the track runs there, and its run-up along the line
+  const rounded = ch.jumps > 0 ? evenOut(bumps, LIP_ROUND / TRACK_STEP) : bumps
+  // register each jump: its lip where its rounded crest is, the way the track runs there, its run-up along the line, and where it starts and ends
   field.trackJumps = shaped.map(({ start, jumpLength }) => {
     let lip = -1
+    let foot = -1
+    let end = -1
+    const past = (k: number) => ((along[k] - start) * way + length) % length
     for (let k = 0; k < count; k++) {
-      const u = ((along[k] - start) * way + length) % length
-      if (u < jumpLength && (lip < 0 || rounded[k] > rounded[lip])) lip = k
+      const u = past(k)
+      if (u >= jumpLength) continue
+      if (lip < 0 || rounded[k] > rounded[lip]) lip = k
+      if (foot < 0 || u < past(foot)) foot = k
+      if (end < 0 || u > past(end)) end = k
     }
     const next = (lip + way + count) % count
     const runUp = [{ x: xs[lip], z: zs[lip] }]
@@ -140,7 +146,15 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
       runUp.unshift({ x: xs[before], z: zs[before] })
       k = before
     }
-    return { x: xs[lip], z: zs[lip], heading: (Math.atan2(xs[next] - xs[lip], -(zs[next] - zs[lip])) * 180) / Math.PI, runUp, speed: ch.jumpSpeed }
+    return {
+      x: xs[lip],
+      z: zs[lip],
+      heading: (Math.atan2(xs[next] - xs[lip], -(zs[next] - zs[lip])) * 180) / Math.PI,
+      runUp,
+      speed: ch.jumpSpeed,
+      foot: { x: xs[foot], z: zs[foot] },
+      end: { x: xs[end], z: zs[end] },
+    }
   })
   for (let k = 0; k < count; k++) floor[k] += rounded[k]
 

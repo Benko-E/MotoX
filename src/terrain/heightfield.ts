@@ -23,6 +23,9 @@ export interface Heightfield {
     runUp: { x: number; z: number }[]
     /** The speed it's built to be hit at, km/h. */
     speed: number
+    /** Where it starts (the foot of its face) and ends (the bottom of its drop), on the track's line. */
+    foot: { x: number; z: number }
+    end: { x: number; z: number }
   }[]
   /** Which samples belong to a map feature (a track, a clearing, ...): 1 if one owns it. The jump finder keeps off them. */
   owned?: Uint8Array

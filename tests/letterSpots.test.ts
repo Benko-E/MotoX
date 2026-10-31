@@ -181,7 +181,7 @@ describe('jumps the map built', () => {
   it('are always among the ghost\'s tries, however low they score', () => {
     // 40 found jumps a slice; one built by a feature, scoring between two the usual tries pick, in slice 0
     const many = middles.flatMap((b) => Array.from({ length: 40 }, (_, i) => jump(b - 30 + i * 1.5, 60 + i * 6, 1 + i * 0.1)))
-    const built = { ...jump(20, 150, 1.35), source: 'channel' }
+    const built = { ...jump(20, 150, 1.35), source: 'track' }
     const { ride, ridden } = ghost()
     placeLetters([built, ...many], plan(), ride)
     expect(ridden).toContain(built)

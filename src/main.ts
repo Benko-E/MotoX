@@ -17,6 +17,7 @@ import { NameTag, riderName } from './render/nameTag'
 import { GroundEffects } from './render/groundEffects'
 import { HelmetCamera } from './render/helmetCamera'
 import { JumpLanes } from './render/jumpLanes'
+import { TrackDebug } from './render/trackDebug'
 import { LetterLanes } from './render/letterLanes'
 import { LetterView } from './render/letterView'
 import { nextCameraMode } from './render/cameraViews'
@@ -86,6 +87,9 @@ const groundEffects = new GroundEffects(
 /** The jumps the map's features built (the track's kickers), and a debug view of them. */
 let jumps: JumpSpot[] = []
 const jumpLanes = new JumpLanes(view.scene, jumps, groundAt, config.jumpGuide)
+/** The track's debug view: its lines and kickers drawn on the ground. */
+const trackDebug = new TrackDebug(view.scene, groundAt, config.trackDebug)
+trackDebug.show(field, map.track)
 /** Each frame the letters' ghost rides get this long to work on, milliseconds. */
 const LETTER_BUDGET = 5
 
@@ -130,6 +134,7 @@ function rebuildTerrain() {
   physics.setGround(field)
   jumps = featureJumps(field, config.jumps.gravity * EARTH_GRAVITY)
   jumpLanes.replace(jumps)
+  trackDebug.show(field, map.track)
   ghost?.dispose()
   ghost = new GhostRider(field, config)
   ghostRides = new Map()
@@ -160,7 +165,7 @@ const riderEffects: GroundEffects[] = []
 const nameTags: NameTag[] = []
 for (const [i, me] of config.ai.riders.entries()) {
   const roam = new FreeRoam(me.freeRoam, () => jumps)
-  const follow = new FollowTrack(() => map.channel.way, () => field.trackLine, () => jumps)
+  const follow = new FollowTrack(() => map.track.way, () => field.trackLine, () => jumps)
   const rider = new AiRider(physics, config, me, groundAt, new PickBehaviour(() => (me.job === 'followTrack' ? follow : roam)))
   rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
   riders.push(rider)
@@ -219,14 +224,14 @@ const rebuildMap = (_path: string, last: boolean) => {
     rider.crashes.recover()
   }
 }
-const fromMap = (title: string, part: 'clearing' | 'channel' | '', place: string[], extra: Partial<PanelSection> = {}): PanelSection => ({
+const fromMap = (title: string, part: 'clearing' | 'track' | '', place: string[], extra: Partial<PanelSection> = {}): PanelSection => ({
   title,
   place,
   file: 'map',
   target: part ? map[part] : map,
   path: part,
   ranges: mapRanges,
-  choices: { 'channel.way': TRACK_WAYS },
+  choices: { 'track.way': TRACK_WAYS },
   notes: mapNotes,
   onChange: rebuildMap,
   ...extra,
@@ -235,10 +240,11 @@ const sections: PanelSection[] = [
   fromConfig('bike'),
   fromConfig('jumps', ['riding rules']),
   fromConfig('crashes', ['riding rules']),
-  fromMap('land', '', ['map'], { exclude: ['clearing', 'channel'] }),
+  fromMap('land', '', ['map'], { exclude: ['clearing', 'track'] }),
   fromMap('clearing', 'clearing', ['map', 'features']),
-  fromMap('track', 'channel', ['map', 'features']),
-  fromConfig('jumpGuide', ['map', 'features', 'track'], { title: 'debug: kicker lanes', shownWhen: () => map.channel.show }),
+  fromMap('track', 'track', ['map', 'features']),
+  fromConfig('trackDebug', ['map', 'features', 'track'], { title: 'debug: track lines', shownWhen: () => map.track.show }),
+  fromConfig('jumpGuide', ['map', 'features', 'track'], { title: 'debug: kicker lanes', shownWhen: () => map.track.show }),
   fromConfig('letters', ['map', 'features'], {
     title: 'letters (off until big air)',
     // these decide which jumps the letters go on (a letter that needs air only fits a jump that floats it high enough)
@@ -389,6 +395,7 @@ function showFrame(frameTime: number) {
   letterView.update(Math.min(frameTime, 0.1), hunt.grabbed)
   letterLanes.update(hunt.grabbed, Math.min(frameTime, 0.1))
   jumpLanes.update(Math.min(frameTime, 0.1))
+  trackDebug.update()
   hud.update({ speed: watchedBike().speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime) // the speed of whoever you watch
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)

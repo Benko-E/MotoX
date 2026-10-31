@@ -19,7 +19,7 @@ const trackAt = (field: Heightfield, x: number, z: number) => {
   return field.track![iz * n + ix]
 }
 
-describe('the channel jumps, ridden by the ghost', () => {
+describe('the track jumps, ridden by the ghost', () => {
   it('ridden along the track at a good lick, every kicker puts you back down on the track, on every seed tried', { timeout: 60_000 }, () => {
     const misses: string[] = []
     let flown = 0

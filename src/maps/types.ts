@@ -42,8 +42,8 @@ export interface MapDef {
     /** How calm: 0 leaves the hills as they are, 1 makes it level; in between keeps a little of their roll. */
     calm: number
   }
-  /** A channel: a track of flat-ish ground winding through the hills in a loop round the clearing, with jumps shaped into it. */
-  channel: {
+  /** A track: flat-ish ground winding through the hills in a loop round the clearing, with jumps shaped into it. */
+  track: {
     /** Cut it into the map at all. */
     show: boolean
     /** Which way round it's ridden (seen from above, north up): its jumps face that way. */
