@@ -28,8 +28,10 @@ export const config = {
       secondsTo60: 2,
       /** Seconds to stop from 60 km/h at full brake. Lower is stronger brakes. */
       secondsToStopFrom60: 1.5,
-      /** How quickly it slows down with neither throttle nor brake, km/h per second. */
+      /** How quickly it slows down with neither throttle nor brake, at 60 km/h, km/h per second (faster still at speed: the air holds back harder). */
       coastSlowdown: 5,
+      /** How much slopes matter: they slow you climbing and speed you up going down. 1 = like real gravity, 0 = not at all, 2 = twice as much. */
+      hills: 1,
     },
 
     /** How tight it turns, how quickly it reacts, and how far it leans. */
@@ -462,6 +464,7 @@ export const configRanges: Ranges = {
   'bike.speed.secondsTo60': [0.5, 10, 0.1],
   'bike.speed.secondsToStopFrom60': [0.5, 6, 0.1],
   'bike.speed.coastSlowdown': [0, 30, 0.5],
+  'bike.speed.hills': [0, 3, 0.1],
   'bike.turning.tightestTurnSlow': [0.5, 15, 0.1],
   'bike.turning.tightestTurnFast': [5, 150, 1],
   'bike.turning.turnCurve': [0.5, 4, 0.05],

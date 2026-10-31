@@ -11,6 +11,7 @@ export interface SpeedSettings {
   secondsTo60: number
   secondsToStopFrom60: number
   coastSlowdown: number
+  hills: number
 }
 
 export interface TurningSettings {
@@ -20,32 +21,52 @@ export interface TurningSettings {
 }
 
 /**
- * Full-throttle acceleration fades from its strongest at a standstill to
- * nothing at top speed: a(v) = a0 * (1 - (v / top)^2). Getting from 0 to v60
- * along that curve takes (top / a0) * atanh(v60 / top), so this is the a0
- * that makes it take exactly secondsTo60.
+ * The engine and the air, like a real bike's. The engine has a limited
+ * power: past a third of top speed, going twice as fast it pulls half as
+ * hard (so a climb, which needs more pull, costs speed); below that the tyre
+ * can only grip so hard, and it pulls the same all the way from a standstill.
+ * The air holds back k * v², always, throttle or not. On the flat they meet
+ * at exactly topSpeed; downhill gravity can push past it until the air reins
+ * it in. Their strength (k) is whatever gets you to 60 in secondsTo60.
  */
-export function launchAcceleration(speed: SpeedSettings): number {
+function airStrength(speed: SpeedSettings): number {
   const top = Math.max(speed.topSpeed * KMH, SIXTY * 1.05)
-  return (top * Math.atanh(SIXTY / top)) / Math.max(speed.secondsTo60, 0.1)
+  const key = `${top} ${speed.secondsTo60}`
+  let k = strengths.get(key)
+  if (k === undefined) {
+    // engine minus air is k * pull(v), so the time to 60 is (time with k = 1) / k
+    const pull = (v: number) => Math.min(3 * top * top, top ** 3 / Math.max(v, 1e-9)) - v * v
+    const steps = 400
+    let time = 0
+    for (let i = 0; i < steps; i++) time += SIXTY / steps / pull(((i + 0.5) / steps) * SIXTY)
+    k = time / Math.max(speed.secondsTo60, 0.1)
+    if (strengths.size > 50) strengths.clear()
+    strengths.set(key, k)
+  }
+  return k
+}
+const strengths = new Map<string, number>()
+
+/** How hard full throttle pulls at `v` m/s (forward), before the air and the hill. */
+export function engineAcceleration(speed: SpeedSettings, v: number): number {
+  const top = Math.max(speed.topSpeed * KMH, SIXTY * 1.05)
+  const k = airStrength(speed)
+  return Math.min(3 * k * top * top, (k * top ** 3) / Math.max(v, 1e-9))
 }
 
-/** How hard full throttle accelerates at `v` m/s (forward). */
-export function driveAcceleration(speed: SpeedSettings, v: number): number {
-  const top = Math.max(speed.topSpeed * KMH, SIXTY * 1.05)
-  if (v >= top) return 0
-  const fade = v > 0 ? 1 - (v / top) ** 2 : 1
-  return launchAcceleration(speed) * fade
+/** How hard the air holds the bike back at `v` m/s, m/s². */
+export function airDrag(speed: SpeedSettings, v: number): number {
+  return airStrength(speed) * v * v
+}
+
+/** Off the throttle the engine holds back too: with the air, coastSlowdown at 60 km/h. m/s². */
+export function engineBraking(speed: SpeedSettings): number {
+  return Math.max(speed.coastSlowdown * KMH - airDrag(speed, SIXTY), 0)
 }
 
 /** Full brake, m/s². */
 export function brakeDeceleration(speed: SpeedSettings): number {
   return SIXTY / Math.max(speed.secondsToStopFrom60, 0.1)
-}
-
-/** With neither throttle nor brake, m/s². */
-export function coastDeceleration(speed: SpeedSettings): number {
-  return speed.coastSlowdown * KMH
 }
 
 /** The top speed in m/s. */

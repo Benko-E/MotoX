@@ -2,9 +2,10 @@ import RAPIER from '@dimforge/rapier3d-compat'
 import type { BikeBody, BikeStats, LandingSettings } from '../config'
 import {
   brakeDeceleration,
-  coastDeceleration,
+  airDrag,
   dampingRate,
-  driveAcceleration,
+  engineAcceleration,
+  engineBraking,
   springRate,
   topSpeed,
   turnRadiusAt,
@@ -408,18 +409,25 @@ export class Bike {
       // instead of secondsTo60, more the higher the front is (fully at wheelieAngle).
       const noseUp = Math.asin(clamp(dot(forward, n), -1, 1))
       const wheelieUp = frontUp ? clamp(noseUp / (Math.max(rider.wheelieAngle, 5) * DEG), 0, 1) : 0
-      const onBoth = driveAcceleration(speed, speedAlong)
-      const onBack = driveAcceleration({ ...speed, secondsTo60: rider.wheelieSecondsTo60 }, speedAlong)
+      const onBoth = engineAcceleration(speed, speedAlong)
+      // (pulling harder off the line, but no more power: it still tops out at topSpeed)
+      const wheelie = { ...speed, secondsTo60: rider.wheelieSecondsTo60 }
+      const onBack = engineAcceleration(wheelie, speedAlong) - airDrag(wheelie, speedAlong) + airDrag(speed, speedAlong)
       const pull = onBoth + (onBack - onBoth) * wheelieUp
       const drive = this.wheels[1].onGround ? throttle * pull * traction * railCos : 0
       const braking = brake * brakeDeceleration(speed)
-      const coasting = (1 - throttle) * coastDeceleration(speed) + (sliding * powerslide.scrub) / 3.6
-      const nextSpeed = speedAlong + (drive - gravity * dot(UP, along)) * dt
+      // The air always holds back; off the throttle the engine does too.
+      const coasting = airDrag(speed, speedAlong) + (1 - throttle) * engineBraking(speed) + (sliding * powerslide.scrub) / 3.6
+      // Gravity pulls you back up a hill and on down one. The physics does
+      // that by itself (hills 1); other hills settings add or take away some.
+      const uphill = gravity * dot(UP, along)
+      const hillExtra = -uphill * (speed.hills - 1)
+      const nextSpeed = speedAlong + (drive - uphill + hillExtra) * dt
       const canSlow = Math.abs(nextSpeed) / dt
       const slowing = Math.min(braking + coasting, canSlow)
       const brakeShare = braking + coasting > 0 ? braking / (braking + coasting) : 0
       const against = -Math.sign(nextSpeed)
-      pushes.push([scale(along, mass * (drive * onWheels)), centerOfMass])
+      pushes.push([scale(along, mass * ((drive + hillExtra) * onWheels)), centerOfMass])
       pushes.push([scale(along, mass * against * slowing * (1 - brakeShare) * onWheels), centerOfMass])
       // Braking acts lower down, so it dips the nose (noseDive 1 = at the ground,
       // like a real bike), but never so low that it could tip the bike over the

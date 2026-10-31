@@ -56,6 +56,44 @@ describe('speed', () => {
     expect(bike.forwardSpeed / KMH).toBeLessThan(speedSettings.topSpeed * 1.01)
   })
 
+  /** Full throttle at top speed onto a long slope of `angle` degrees (positive: uphill); its speed after `seconds` on it, km/h. */
+  function hill(angle: number, seconds: number, hills = speedSettings.hills) {
+    const before = speedSettings.hills
+    speedSettings.hills = hills
+    try {
+      const { bike, run } = setup(ground((x) => (x > 0 ? x * Math.tan(angle * DEG) : 0), 1200))
+      bike.placeOnGround(-150, 0, 90)
+      bike.controls.throttle = 1
+      run(8) // flat run-up to top speed, reaching the slope about now
+      run(seconds)
+      return bike.forwardSpeed / KMH
+    } finally {
+      speedSettings.hills = before
+    }
+  }
+
+  it('slows down climbing a hill at full throttle, more the steeper it is', () => {
+    const gentle = hill(10, 6)
+    const steep = hill(20, 6)
+    expect(gentle).toBeLessThan(speedSettings.topSpeed * 0.88)
+    expect(steep).toBeLessThan(speedSettings.topSpeed * 0.75)
+    expect(steep).toBeLessThan(gentle - 10)
+    expect(steep).toBeGreaterThan(speedSettings.topSpeed * 0.4)
+  })
+
+  it('climbs at top speed with hills at 0 (slopes switched off), and steeper with hills at 2', () => {
+    expect(hill(20, 6, 0)).toBeGreaterThan(speedSettings.topSpeed * 0.95)
+    expect(hill(10, 6, 2)).toBeLessThan(hill(10, 6, 1) - 8)
+  })
+
+  it('runs past top speed downhill, but the air reins it in: it levels off', () => {
+    const settling = hill(-10, 10)
+    const later = hill(-10, 13)
+    expect(settling).toBeGreaterThan(speedSettings.topSpeed * 1.08)
+    expect(later).toBeLessThan(speedSettings.topSpeed * 1.35)
+    expect(Math.abs(later - settling)).toBeLessThan(3)
+  })
+
   it('stops from 60 km/h in about secondsToStopFrom60, diving the front without lifting the rear', () => {
     const { bike, run } = setup(flat(600))
     bike.placeOnGround(0, 250, 0)

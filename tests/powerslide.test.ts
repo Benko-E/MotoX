@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { config } from '../src/config'
 import type { Bike } from '../src/physics/bike'
+import { turnRadiusAt } from '../src/physics/bikeTuning'
 import { initPhysics } from '../src/physics/world'
 import { DEG, flat, setup, setupWithCrashes } from './physicsSetup'
 
@@ -67,14 +68,16 @@ describe('powerslides', () => {
     const normal = rolling(60)
     normal.bike.controls.steer = 1
     normal.run(1, () => cruise(normal.bike, 60 * KMH))
-    const normalRadius = pathRadius(normal.bike, normal.run, 0.5, () => cruise(normal.bike, 60 * KMH))
+    // each against the normal turn at its own speed (sliding scrubs some off, and the turn widens with speed)
+    const normalTurn = (bike: Bike) => turnRadiusAt(config.bike.turning, config.bike.speed, groundSpeed(bike))
+    const normalRadius = pathRadius(normal.bike, normal.run, 0.5, () => cruise(normal.bike, 60 * KMH)) / normalTurn(normal.bike)
 
     for (const tighterTurn of [0.6, 1]) {
       const { bike, run } = rolling(60, (b) => (b.stats.powerslide.tighterTurn = tighterTurn))
       bike.controls.steer = 1
       bike.controls.powerslide = true
       run(1, () => cruise(bike, 60 * KMH))
-      const radius = pathRadius(bike, run, 0.5, () => cruise(bike, 60 * KMH))
+      const radius = pathRadius(bike, run, 0.5, () => cruise(bike, 60 * KMH)) / normalTurn(bike)
       expect(radius / normalRadius).toBeGreaterThan(tighterTurn - 0.1)
       expect(radius / normalRadius).toBeLessThan(tighterTurn + 0.1)
     }

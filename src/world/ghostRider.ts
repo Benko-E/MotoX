@@ -84,11 +84,15 @@ export class GhostRider {
     const gravity = settings.jumps.gravity * EARTH_GRAVITY
     const target = jump.speed / 3.6
     const start = jump.runUp[0]
+    // Climbing to the lip costs speed, the way it does on a real bike, so it
+    // comes in that much faster, to leave the lip at the jump's speed.
+    const wanted = (x: number, z: number) => Math.sqrt(target ** 2 + 2 * gravity * Math.max(jump.lip.y - heightAt(this.field, x, z), 0))
     const forward = { x: Math.sin(jump.heading * DEG), z: -Math.cos(jump.heading * DEG) }
 
     bike.setCrashed(false)
     bike.placeOnGround(start.x, start.z, jump.heading)
-    bike.body.setLinvel({ x: forward.x * target, y: 0, z: forward.z * target }, true)
+    const startSpeed = wanted(start.x, start.z)
+    bike.body.setLinvel({ x: forward.x * startSpeed, y: 0, z: forward.z * startSpeed }, true)
 
     const runUp = Math.hypot(jump.lip.x - start.x, jump.lip.z - start.z)
     const timeLimit = runUp / target + jump.airtime * 2 + 3
@@ -111,7 +115,8 @@ export class GhostRider {
       pitchBefore = pitch
 
       const controls = bike.controls
-      controls.throttle = !inAir && bike.forwardSpeed < target ? 1 : 0
+      const here = bike.body.translation()
+      controls.throttle = !inAir && bike.forwardSpeed < wanted(here.x, here.z) ? 1 : 0
       controls.steer = steerOntoLine(bike.body.translation(), bike.heading, jump)
       controls.lean = inAir ? leanToLand(bike, (x, z) => heightAt(this.field, x, z), pitchRate) : 0
 

@@ -2,31 +2,49 @@ import { describe, expect, it } from 'vitest'
 import {
   brakeDeceleration,
   dampingRate,
-  driveAcceleration,
-  launchAcceleration,
+  airDrag,
+  engineAcceleration,
+  engineBraking,
   springRate,
   turnRadiusAt,
 } from '../src/physics/bikeTuning'
 
-const speed = { topSpeed: 100, secondsTo60: 2.5, secondsToStopFrom60: 2, coastSlowdown: 5 }
+const speed = { topSpeed: 100, secondsTo60: 2.5, secondsToStopFrom60: 2, coastSlowdown: 5, hills: 1 }
 
 describe('speed settings', () => {
-  it('reaches 60 km/h in secondsTo60 when following the throttle curve', () => {
-    // step through the curve by hand, independent of how launchAcceleration works it out
+  it('reaches 60 km/h in secondsTo60 at full throttle on the flat: the engine pulling, the air holding it back', () => {
+    // step through it by hand, independent of how the engine's strength is worked out
     let v = 0
     let t = 0
     const dt = 0.0005
     while (v < 60 / 3.6 && t < 10) {
-      v += driveAcceleration(speed, v) * dt
+      v += (engineAcceleration(speed, v) - airDrag(speed, v)) * dt
       t += dt
     }
     expect(t).toBeCloseTo(2.5, 2)
   })
 
-  it('pulls hardest from a standstill and not at all at top speed', () => {
-    expect(driveAcceleration(speed, 0)).toBeCloseTo(launchAcceleration(speed), 9)
-    expect(driveAcceleration(speed, 100 / 3.6)).toBe(0)
-    expect(driveAcceleration(speed, 120 / 3.6)).toBe(0)
+  it('levels off at topSpeed on the flat, where the air holds back as hard as the engine pulls', () => {
+    const top = 100 / 3.6
+    expect(engineAcceleration(speed, top)).toBeCloseTo(airDrag(speed, top), 9)
+    expect(engineAcceleration(speed, top * 0.9)).toBeGreaterThan(airDrag(speed, top * 0.9))
+    expect(engineAcceleration(speed, top * 1.1)).toBeLessThan(airDrag(speed, top * 1.1))
+  })
+
+  it('has an engine of limited power: past a third of top speed, twice as fast pulls half as hard', () => {
+    // so a climb, which needs more pull, costs speed, the way it does on a real bike
+    const top = 100 / 3.6
+    for (const v of [top / 2, top * 0.6, top * 0.9]) expect(engineAcceleration(speed, v * 1.1) * v * 1.1).toBeCloseTo(engineAcceleration(speed, v) * v, 9)
+    // below that the tyre can only grip so hard: the same pull all the way from a standstill
+    expect(engineAcceleration(speed, 0)).toBeCloseTo(engineAcceleration(speed, top / 4), 9)
+    expect(engineAcceleration(speed, 0)).toBeGreaterThan(engineAcceleration(speed, top / 2))
+  })
+
+  it('lets go: the air and the engine braking slow it by coastSlowdown at 60 km/h', () => {
+    const sixty = 60 / 3.6
+    expect(airDrag(speed, sixty) + engineBraking(speed)).toBeCloseTo(5 / 3.6, 9)
+    // the air holds back harder the faster you go
+    expect(airDrag(speed, 2 * sixty)).toBeCloseTo(4 * airDrag(speed, sixty), 9)
   })
 
   it('brakes hard enough to stop from 60 km/h in secondsToStopFrom60', () => {
