@@ -26,7 +26,18 @@ export interface Heightfield {
     /** Where it starts (the foot of its face) and ends (the bottom of its drop), on the track's line. */
     foot: { x: number; z: number }
     end: { x: number; z: number }
+    /** How long it was built (face and drop) and how high, metres. */
+    length: number
+    height: number
+    /**
+     * The straight round it (none when the track has no landing straight), on
+     * the track's line in the order you ride it: where it eases in from the
+     * curve, where it's fully straight from and to, and where it's eased back out.
+     */
+    straight?: { easeFrom: { x: number; z: number }; from: { x: number; z: number }; to: { x: number; z: number }; easeTo: { x: number; z: number } }
   }[]
+  /** A clearing's calm edge as it really runs, wandering in and out round its radius, all the way round. Missing when the map has none. */
+  clearingEdge?: { x: number; z: number }[]
   /** Which samples belong to a map feature (a track, a clearing, ...): 1 if one owns it. The jump finder keeps off them. */
   owned?: Uint8Array
   /** The line down the middle of a track, its points about a metre apart, going round clockwise. */

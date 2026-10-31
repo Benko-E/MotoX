@@ -2,136 +2,116 @@ import * as THREE from 'three'
 import type { TrackDebugSettings } from '../config'
 import type { MapDef } from '../maps/types'
 import type { Heightfield } from '../terrain/heightfield'
+import type { JumpSpot } from '../world/jumps'
+import { arc, arrow, between, circle, DebugView, groundRing, LABEL_LIFT, num, offset, post, ribbon, type GroundAt } from './debugDraw'
 
 /**
- * A debug view of the track, drawn on the ground: the line down its middle,
- * the edges of its floor and of its banks, and its kickers (face, drop and a
- * post at the lip). Each part has its own checkbox. Only drawn: no collision.
+ * A debug view of the track, drawn on the ground, each part with its own
+ * checkbox: the line down its middle with arrows the way it's ridden, the
+ * edges of its floor and of its banks, the radius it runs round and how far
+ * its winding lets it wander, its kickers (face, drop and a post as tall as
+ * each was built), the straight round each kicker, the flight off each at the
+ * speed it was built for, and labels naming each setting with its number.
  */
 
-type Part = 'middle' | 'floor' | 'banks' | 'kickers'
-type Path = readonly { x: number; z: number }[]
+type Part = 'middle' | 'floor' | 'banks' | 'ring' | 'kickers' | 'straights' | 'flights' | 'labels'
+const PARTS: Part[] = ['middle', 'floor', 'banks', 'ring', 'kickers', 'straights', 'flights', 'labels']
 
-/** Lifted this far off the ground so they don't flicker into it, metres. */
-const LIFT = 0.08
-const LINE_WIDTH = 0.35
 const KICKER_WIDTH = 1.2
-const POST = { width: 0.3, height: 3 }
-const COLORS = { middle: 0xffffff, floor: 0xffd23f, banks: 0x3fb8ff, face: 0xff8a00, drop: 0xff2020, lip: 0xff2020 }
+const STRAIGHT_WIDTH = 0.9
+/** An arrow along the middle line every this many of its points (about a metre apart). */
+const ARROW_EVERY = 30
+const LANDING_RING = 2.5
+const COLORS = {
+  middle: 0xffffff,
+  floor: 0xffd23f,
+  banks: 0x3fb8ff,
+  radius: 0xd8d8ff,
+  wander: 0xb47cff,
+  face: 0xff8a00,
+  drop: 0xff2020,
+  lip: 0xff2020,
+  straight: 0x3fdc5a,
+  ease: 0x1f8a3a,
+  flight: 0xff4fd8,
+}
 
-export class TrackDebug {
-  private readonly parts = new Map<Part, THREE.Group>()
-
-  constructor(
-    scene: THREE.Scene,
-    private readonly groundAt: (x: number, z: number) => number,
-    /** Read live, so the tuning panel applies at once. */
-    readonly settings: TrackDebugSettings,
-  ) {
-    for (const name of ['middle', 'floor', 'banks', 'kickers'] as const) {
-      const group = new THREE.Group()
-      group.name = name
-      group.visible = false
-      scene.add(group)
-      this.parts.set(name, group)
-    }
+export class TrackDebug extends DebugView<Part> {
+  constructor(scene: THREE.Scene, groundAt: GroundAt, settings: TrackDebugSettings) {
+    super(scene, PARTS, groundAt, settings)
   }
 
-  /** One part's drawing. */
-  part(name: Part): THREE.Group {
-    return this.parts.get(name)!
-  }
-
-  /** Draws the track `field` was built with (`track` its settings then); none if it has none. */
-  show(field: Heightfield, track: MapDef['track']): void {
-    for (const group of this.parts.values()) {
-      for (const child of group.children) disposeMesh(child as THREE.Mesh)
-      group.clear()
-    }
+  /**
+   * Draws the track `field` was built with (`track` its settings then, run
+   * round `middle`), and the flights off its kickers (`jumps`, as measured);
+   * none if it has none.
+   */
+  show(field: Heightfield, track: MapDef['track'], middle: { x: number; z: number }, jumps: readonly JumpSpot[]): void {
+    this.clear()
     const line = field.trackLine
     if (!line?.length) return
-    const add = (part: Part, name: string, geometry: THREE.BufferGeometry, color: number) => {
-      const mesh = new THREE.Mesh(geometry, debugMaterial(color))
-      mesh.name = name
-      mesh.renderOrder = 4
-      this.part(part).add(mesh)
-    }
-    add('middle', 'middle', ribbon([...line, line[0]], this.groundAt, LINE_WIDTH), COLORS.middle)
+    const { groundAt } = this
+    const n = line.length
+    const add = this.add.bind(this)
+    const say = this.say.bind(this)
+    const way = track.way === 'counterclockwise' ? -1 : 1
+
+    // the middle, and arrows along it the way it's ridden (the line runs clockwise)
+    add('middle', 'middle', ribbon([...line, line[0]], groundAt), COLORS.middle)
+    for (let k = 0, count = 1; k < n; k += ARROW_EVERY, count++) add('middle', `way ${count}`, arrow(line[k], line[(k + way * 3 + n) % n], groundAt), COLORS.middle)
+    say(`ridden ${track.way}\nfloor: flatness ${num(track.flatness)}, smoothing ${num(track.smoothing)} m`, line[Math.floor((n * 3) / 8)], COLORS.middle)
+
+    // its floor and its banks, either side
     for (const side of [-1, 1]) {
-      add('floor', side < 0 ? 'left' : 'right', ribbon(offset(line, (side * track.width) / 2), this.groundAt, LINE_WIDTH), COLORS.floor)
-      add('banks', side < 0 ? 'left' : 'right', ribbon(offset(line, side * (track.width / 2 + track.banks)), this.groundAt, LINE_WIDTH), COLORS.banks)
+      add('floor', side < 0 ? 'left' : 'right', ribbon(offset(line, (side * track.width) / 2), groundAt), COLORS.floor)
+      add('banks', side < 0 ? 'left' : 'right', ribbon(offset(line, side * (track.width / 2 + track.banks)), groundAt), COLORS.banks)
     }
+    const labelled = Math.floor(n / 8)
+    say(`floor: width ${num(track.width)} m`, offset(line, track.width / 2)[labelled], COLORS.floor)
+    say(`banks ${num(track.banks)} m`, offset(line, track.width / 2 + track.banks)[labelled], COLORS.banks)
+
+    // the radius it runs round, and how far its winding lets it wander in and out
+    const r = track.radius
+    add('ring', 'radius', ribbon(circle(middle.x, middle.z, r), groundAt), COLORS.radius)
+    add('ring', 'wander in', ribbon(circle(middle.x, middle.z, r * (1 - track.winding)), groundAt), COLORS.wander)
+    add('ring', 'wander out', ribbon(circle(middle.x, middle.z, r * (1 + track.winding)), groundAt), COLORS.wander)
+    say(`track radius ${num(r)} m`, { x: middle.x, z: middle.z - r }, COLORS.radius)
+    say(`winding ${num(track.winding)}: wanders up to\n${num(track.winding * r)} m in or out from the radius`, { x: middle.x, z: middle.z - r * (1 + track.winding) }, COLORS.wander)
+
+    // each kicker: its face and drop along the line, a post as tall as it was built, and the straight round it
     const indexOf = (p: { x: number; z: number }) => line.findIndex((q) => q.x === p.x && q.z === p.z)
     for (const [i, jump] of (field.trackJumps ?? []).entries()) {
       const lip = indexOf(jump)
-      add('kickers', `face ${i + 1}`, ribbon(between(line, indexOf(jump.foot), lip), this.groundAt, KICKER_WIDTH), COLORS.face)
-      add('kickers', `drop ${i + 1}`, ribbon(between(line, lip, indexOf(jump.end)), this.groundAt, KICKER_WIDTH), COLORS.drop)
-      const post = new THREE.BoxGeometry(POST.width, POST.height, POST.width)
-      post.translate(jump.x, this.groundAt(jump.x, jump.z) + POST.height / 2, jump.z)
-      add('kickers', `lip ${i + 1}`, post, COLORS.lip)
+      add('kickers', `face ${i + 1}`, ribbon(between(line, indexOf(jump.foot), lip), groundAt, KICKER_WIDTH), COLORS.face)
+      add('kickers', `drop ${i + 1}`, ribbon(between(line, lip, indexOf(jump.end)), groundAt, KICKER_WIDTH), COLORS.drop)
+      add('kickers', `lip ${i + 1}`, post(jump.x, jump.z, jump.height, groundAt), COLORS.lip)
+      say(
+        `kicker ${i + 1}: height ${num(jump.height)} m, length ${num(jump.length)} m\n(face ${num(jump.length * 0.7)} m, drop ${num(jump.length * 0.3)} m)`,
+        jump,
+        COLORS.face,
+        jump.height + LABEL_LIFT,
+      )
+      const straight = jump.straight
+      if (!straight) continue
+      const [easeFrom, from, to, easeTo] = [straight.easeFrom, straight.from, straight.to, straight.easeTo].map(indexOf)
+      add('straights', `ease in ${i + 1}`, ribbon(between(line, easeFrom, from), groundAt, STRAIGHT_WIDTH), COLORS.ease)
+      add('straights', `straight ${i + 1}`, ribbon(between(line, from, to), groundAt, STRAIGHT_WIDTH), COLORS.straight)
+      add('straights', `ease out ${i + 1}`, ribbon(between(line, to, easeTo), groundAt, STRAIGHT_WIDTH), COLORS.ease)
+      say(
+        `landing straight ${i + 1}: ${num(track.landingStraight)} × ${num(jump.length)} m\n= ${num(track.landingStraight * jump.length)} m past the lip, then eases back into the curve`,
+        straight.to,
+        COLORS.straight,
+      )
+      say(`straight ${i + 1} starts here\n(eases in from the curve before it)`, straight.from, COLORS.straight)
+    }
+
+    // the flight off each kicker at the speed it was built for, and where you land
+    for (const [i, jump] of jumps.filter((j) => j.source === 'track').entries()) {
+      if (jump.flight.length < 2) continue
+      add('flights', `flight ${i + 1}`, arc(jump.flight), COLORS.flight)
+      add('flights', `landing ${i + 1}`, groundRing(jump.landing.x, jump.landing.z, LANDING_RING, groundAt), COLORS.flight)
+      const far = Math.hypot(jump.landing.x - jump.lip.x, jump.landing.z - jump.lip.z)
+      say(`lands ${i + 1}: at ${num(jump.speed)} km/h (jump speed)\n${num(jump.airtime)} s in the air, ${num(far)} m past the lip`, jump.landing, COLORS.flight)
     }
   }
-
-  /** Call once a frame (or after a setting changes): shows the parts switched on. */
-  update(): void {
-    const { settings } = this
-    for (const [name, group] of this.parts) group.visible = settings.show && settings[name]
-  }
-}
-
-/** The line's points from `from` to `to`, the short way round the loop. */
-function between(line: Path, from: number, to: number): Path {
-  const n = line.length
-  const step = (to - from + n) % n <= n / 2 ? 1 : -1
-  const path = [line[from]]
-  for (let k = from; k !== to; ) {
-    k = (k + step + n) % n
-    path.push(line[k])
-  }
-  return path
-}
-
-/** The loop moved `by` metres to its right (negative: left) all the way round, closed. */
-function offset(line: Path, by: number): Path {
-  const n = line.length
-  const moved = line.map((p, k) => {
-    const before = line[(k - 1 + n) % n]
-    const after = line[(k + 1) % n]
-    const length = Math.hypot(after.x - before.x, after.z - before.z) || 1
-    // right of the way the line runs: its direction turned a quarter clockwise
-    return { x: p.x - ((after.z - before.z) / length) * by, z: p.z + ((after.x - before.x) / length) * by }
-  })
-  return [...moved, moved[0]]
-}
-
-/** A flat strip `width` wide along `path`, lying on the ground. */
-function ribbon(path: Path, groundAt: (x: number, z: number) => number, width: number): THREE.BufferGeometry {
-  const positions: number[] = []
-  path.forEach((point, i) => {
-    const before = path[Math.max(i - 1, 0)]
-    const after = path[Math.min(i + 1, path.length - 1)]
-    const length = Math.hypot(after.x - before.x, after.z - before.z) || 1
-    const ax = ((after.z - before.z) / length) * (width / 2)
-    const az = (-(after.x - before.x) / length) * (width / 2)
-    for (const side of [-1, 1]) {
-      const x = point.x + ax * side
-      const z = point.z + az * side
-      positions.push(x, groundAt(x, z) + LIFT, z)
-    }
-  })
-  const index: number[] = []
-  for (let i = 0; i < path.length - 1; i++) index.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 2, i * 2 + 1, i * 2 + 3)
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setIndex(index)
-  return geometry
-}
-
-function debugMaterial(color: number): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 })
-}
-
-function disposeMesh(mesh: THREE.Mesh): void {
-  mesh.geometry.dispose()
-  ;(mesh.material as THREE.Material).dispose()
 }

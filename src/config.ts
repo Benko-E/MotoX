@@ -229,14 +229,50 @@ export const config = {
   /** A debug view of the track, drawn on the ground. Only drawn: nothing here changes the map. */
   trackDebug: {
     show: false,
-    /** The line down its middle (white). */
+    /** The line down its middle (white), with arrows the way it's ridden. */
     middle: true,
     /** The edges of its flat-ish floor (yellow), half its width out. */
     floor: true,
     /** Where its banks end and the hills begin (blue). */
     banks: true,
-    /** Each kicker: its face (orange), its drop (red) and a post at its lip. */
+    /** The radius it runs round (pale), and how far its winding lets it wander in and out (purple). */
+    ring: true,
+    /** Each kicker: its face (orange), its drop (red) and a post at its lip as tall as it was built. */
     kickers: true,
+    /** The straight round each kicker (green), easing in and out of the curve either side (dark green). */
+    straights: true,
+    /** The flight off each kicker at its jump speed (pink), and a ring where you land. */
+    flights: true,
+    /** Labels naming each setting, with its number, by the line it draws. */
+    labels: true,
+  },
+
+  /** A debug view of the clearing, drawn on the ground. Only drawn: nothing here changes the map. */
+  clearingDebug: {
+    show: false,
+    /** A post at its middle. */
+    middle: true,
+    /** Its radius (pale): how far out it's calm, before its edge wanders. */
+    radius: true,
+    /** Its calm edge as it really runs (white), wandering in and out of the radius. */
+    edge: true,
+    /** Where its blend back into the hills ends (blue), blend metres out past its edge. */
+    blend: true,
+    /** Labels naming each setting, with its number, by the line it draws. */
+    labels: true,
+  },
+
+  /** A debug view of the land, drawn on the ground. Only drawn: nothing here changes the map. */
+  landDebug: {
+    show: false,
+    /** Where the wall at the map's edge starts to rise (orange), and the very edge of the map (red). */
+    edge: true,
+    /** The spawn point with an arrow its heading, how far round it the start is looked for, and the spot you really start on. */
+    spawn: true,
+    /** A bar one hill wavelength long by the start, and a post as tall as the hills, to show their size. */
+    hills: true,
+    /** Labels naming each setting, with its number, by the line it draws. */
+    labels: true,
   },
 
   /**
@@ -440,6 +476,8 @@ export type FallingOverSettings = Config['advanced']['fallingOver']
 export type EffectSettings = Config['effects']
 export type JumpGuideSettings = Config['jumpGuide']
 export type TrackDebugSettings = Config['trackDebug']
+export type ClearingDebugSettings = Config['clearingDebug']
+export type LandDebugSettings = Config['landDebug']
 export type LetterSettings = Config['letters']
 export type AiRiderSettings = Config['ai']['riders'][number]
 

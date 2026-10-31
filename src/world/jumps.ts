@@ -26,8 +26,9 @@ export interface JumpSpot {
   /** The speed it's built to be hit at, km/h, and how long you fly at it, seconds. */
   speed: number
   airtime: number
-  /** Where you land at that speed. */
+  /** Where you land at that speed, and the flight there: where the middle of the bike is at each moment, from the lip (none if it never throws you). */
   landing: Point
+  flight: Point[]
   /** The map feature that built it ('track', ...). */
   source: string
   /** What it's like: fast (long, low and quick), or big air (high, plenty of airtime). */
@@ -90,6 +91,7 @@ export function measureJump(
     speed,
     airtime: flight?.airtime ?? 0,
     landing: flight?.landing ?? lip,
+    flight: flight?.path ?? [],
     source,
     kind,
   }
@@ -127,19 +129,21 @@ function fly(
   speed: number,
   dx: number,
   dz: number,
-): { airtime: number; landing: Point } | null {
+): { airtime: number; landing: Point; path: Point[] } | null {
   const across = speed * Math.cos(lipAngle * DEG)
   const up = speed * Math.sin(lipAngle * DEG)
+  const path: Point[] = [{ x: lx, y: lipY + RIDE_HEIGHT, z: lz }]
   for (let t = FLIGHT_STEP; t <= LONGEST_FLIGHT; t += FLIGHT_STEP) {
     const d = across * t
     const y = lipY + RIDE_HEIGHT + up * t - (gravity * t * t) / 2
     const px = lx + dx * d
     const pz = lz + dz * d
     const groundY = at(px, pz)
+    path.push({ x: px, y, z: pz })
     // still clear of the ground (allowing for the bumps of the height grid right at take-off)
     if (y - RIDE_HEIGHT > groundY - GRID_SLACK) continue
     if (t < NOT_A_FLIGHT) return null // never really left the ground
-    return { airtime: t, landing: { x: px, y: groundY, z: pz } }
+    return { airtime: t, landing: { x: px, y: groundY, z: pz }, path }
   }
   return null
 }

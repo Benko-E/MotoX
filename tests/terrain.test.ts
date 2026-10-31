@@ -262,6 +262,65 @@ describe('a loop track', () => {
   })
 })
 
+describe('what the map features record about what they built (for the debug views)', () => {
+  const hills = { seed: 3, height: 10, wavelength: 40, octaves: 3, roughness: 0.5 }
+  const track = (way: 'clockwise' | 'counterclockwise'): MapDef['track'] => ({ show: true, way, radius: 75, winding: 0.15, width: 8, banks: 10, flatness: 1, smoothing: 40, jumps: 2, jumpHeight: 3, jumpLength: 20, jumpVary: 0, jumpSpeed: 80, landingStraight: 2 })
+
+  it('each track kicker: its size, and the straight round it, from before its face to landingStraight jump lengths past its lip', () => {
+    for (const way of ['clockwise', 'counterclockwise'] as const) {
+      const field = generateTerrain(testMap({ size: 260, hills, track: track(way) }))
+      const line = field.trackLine!
+      const n = line.length
+      const step = way === 'clockwise' ? 1 : -1
+      const index = (p: { x: number; z: number }) => line.findIndex((q) => q.x === p.x && q.z === p.z)
+      /** Metres along the line, the way it's ridden, from one point of it to another. */
+      const ridden = (from: { x: number; z: number }, to: { x: number; z: number }) => {
+        let metres = 0
+        for (let k = index(from); k !== index(to); k = (k + step + n) % n) {
+          const next = line[(k + step + n) % n]
+          metres += Math.hypot(next.x - line[k].x, next.z - line[k].z)
+        }
+        return metres
+      }
+      for (const jump of field.trackJumps!) {
+        expect(jump.length).toBeCloseTo(20, 6)
+        expect(jump.height).toBeCloseTo(3, 6)
+        const straight = jump.straight!
+        for (const p of [straight.from, straight.to, straight.easeFrom, straight.easeTo]) expect(index(p), way).toBeGreaterThanOrEqual(0)
+        // in the order you ride them, and as long as the settings say
+        expect(ridden(straight.easeFrom, straight.from), way).toBeCloseTo(10, -0.5) // easing in over half a jump length
+        expect(ridden(straight.from, jump.foot), way).toBeCloseTo(30, -0.5) // straight at least 30 m before the face
+        expect(ridden(jump, straight.to), way).toBeCloseTo(2 * 20, -0.5) // landingStraight jump lengths past the lip
+        expect(ridden(straight.to, straight.easeTo), way).toBeCloseTo(10, -0.5)
+        // and really straight in between
+        const a = straight.from
+        const b = straight.to
+        const span = Math.hypot(b.x - a.x, b.z - a.z)
+        for (let k = index(a); k !== index(b); k = (k + step + n) % n) {
+          const p = line[k]
+          const across = Math.abs((p.x - a.x) * (b.z - a.z) - (p.z - a.z) * (b.x - a.x)) / span
+          expect(across, way).toBeLessThan(0.3)
+        }
+      }
+    }
+  })
+
+  it('the clearing: its calm edge as it really runs, wandering in and out round its radius', () => {
+    const map = testMap({ size: 200, hills, clearing: { x: 10, z: -5, radius: 30, blend: 15, calm: 0.8 } })
+    const edge = generateTerrain(map).clearingEdge!
+    expect(edge.length).toBeGreaterThanOrEqual(64)
+    const out = edge.map((p) => Math.hypot(p.x - 10, p.z + 5))
+    for (const r of out) {
+      expect(r).toBeGreaterThan(30 * 0.8 - 0.01)
+      expect(r).toBeLessThan(30 * 1.2 + 0.01)
+    }
+    expect(Math.max(...out) - Math.min(...out)).toBeGreaterThan(2) // it wanders
+    // all the way round
+    const bearings = new Set(edge.map((p) => Math.round(Math.atan2(p.x - 10, -(p.z + 5)) / (Math.PI / 4))))
+    expect(bearings.size).toBeGreaterThanOrEqual(8)
+  })
+})
+
 describe('flattestSpotNear', () => {
   /** A smooth hollow with its flat bottom at (cx, cz). */
   const hollow = (cx: number, cz: number) => ground((x, z) => 0.02 * ((x - cx) ** 2 + (z - cz) ** 2))

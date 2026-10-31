@@ -12,7 +12,7 @@ function jump(x: number, z: number, heading: number): JumpSpot {
   const dx = Math.sin(heading * DEG)
   const dz = -Math.cos(heading * DEG)
   const runUp = [{ x, y: 0, z }, { x: x + dx * 30, y: 0, z: z + dz * 30 }]
-  return { lip: runUp[1], heading, runUp, speed: 70, airtime: 2, landing: { x: x + dx * 60, y: 0, z: z + dz * 60 }, source: 'found', kind: 'fast' }
+  return { lip: runUp[1], heading, runUp, speed: 70, airtime: 2, landing: { x: x + dx * 60, y: 0, z: z + dz * 60 }, source: 'found', kind: 'fast', flight: [] }
 }
 /** Him at the middle, heading north (toward -z). */
 const here = { x: 0, z: 0, heading: 0 }

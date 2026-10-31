@@ -2,8 +2,9 @@ import type { MapDef } from '../maps/types'
 import { createHeightfield, sampleCoord, type Heightfield } from './heightfield'
 import { createPerlin, fractalNoise, type Noise2D } from './noise'
 
-/** A clearing's edge wanders in and out by up to this share of its radius. */
+/** A clearing's edge wanders in and out by up to this share of its radius; it's recorded as this many points round. */
 const RAGGED = 0.2
+const CLEARING_EDGE_POINTS = 180
 /** A track's line is followed in steps this long, metres. */
 const TRACK_STEP = 1
 /** Whatever of the land a track's floor keeps, it keeps only rolls longer than this, metres: no short bumps to rattle over. */
@@ -80,15 +81,34 @@ function carveTrack(map: MapDef, noise: Noise2D, field: Heightfield): void {
     ? jumpSizes.map((size, j) => {
         const jumpLength = ch.jumpLength * size
         const ease = jumpLength * STRAIGHT_EASE
-        const runIn = Math.max(STRAIGHT_RUN_IN, jumpLength) + ease
-        const landing = jumpLength * (JUMP_FACE + ch.landingStraight) + ease
-        // before and after along the line, which runs clockwise
-        return { at: jumpFeet[j], before: way > 0 ? runIn : landing, after: way > 0 ? landing : runIn, ease }
+        // fully straight this far before the foot of its face, and this far past it (landingStraight jump lengths past the lip)
+        const runIn = Math.max(STRAIGHT_RUN_IN, jumpLength)
+        const landing = jumpLength * (JUMP_FACE + ch.landingStraight)
+        // Straightened, the curve becomes the chord across it, which is
+        // shorter: planned that much longer round the curve, so it comes out
+        // the length asked for (a few goes, as the chord depends on the
+        // length), but never longer than its share of the loop.
+        const fits = (runIn + landing) / Math.max(loopLength / ch.jumps - 2 * ease, 1e-6)
+        let shorter = 1
+        let stretch = { at: jumpFeet[j], before: 0, after: 0, ease }
+        for (let go = 0; go < 4; go++) {
+          // before and after along the line, which runs clockwise
+          const [before, after] = way > 0 ? [runIn, landing] : [landing, runIn]
+          stretch = { at: jumpFeet[j], before: ease + before / shorter, after: ease + after / shorter, ease }
+          const points = stretchPoints(along, stretch)
+          const [a, b] = [points[0].k, points[points.length - 1].k]
+          shorter = Math.min(Math.max(Math.hypot(xs[b] - xs[a], zs[b] - zs[a]) / (stretch.before + stretch.after), fits), 1)
+        }
+        return stretch
       })
     : []
+  // each straight's ends, as points of the line (clockwise): eased in from, fully straight from and to, eased out to
+  const straightEnds: { a: number; from: number; to: number; b: number }[] = []
   for (const stretch of stretches) {
     const points = stretchPoints(along, stretch)
     const [a, b] = [points[0].k, points[points.length - 1].k]
+    const full = points.filter((p) => p.w >= 1 - 1e-9)
+    straightEnds.push({ a, from: (full[0] ?? points[0]).k, to: (full.at(-1) ?? points.at(-1)!).k, b })
     const span = stretch.before + stretch.after
     for (const { k, metres, w } of points) {
       const t = Math.min(metres / span, 1)
@@ -108,13 +128,13 @@ function carveTrack(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const floor = new Float64Array(count)
   for (let k = 0; k < count; k++) floor[k] = even[k] + (gentle[k] - even[k]) * (1 - ch.flatness)
   const bumps = new Float64Array(count)
-  const shaped: { start: number; jumpLength: number }[] = []
+  const shaped: { start: number; jumpLength: number; height: number }[] = []
   for (let j = 0; j < jumpSizes.length; j++) {
     const size = jumpSizes[j]
     const height = ch.jumpHeight * size
     const jumpLength = ch.jumpLength * size
     const start = along[jumpFeet[j]]
-    shaped.push({ start, jumpLength })
+    shaped.push({ start, jumpLength, height })
     for (let k = 0; k < count; k++) {
       const u = ((along[k] - start) * way + length) % length // metres past the foot of its face, the way it's ridden
       if (u >= jumpLength) continue
@@ -126,7 +146,8 @@ function carveTrack(map: MapDef, noise: Noise2D, field: Heightfield): void {
   // lips rounded a little, as dirt ones are: a sharp crease saw-tooths across the ground's grid
   const rounded = ch.jumps > 0 ? evenOut(bumps, LIP_ROUND / TRACK_STEP) : bumps
   // register each jump: its lip where its rounded crest is, the way the track runs there, its run-up along the line, and where it starts and ends
-  field.trackJumps = shaped.map(({ start, jumpLength }) => {
+  const point = (k: number) => ({ x: xs[k], z: zs[k] })
+  field.trackJumps = shaped.map(({ start, jumpLength, height }, j) => {
     let lip = -1
     let foot = -1
     let end = -1
@@ -138,6 +159,11 @@ function carveTrack(map: MapDef, noise: Noise2D, field: Heightfield): void {
       if (foot < 0 || u < past(foot)) foot = k
       if (end < 0 || u > past(end)) end = k
     }
+    // ridden the other way round, the straight's ends come the other way round too
+    const straightAt = (ends: (typeof straightEnds)[number] | undefined) =>
+      ends && (way > 0
+        ? { easeFrom: point(ends.a), from: point(ends.from), to: point(ends.to), easeTo: point(ends.b) }
+        : { easeFrom: point(ends.b), from: point(ends.to), to: point(ends.from), easeTo: point(ends.a) })
     const next = (lip + way + count) % count
     const runUp = [{ x: xs[lip], z: zs[lip] }]
     for (let k = lip, metres = 0; metres < TRACK_RUN_UP; ) {
@@ -154,6 +180,9 @@ function carveTrack(map: MapDef, noise: Noise2D, field: Heightfield): void {
       speed: ch.jumpSpeed,
       foot: { x: xs[foot], z: zs[foot] },
       end: { x: xs[end], z: zs[end] },
+      length: jumpLength,
+      height,
+      straight: straightAt(straightEnds[j]),
     }
   })
   for (let k = 0; k < count; k++) floor[k] += rounded[k]
@@ -239,7 +268,7 @@ function carveTrack(map: MapDef, noise: Noise2D, field: Heightfield): void {
  */
 function calmClearing(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const { clearing } = map
-  if (clearing.calm <= 0 || clearing.radius <= 0) return
+  if (clearing.radius <= 0) return
   const n = field.samples
   const toIndex = (w: number) => (w + field.size / 2) / field.cellSize
   const reach = clearing.radius * (1 + RAGGED) + clearing.blend
@@ -250,6 +279,13 @@ function calmClearing(map: MapDef, noise: Noise2D, field: Heightfield): void {
     const angle = Math.atan2(dz, dx)
     return clearing.radius * (1 + RAGGED * fractalNoise(noise, 37 + Math.cos(angle) * 1.5, 91 + Math.sin(angle) * 1.5, 2, 0.5))
   }
+  // its edge as it really runs, for the debug view
+  field.clearingEdge = Array.from({ length: CLEARING_EDGE_POINTS }, (_, i) => {
+    const angle = (i / CLEARING_EDGE_POINTS) * Math.PI * 2
+    const r = edgeAt(Math.cos(angle), Math.sin(angle))
+    return { x: clearing.x + Math.cos(angle) * r, z: clearing.z + Math.sin(angle) * r }
+  })
+  if (clearing.calm <= 0) return
 
   let total = 0
   let count = 0

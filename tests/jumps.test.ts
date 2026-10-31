@@ -18,6 +18,17 @@ describe('measuring a jump a feature built', () => {
     expect(jump.kind).toBe('fast')
   })
 
+  it('keeps the flight itself: from the lip, up over it and down to where you land, the middle of the bike at each moment', () => {
+    const jump = measureJump(ground(kicker(), 300), { x: 30, z: 0 }, 90, 95, 'test', 'fast')
+    const flight = jump.flight
+    expect(flight.length).toBeGreaterThan(jump.airtime / 0.05)
+    expect(Math.hypot(flight[0].x - jump.lip.x, flight[0].z - jump.lip.z)).toBeLessThan(1.5)
+    expect(Math.hypot(flight.at(-1)!.x - jump.landing.x, flight.at(-1)!.z - jump.landing.z)).toBeLessThan(1.5)
+    expect(Math.max(...flight.map((p) => p.y))).toBeGreaterThan(jump.lip.y + 1) // up over it
+    for (let i = 1; i < flight.length; i++) expect(flight[i].x).toBeGreaterThan(flight[i - 1].x) // always onward
+    expect(measureJump(flat(300), { x: 0, z: 0 }, 90, 95, 'test', 'fast').flight).toEqual([]) // no flight
+  })
+
   it('a rounded hilltop at speed: you take off before the top, where it bends away', () => {
     const hill = ground((x) => 12 * Math.exp(-((x / 25) ** 2)), 300)
     const jump = measureJump(hill, { x: 0, z: 0 }, 90, 95, 'test', 'fast')

@@ -18,6 +18,8 @@ import { GroundEffects } from './render/groundEffects'
 import { HelmetCamera } from './render/helmetCamera'
 import { JumpLanes } from './render/jumpLanes'
 import { TrackDebug } from './render/trackDebug'
+import { ClearingDebug } from './render/clearingDebug'
+import { LandDebug } from './render/landDebug'
 import { LetterLanes } from './render/letterLanes'
 import { LetterView } from './render/letterView'
 import { nextCameraMode } from './render/cameraViews'
@@ -87,9 +89,12 @@ const groundEffects = new GroundEffects(
 /** The jumps the map's features built (the track's kickers), and a debug view of them. */
 let jumps: JumpSpot[] = []
 const jumpLanes = new JumpLanes(view.scene, jumps, groundAt, config.jumpGuide)
-/** The track's debug view: its lines and kickers drawn on the ground. */
+/** The track's debug view: its lines, kickers, straights and flights drawn on the ground, and labels saying what each is. */
 const trackDebug = new TrackDebug(view.scene, groundAt, config.trackDebug)
-trackDebug.show(field, map.track)
+/** The clearing's debug view: its middle, radius, real edge and blend. */
+const clearingDebug = new ClearingDebug(view.scene, groundAt, config.clearingDebug)
+/** The land's debug view: the edge wall, the spawn point and start, and the size of the hills. */
+const landDebug = new LandDebug(view.scene, groundAt, config.landDebug)
 /** Each frame the letters' ghost rides get this long to work on, milliseconds. */
 const LETTER_BUDGET = 5
 
@@ -134,7 +139,9 @@ function rebuildTerrain() {
   physics.setGround(field)
   jumps = featureJumps(field, config.jumps.gravity * EARTH_GRAVITY)
   jumpLanes.replace(jumps)
-  trackDebug.show(field, map.track)
+  trackDebug.show(field, map.track, map.clearing, jumps)
+  clearingDebug.show(field, map.clearing)
+  landDebug.show(field, map, SPAWN_SEARCH)
   ghost?.dispose()
   ghost = new GhostRider(field, config)
   ghostRides = new Map()
@@ -241,7 +248,9 @@ const sections: PanelSection[] = [
   fromConfig('jumps', ['riding rules']),
   fromConfig('crashes', ['riding rules']),
   fromMap('land', '', ['map'], { exclude: ['clearing', 'track'] }),
+  fromConfig('landDebug', ['map', 'land'], { title: 'debug: land lines' }),
   fromMap('clearing', 'clearing', ['map', 'features']),
+  fromConfig('clearingDebug', ['map', 'features', 'clearing'], { title: 'debug: clearing lines' }),
   fromMap('track', 'track', ['map', 'features']),
   fromConfig('trackDebug', ['map', 'features', 'track'], { title: 'debug: track lines', shownWhen: () => map.track.show }),
   fromConfig('jumpGuide', ['map', 'features', 'track'], { title: 'debug: kicker lanes', shownWhen: () => map.track.show }),
@@ -395,7 +404,9 @@ function showFrame(frameTime: number) {
   letterView.update(Math.min(frameTime, 0.1), hunt.grabbed)
   letterLanes.update(hunt.grabbed, Math.min(frameTime, 0.1))
   jumpLanes.update(Math.min(frameTime, 0.1))
-  trackDebug.update()
+  trackDebug.update(view.camera.position)
+  clearingDebug.update(view.camera.position)
+  landDebug.update(view.camera.position)
   hud.update({ speed: watchedBike().speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime) // the speed of whoever you watch
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)

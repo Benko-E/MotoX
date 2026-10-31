@@ -23,6 +23,7 @@ function jump(x: number, z: number, heading: number): JumpSpot {
     landing: { x: x + dx * 30, y: 0, z: z + dz * 30 },
     source: 'track',
     kind: 'fast',
+    flight: [],
   }
 }
 
