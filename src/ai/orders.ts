@@ -306,6 +306,10 @@ export class PickBehaviour implements Behaviour {
     return this.chosen().area?.()
   }
 
+  roadAhead(rider: RiderState, reach: number): Bend[] {
+    return this.chosen().roadAhead?.(rider, reach) ?? []
+  }
+
   private switchIfChanged(orders: Orders): void {
     const now = this.chosen()
     if (this.last && now !== this.last) orders.clear()

@@ -260,4 +260,16 @@ describe('picking a behaviour', () => {
     pick.refill(orders, here)
     expect(calls).toEqual(['a', 'b'])
   })
+
+  it('passes on everything the chosen one knows: its area, and how the way bends ahead', () => {
+    const bends = [{ distance: 10, radius: 30, x: 0, z: 0 }]
+    const track = { refill: () => {}, area: () => 123, roadAhead: () => bends }
+    const roam = { refill: () => {} }
+    let choice: 'track' | 'roam' = 'track'
+    const pick = new PickBehaviour(() => (choice === 'track' ? track : roam))
+    expect(pick.area()).toBe(123)
+    expect(pick.roadAhead(here, 100)).toBe(bends)
+    choice = 'roam'
+    expect(pick.roadAhead(here, 100)).toEqual([]) // roaming free: it doesn't know
+  })
 })

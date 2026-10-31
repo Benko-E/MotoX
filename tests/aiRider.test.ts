@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { AiRider } from '../src/ai/aiRider'
-import { FollowTrack, type Behaviour } from '../src/ai/orders'
+import { FollowTrack, PickBehaviour, type Behaviour } from '../src/ai/orders'
 import { cornerSpeed } from '../src/ai/riding'
 import { config } from '../src/config'
 import { initPhysics, PhysicsWorld } from '../src/physics/world'
@@ -202,7 +202,8 @@ describe('an AI rider', () => {
     const track = runningTrack()
     const { ai, run, settings } = rider(flat(600), 90)
     ai.bike.placeOnGround(-60, -track.radius, 90) // on the north straight, going its way
-    ai.behaviour = new FollowTrack(() => 'clockwise', () => track.line)
+    const follow = new FollowTrack(() => 'clockwise', () => track.line)
+    ai.behaviour = new PickBehaviour(() => follow) // as the game hands him his job
     const me = settings.ai.riders[0]
     const bendSpeed = cornerSpeed(track.radius * me.followTrack.cornering, settings.bike.turning, settings.bike.speed) * 3.6
     let fastest = 0
