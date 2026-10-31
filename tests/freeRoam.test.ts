@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FollowTrack, FreeRoam, Orders, PickBehaviour } from '../src/ai/orders'
-import type { JumpSpot } from '../src/world/jumpFinder'
+import type { JumpSpot } from '../src/world/jumps'
 
 const DEG = Math.PI / 180
 const settings = () => ({ roamRadius: 300, lookAhead: 120, lookWide: 35, jumpAppetite: 1, jumpCooldown: 12 })
@@ -12,7 +12,7 @@ function jump(x: number, z: number, heading: number): JumpSpot {
   const dx = Math.sin(heading * DEG)
   const dz = -Math.cos(heading * DEG)
   const runUp = [{ x, y: 0, z }, { x: x + dx * 30, y: 0, z: z + dz * 30 }]
-  return { lip: runUp[1], heading, runUp, lipAngle: 20, speed: 70, airtime: 2, landing: { x: x + dx * 60, y: 0, z: z + dz * 60 }, score: 2, source: 'found', kind: 'fast' }
+  return { lip: runUp[1], heading, runUp, speed: 70, airtime: 2, landing: { x: x + dx * 60, y: 0, z: z + dz * 60 }, source: 'found', kind: 'fast' }
 }
 /** Him at the middle, heading north (toward -z). */
 const here = { x: 0, z: 0, heading: 0 }
@@ -23,28 +23,43 @@ describe('free roam', () => {
   it('rides off to the quarter of the map he has been to least, within the roam radius, then cruises', () => {
     const roam = new FreeRoam(settings(), () => [], always(0.5))
     const quarters: number[] = []
+    let him = here
     for (let i = 0; i < 8; i++) {
       const orders = new Orders()
-      roam.refill(orders, here)
+      roam.refill(orders, him)
       const order = orders.current!
       if (order.kind !== 'rideTo') throw new Error('expected a ride to a spot')
       expect(Math.hypot(order.x, order.z)).toBeLessThanOrEqual(300)
       quarters.push((order.x >= 0 ? 1 : 0) + (order.z >= 0 ? 2 : 0))
       orders.next()
       expect(orders.current?.kind).toBe('cruise')
+      him = { x: order.x, z: order.z, heading: Math.atan2(order.x - him.x, -(order.z - him.z)) / DEG } // he got there
     }
     expect([0, 1, 2, 3].map((q) => quarters.filter((at) => at === q).length)).toEqual([2, 2, 2, 2])
   })
 
-  it('goes for a jump ahead of him that points his way, before whatever he was doing', () => {
+  it('goes for a jump ahead of him that points his way, dropping what he was doing (so he never turns back for it after)', () => {
     const ahead = jump(5, -60, 10)
     const roam = new FreeRoam(settings(), () => [ahead], always(0))
     const orders = new Orders()
+    orders.add({ kind: 'rideTo', x: 0, z: -50 })
     orders.add({ kind: 'cruise', seconds: 5 })
     roam.watch(orders, here, 1)
     expect(orders.current).toEqual({ kind: 'takeJump', jump: ahead })
     orders.next()
-    expect(orders.current?.kind).toBe('cruise')
+    expect(orders.current).toBeUndefined() // he picks where next from wherever he lands
+  })
+
+  it('heads for a quarter ahead of him rather than one behind, when he has been to both as often', () => {
+    const roam = new FreeRoam(settings(), () => [], always(0.5))
+    const southward = { x: 0, z: 0, heading: 180 }
+    for (const wanted of [2, 3]) {
+      const orders = new Orders()
+      roam.refill(orders, southward)
+      const order = orders.current!
+      if (order.kind !== 'rideTo') throw new Error('expected a ride to a spot')
+      expect((order.x >= 0 ? 1 : 0) + (order.z >= 0 ? 2 : 0)).toBe(wanted) // south-west, then south-east
+    }
   })
 
   it('leaves jumps behind him, off to the side, too far, or pointing another way', () => {
@@ -96,6 +111,20 @@ describe('free roam', () => {
     expect(none.current).toBeUndefined()
   })
 
+  it('thinks again about a jump he turned down, a while later', () => {
+    const ahead = jump(5, -60, 10)
+    const s = settings()
+    s.jumpAppetite = 0.3
+    const roam = new FreeRoam(s, () => [ahead], always(0.5))
+    const orders = new Orders()
+    roam.watch(orders, here, 1) // turned down
+    s.jumpAppetite = 1
+    for (let t = 0; t < 30; t++) roam.watch(orders, here, 1)
+    expect(orders.current).toBeUndefined() // half a minute on: his mind is still made up
+    for (let t = 0; t < 40; t++) roam.watch(orders, here, 1)
+    expect(orders.current).toEqual({ kind: 'takeJump', jump: ahead })
+  })
+
   it('cruises a while after a jump before going for another', () => {
     const first = jump(5, -60, 10)
     const second = jump(-5, -70, 350)
@@ -122,9 +151,9 @@ describe('following the track', () => {
   const onTrack = { x: 0, z: -100, heading: 90 }
   const bearingOf = (p: { x: number; z: number }) => (Math.atan2(p.x, -p.z) * 180) / Math.PI
 
-  it('rides on to a point a little further round the track, the way he is set to go', () => {
+  it('rides on to a point a little further round the track, the way the track runs', () => {
     for (const [way, sign] of [['clockwise', 1], ['counterclockwise', -1]] as const) {
-      const follow = new FollowTrack({ trackWay: way }, () => line)
+      const follow = new FollowTrack(() => way, () => line)
       const orders = new Orders()
       follow.refill(orders, onTrack)
       const order = orders.current!
@@ -136,7 +165,7 @@ describe('following the track', () => {
   })
 
   it('heads for the nearest bit of track when he is away from it', () => {
-    const follow = new FollowTrack({ trackWay: 'clockwise' }, () => line)
+    const follow = new FollowTrack(() => 'clockwise', () => line)
     const orders = new Orders()
     follow.refill(orders, { x: 0, z: -40, heading: 0 }) // inside the loop, south of its north point
     const order = orders.current!
@@ -144,7 +173,7 @@ describe('following the track', () => {
     expect(Math.abs(bearingOf(order))).toBeLessThan(35)
   })
 
-  it('takes the track kickers coming up on his line as jumps, lined up at their speed', () => {
+  it('takes the track kickers coming up on his line as jumps, dropping the rest of his way there', () => {
     // a kicker on the track 40 m on round from the north point, the way he's going (clockwise), and one the other way
     const at = (i: number) => line[(i + line.length) % line.length]
     const kicker = (from: number, to: number) => {
@@ -155,20 +184,29 @@ describe('following the track', () => {
     }
     const ahead = kicker(20, 50)
     const behind = kicker(-20, -50)
-    const follow = new FollowTrack({ trackWay: 'clockwise' }, () => line, () => [behind, ahead])
+    const follow = new FollowTrack(() => 'clockwise', () => line, () => [behind, ahead])
     const orders = new Orders()
+    orders.add({ kind: 'rideTo', ...at(25), onLine: true })
     follow.watch(orders, onTrack, 1 / 60)
     expect(orders.current).toEqual({ kind: 'takeJump', jump: ahead })
+    orders.next()
+    expect(orders.current).toBeUndefined() // on from wherever he lands
   })
 
-  it('may go as far out as the track does', () => {
-    expect(new FollowTrack({ trackWay: 'clockwise' }, () => line).area?.()).toBeGreaterThanOrEqual(100)
+  it('may go as far out as the track does, wherever the map has put it', () => {
+    let track = line
+    const follow = new FollowTrack(() => 'clockwise', () => track)
+    expect(follow.area?.()).toBeGreaterThanOrEqual(100)
+    track = line.map((p) => ({ x: p.x * 2, z: p.z * 2 })) // the map rebuilt, its track bigger
+    expect(follow.area?.()).toBeGreaterThanOrEqual(200)
   })
 
-  it('with no track on the map, he just cruises', () => {
+  it('with no track on the map, he just cruises, within his roam radius', () => {
     const orders = new Orders()
-    new FollowTrack({ trackWay: 'clockwise' }, () => undefined).refill(orders, onTrack)
+    const follow = new FollowTrack(() => 'clockwise', () => undefined)
+    follow.refill(orders, onTrack)
     expect(orders.current?.kind).toBe('cruise')
+    expect(follow.area?.()).toBeUndefined()
   })
 })
 

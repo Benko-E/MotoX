@@ -34,7 +34,7 @@ import { HelpTimer } from './ui/helpCard'
 import { readNotes } from './ui/notes'
 import { GhostRider, type GhostRide } from './world/ghostRider'
 import { LetterHunt } from './world/letterHunt'
-import { designedJumps, findJumpsGradually, type JumpSpot } from './world/jumpFinder'
+import { featureJumps, type JumpSpot } from './world/jumps'
 import { placeLettersGradually, sliceTurn, type LetterSpot, type Ride } from './world/letterSpots'
 import { createTuningPanel, type PanelSection } from './ui/tuningPanel'
 
@@ -83,14 +83,13 @@ const groundEffects = new GroundEffects(
   () => config.jumps.gravity * EARTH_GRAVITY,
 )
 
-/** The good jumps in the hills, found by reading the ground, and the lanes marking the best ones near you. */
+/** The jumps the map's features built (the track's kickers), and a debug view of them. */
 let jumps: JumpSpot[] = []
 const jumpLanes = new JumpLanes(view.scene, jumps, groundAt, config.jumpGuide)
-let jumpSearch: Generator<void, JumpSpot[]> | null = null
-/** Each frame the jump search (and then the letters' ghost rides) gets this long to work on, milliseconds. */
-const JUMP_SEARCH_BUDGET = 5
+/** Each frame the letters' ghost rides get this long to work on, milliseconds. */
+const LETTER_BUDGET = 5
 
-/** The letters M O T O X over jumps the ghost bike has ridden, placed once the jumps are found. */
+/** The letters M O T O X over jumps the ghost bike has ridden (only while they're shown). */
 let letterSpots: LetterSpot[] = []
 const letterView = new LetterView(view.scene, config.letters)
 const letterLanes = new LetterLanes(view.scene, groundAt, config.letters)
@@ -110,9 +109,9 @@ const rideOnce: Ride = (jump) => {
   })()
 }
 
-/** Hands the letters out again (after the jumps are found, or when their difficulty or spread changed). */
+/** Hands the letters out again (a new map, or their settings changed), if they're shown. */
 function placeLetters() {
-  if (jumpSearch) return // they're placed once the search is done
+  if (!config.letters.show) return
   letterSearch = placeLettersGradually(
     jumps,
     {
@@ -129,8 +128,8 @@ function rebuildTerrain() {
   field = generateTerrain(map)
   terrainView.show(field)
   physics.setGround(field)
-  // found a bit at a time between frames (see showFrame), so the game doesn't stall
-  jumpSearch = findJumpsGradually(field)
+  jumps = featureJumps(field, config.jumps.gravity * EARTH_GRAVITY)
+  jumpLanes.replace(jumps)
   ghost?.dispose()
   ghost = new GhostRider(field, config)
   ghostRides = new Map()
@@ -139,6 +138,7 @@ function rebuildTerrain() {
   letterView.show(letterSpots)
   letterLanes.show(letterSpots)
   hunt.reset()
+  placeLetters()
 }
 rebuildTerrain()
 const start = flattestSpotNear(field, map.spawn.x, map.spawn.z, SPAWN_SEARCH)
@@ -160,7 +160,7 @@ const riderEffects: GroundEffects[] = []
 const nameTags: NameTag[] = []
 for (let i = 0; i < AI_RIDERS; i++) {
   const roam = new FreeRoam(config.ai, () => jumps)
-  const follow = new FollowTrack(config.ai, () => field.trackLine, () => jumps)
+  const follow = new FollowTrack(() => map.channel.way, () => field.trackLine, () => jumps)
   const rider = new AiRider(physics, config, groundAt, new PickBehaviour(() => (config.ai.behaviour === 'followTrack' ? follow : roam)))
   rider.bike.placeOnGround(start.x + 8 * (i + 1), start.z + 6, map.spawn.heading)
   riders.push(rider)
@@ -205,7 +205,7 @@ const sections: PanelSection[] = Object.entries(config).map(([name, target]) => 
   onChange:
     name === 'letters'
       ? (path: string, last: boolean) => {
-          if (last && (path === 'spread' || /\.(difficulty|along|grabSize|airGap)$/.test(path))) placeLetters()
+          if (last && (path === '' || path === 'show' || path === 'spread' || /\.(difficulty|along|grabSize|airGap)$/.test(path))) placeLetters()
         }
       : undefined,
 }))
@@ -345,19 +345,8 @@ function showFrame(frameTime: number) {
   })
   groundEffects.update(Math.min(frameTime, 0.1))
   for (const effects of riderEffects) effects.update(Math.min(frameTime, 0.1))
-  if (jumpSearch) {
-    const until = performance.now() + JUMP_SEARCH_BUDGET
-    let step = jumpSearch.next()
-    while (!step.done && performance.now() < until) step = jumpSearch.next()
-    if (step.done) {
-      // the jump stack: what the map's features built first, then what the finder found in the hills
-      jumps = [...designedJumps(field), ...step.value]
-      jumpLanes.replace(jumps)
-      jumpSearch = null
-      placeLetters()
-    }
-  } else if (letterSearch) {
-    const until = performance.now() + JUMP_SEARCH_BUDGET
+  if (letterSearch) {
+    const until = performance.now() + LETTER_BUDGET
     let step = letterSearch.next()
     while (!step.done && performance.now() < until) step = letterSearch.next()
     if (step.done) {
@@ -371,12 +360,7 @@ function showFrame(frameTime: number) {
   hunt.update(letterSpots, bike.body.translation(), Math.min(frameTime, 0.1))
   letterView.update(Math.min(frameTime, 0.1), hunt.grabbed)
   letterLanes.update(hunt.grabbed, Math.min(frameTime, 0.1))
-  // a jump with a letter's gold lane on it isn't marked pink as well
-  const goldLanes = new Set(
-    letterSpots.filter((spot) => config.letters.show && config.letters.each[spot.letter].showRunUp && !hunt.grabbed[spot.letter]).map((spot) => spot.jump),
-  )
-  // the lanes of whoever you watch: what they would see as they ride
-  jumpLanes.update(watchedView().position, watchedView().heading, Math.min(frameTime, 0.1), goldLanes)
+  jumpLanes.update(Math.min(frameTime, 0.1))
   hud.update({ speed: watchedBike().speed, topSpeed: config.bike.speed.topSpeed, letters: hunt.grabbed }, frameTime) // the speed of whoever you watch
   const wheelClicks = input.takeWheel()
   if (wheelClicks && !flying && cameraMode !== 'helmet') chase.zoomBy(wheelClicks)

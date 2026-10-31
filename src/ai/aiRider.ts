@@ -2,9 +2,9 @@ import type { Config } from '../config'
 import { Bike } from '../physics/bike'
 import { CrashWatcher } from '../physics/crashes'
 import type { PhysicsWorld } from '../physics/world'
-import type { JumpSpot } from '../world/jumpFinder'
+import type { JumpSpot } from '../world/jumps'
 import { Orders, type Behaviour, type Order } from './orders'
-import { clamp, leanToLand, turnBetween } from './riding'
+import { clamp, leanToLand, steerOntoLine, turnBetween } from './riding'
 
 /**
  * An AI rider: the same bike as yours, in your physics world, with the same
@@ -30,9 +30,11 @@ const DODGE = [30, -30, 60, -60, 90, -90, 135, -135]
 const STUCK_AFTER = 3
 /** Taking a jump: he first rides to a spot this far back from the start of its run-up, metres, then follows its line. */
 const APPROACH = 25
-/** On the line: full lock this many metres off it, or this many degrees turned off it. */
-const OFF_LINE = 4
-const TURNED_OFF = 20
+/** Already within this many metres of a jump's line, short of its lip and within this many degrees of its way, he's lined up as he is. */
+const ON_LINE_NEAR = 8
+const ON_LINE_TURN = 30
+/** Only flying from this close to the lip (or past it) counts as the jump, not a bump on the way, metres. */
+const NEAR_LIP = 10
 /** He gives up on a jump when he's this far off its line, or this far past its lip without flying, metres, or after this long, seconds. */
 const LOST_LINE = 15
 const PAST_LIP = 30
@@ -91,8 +93,9 @@ export class AiRider {
     const controls = bike.controls
     const inAir = bike.wheels.every((wheel) => !wheel.onGround)
     if (order?.kind === 'takeJump') {
-      if (inAir) this.flown += dt
-      else if (this.flown >= JUMP_FLIGHT) this.landedFor += dt
+      if (inAir) {
+        if (this.lined && lineOffset(order.jump, p).along > -NEAR_LIP) this.flown += dt
+      } else if (this.flown >= JUMP_FLIGHT) this.landedFor += dt
       else this.flown = 0 // only a bump
     }
     const pitchRate = (bike.pitch - this.pitchBefore) / dt
@@ -106,7 +109,7 @@ export class AiRider {
       let target = this.settings.ai.cruiseSpeed / 3.6
       if (order.kind === 'takeJump' && this.lined) {
         // on the run-up: keep to its line at the jump's speed, whatever the ground
-        controls.steer = this.steerOnLine(order.jump)
+        controls.steer = steerOntoLine(p, bike.heading, order.jump)
         target = order.jump.speed / 3.6
       } else {
         let to = order.kind === 'rideTo' ? order : order.kind === 'takeJump' ? approachPoint(order.jump) : null
@@ -151,7 +154,7 @@ export class AiRider {
     const { jump } = order
     if (!this.lined) {
       const at = approachPoint(jump)
-      this.lined = Math.hypot(at.x - p.x, at.z - p.z) < ARRIVED
+      this.lined = Math.hypot(at.x - p.x, at.z - p.z) < ARRIVED || this.onLine(jump, p)
     }
     if (this.landedFor >= RIDE_OUT) return true // done it
     // given up: lost the line, rode past without flying, or too long at it
@@ -162,11 +165,11 @@ export class AiRider {
     return this.orderTime > JUMP_TIME
   }
 
-  /** Steering that keeps him on a jump's line, -1 (left) to 1 (right). */
-  private steerOnLine(jump: JumpSpot): number {
-    const { across } = lineOffset(jump, this.bike.body.translation())
-    const turned = turnBetween(this.bike.heading, jump.heading)
-    return clamp(-(across / OFF_LINE + turned / TURNED_OFF), -1, 1)
+  /** Whether he's on a jump's line already, between where he'd line up and its lip, facing up it. */
+  private onLine(jump: JumpSpot, p: { x: number; z: number }): boolean {
+    const { along, across } = lineOffset(jump, p)
+    const runUp = Math.hypot(jump.runUp[0].x - jump.lip.x, jump.runUp[0].z - jump.lip.z)
+    return along < 0 && along > -(runUp + APPROACH) && Math.abs(across) < ON_LINE_NEAR && Math.abs(turnBetween(this.bike.heading, jump.heading)) < ON_LINE_TURN
   }
 
   /** `heading`, or the nearest way off it where the ground ahead is fit to ride. */

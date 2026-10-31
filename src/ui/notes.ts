@@ -51,12 +51,10 @@ export function readNotes(source: string): Notes {
  * The note for a setting: its own, else its group's (for settings written
  * on one line like `inertia: { pitch: 70, yaw: 70 }`), but no further up. An
  * item in a list shares the note of that setting on every item
- * ("letters.each.3.along" -> "letters.each.along"). With `lastNameOnly`,
- * matches on the final name alone ("jumps.3.height" -> "height").
+ * ("letters.each.3.along" -> "letters.each.along").
  */
-export function noteFor(notes: Notes, path: string, options: { lastNameOnly?: boolean } = {}): string | undefined {
+export function noteFor(notes: Notes, path: string): string | undefined {
   const parts = path.split('.')
-  if (options.lastNameOnly) return notes[parts[parts.length - 1]]
   const inAnyItem = parts.filter((part) => !/^\d+$/.test(part)).join('.')
   return notes[path] ?? notes[parts.slice(0, -1).join('.')] ?? notes[inAnyItem]
 }

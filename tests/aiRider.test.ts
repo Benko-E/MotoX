@@ -4,7 +4,7 @@ import type { Behaviour } from '../src/ai/orders'
 import { config } from '../src/config'
 import { initPhysics, PhysicsWorld } from '../src/physics/world'
 import { heightAt, type Heightfield } from '../src/terrain/heightfield'
-import { findJumps } from '../src/world/jumpFinder'
+import { measureJump } from '../src/world/jumps'
 import { DEG, DT, flat, ground, kicker, tilt } from './physicsSetup'
 
 beforeAll(async () => {
@@ -83,7 +83,7 @@ describe('an AI rider', () => {
 
   it('takes a jump he is told to: lines up on its run-up from off to the side, flies, lands and rides on', () => {
     const field = ground(kicker(), 300)
-    const jump = findJumps(field).find((j) => Math.abs(j.heading - 90) < 15)!
+    const jump = measureJump(field, { x: 30, z: 0 }, 90, 95, 'test', 'fast') // the kicker's crest
     const { ai, run } = rider(field, 0)
     ai.bike.placeOnGround(-60, 40, 0) // behind the run-up and off to the side, facing north
     ai.orders.add({ kind: 'takeJump', jump })
@@ -95,8 +95,47 @@ describe('an AI rider', () => {
     expect(ai.orders.current?.kind).toBe('cruise')
   })
 
+  it('already on a jump\'s line, he rides straight on into it rather than turning back to line up', () => {
+    const field = ground(kicker(), 300)
+    const jump = measureJump(field, { x: 30, z: 0 }, 90, 95, 'test', 'fast')
+    const { ai, run } = rider(field, 90)
+    ai.bike.placeOnGround(-10, 0, 90) // on its line, short of the run-up, facing up it
+    ai.orders.add({ kind: 'takeJump', jump })
+    let longest = 0
+    let turned = 0
+    run(8, () => {
+      longest = Math.max(longest, ai.bike.airtime)
+      if (where(ai).x < 20) turned = Math.max(turned, Math.abs(((ai.bike.heading - 90 + 540) % 360) - 180))
+    })
+    expect(turned).toBeLessThan(30)
+    expect(longest).toBeGreaterThan(0.5)
+  })
+
+  it('a bump on the way is not the jump: he still goes on and takes it', () => {
+    // a little kicker on his way, 60 m short of the big one
+    const bump = (x: number) => (x > -70 && x <= -62 ? (x + 70) * Math.tan(20 * DEG) : x > -62 && x < -59 ? 8 * Math.tan(20 * DEG) - (x + 62) * Math.tan(45 * DEG) : 0)
+    const field = ground((x, z) => kicker()(x, z) + Math.max(0, bump(x)) * Math.max(0, 1 - Math.abs(z) / 20), 300)
+    const jump = measureJump(field, { x: 30, z: 0 }, 90, 95, 'test', 'fast')
+    const { ai, run } = rider(field, 90)
+    ai.bike.placeOnGround(-110, 0, 90)
+    ai.orders.add({ kind: 'takeJump', jump })
+    ai.orders.add({ kind: 'cruise', seconds: 60 })
+    let bumpAir = 0
+    let jumpAir = 0
+    let upTheRunUp: string | undefined
+    run(20, () => {
+      const at = where(ai).x
+      if (at < -40) bumpAir = Math.max(bumpAir, ai.bike.airtime)
+      else jumpAir = Math.max(jumpAir, ai.bike.airtime)
+      if (at > 10 && at < 20) upTheRunUp ??= ai.orders.current?.kind
+    })
+    expect(bumpAir).toBeGreaterThan(0.25) // the bump threw him
+    expect(upTheRunUp).toBe('takeJump') // and he still went for the jump
+    expect(jumpAir).toBeGreaterThan(0.7)
+  })
+
   it('gives up on a jump that never throws him, rather than riding it for ever', () => {
-    const jump = findJumps(ground(kicker(), 300)).find((j) => Math.abs(j.heading - 90) < 15)!
+    const jump = measureJump(ground(kicker(), 300), { x: 30, z: 0 }, 90, 95, 'test', 'fast')
     const { ai, run } = rider(flat(400), 90)
     ai.bike.placeOnGround(-40, 0, 90)
     ai.orders.add({ kind: 'takeJump', jump }) // on flat ground there's nothing there

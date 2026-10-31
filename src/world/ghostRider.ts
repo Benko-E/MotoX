@@ -1,10 +1,10 @@
-import { clamp, leanToLand } from '../ai/riding'
+import { leanToLand, steerOntoLine } from '../ai/riding'
 import { EARTH_GRAVITY, type Config } from '../config'
 import { Bike } from '../physics/bike'
 import { CrashWatcher } from '../physics/crashes'
 import { PhysicsWorld } from '../physics/world'
 import { heightAt, type Heightfield } from '../terrain/heightfield'
-import type { JumpSpot, Point } from './jumpFinder'
+import type { JumpSpot, Point } from './jumps'
 
 /**
  * An invisible bike that tries a jump for real: the same bike, the same
@@ -40,9 +40,6 @@ const MIN_FLIGHT = 0.25
 const RIDE_OUT = 0.75
 /** And then it has to be rolling on at least this fast, m/s: not stopped dead or bounced back off something. */
 const STILL_ROLLING = 3
-/** Steering back onto the line: full lock this many metres off it, or this many degrees turned off it. */
-const OFF_LINE = 4
-const TURNED_OFF = 20
 /** Riding a bit at a time, it pauses after this many physics steps (a few milliseconds' work). */
 const STEPS_PER_PAUSE = 60
 
@@ -115,7 +112,7 @@ export class GhostRider {
 
       const controls = bike.controls
       controls.throttle = !inAir && bike.forwardSpeed < target ? 1 : 0
-      controls.steer = this.steerBack(jump, forward)
+      controls.steer = steerOntoLine(bike.body.translation(), bike.heading, jump)
       controls.lean = inAir ? leanToLand(bike, (x, z) => heightAt(this.field, x, z), pitchRate) : 0
 
       bike.update(dt)
@@ -149,13 +146,5 @@ export class GhostRider {
       }
     }
     return turnedDown(phase === 'runUp' ? 'never took off' : 'still going at the time limit')
-  }
-
-  /** Steering that brings the bike back onto the jump's line, -1 (left) to 1 (right). */
-  private steerBack(jump: JumpSpot, forward: { x: number; z: number }): number {
-    const p = this.bike.body.translation()
-    const offRight = (p.x - jump.lip.x) * -forward.z + (p.z - jump.lip.z) * forward.x // metres right of the line
-    const turnedRight = ((this.bike.heading - jump.heading + 540) % 360) - 180
-    return clamp(-(offRight / OFF_LINE + turnedRight / TURNED_OFF), -1, 1)
   }
 }

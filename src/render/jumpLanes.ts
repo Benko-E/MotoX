@@ -1,12 +1,11 @@
 import * as THREE from 'three'
 import type { JumpGuideSettings } from '../config'
-import type { JumpSpot } from '../world/jumpFinder'
+import type { JumpSpot } from '../world/jumps'
 
 /**
- * Lanes marking good jumps: a ribbon with arrows laid on the ground up each
- * run-up to its lip, and a ring where you'd land. Only the best few near you
- * show, ahead of you and pointing your way, fading in and out as that
- * changes. No collision: they're only drawn.
+ * A debug view of the jumps the map's features built: a ribbon with arrows
+ * laid on the ground up each run-up to its lip, and a ring where you'd land.
+ * All of them show while it's switched on. No collision: only drawn.
  */
 
 const LANE_WIDTH = 2.6
@@ -15,73 +14,13 @@ const LIFT = 0.06
 const COLOR = 0xff2d9b
 /** Seconds a lane takes to fade in or out. */
 const FADE = 0.4
-/** Seconds between picking which lanes to show. */
-const REPICK = 0.25
-/** A run-up starting this close counts as ahead whichever way you face, metres; and how far ahead, either side, degrees. */
-const CLOSE = 20
-const AHEAD = 75
-/** A jump counts as pointing your way within this many degrees of where you're heading. */
-const YOUR_WAY = 60
-/** Riding up a lane: this far off its line still counts as on it, metres. */
-const ON_LANE = 15
 const LANDING_RING = [2.2, 2.9]
-const DEG = Math.PI / 180
-
-/**
- * Which jumps to mark for a bike at `at` heading `heading` (compass degrees):
- * the best few within reach, ahead, pointing much its way, the ones it's
- * heading straight at first. One it's already riding up (in `shown`) stays
- * until it's past the lip. Jumps in `except` are left out (a letter's gold
- * lane marks them instead); jumps a map feature built (a track's kickers,
- * ...) are marked whatever their score, before the found ones.
- */
-export function pickLanes(
-  jumps: readonly JumpSpot[],
-  at: { x: number; z: number },
-  heading: number,
-  settings: JumpGuideSettings,
-  shown: ReadonlySet<number>,
-  except: ReadonlySet<JumpSpot> = new Set(),
-): number[] {
-  const riding: number[] = []
-  const builtAhead: number[] = []
-  const ahead: number[] = []
-  const relevance = new Map<number, number>()
-  jumps.forEach((jump, i) => {
-    const designed = jump.source !== 'found'
-    if ((jump.score < settings.minScore && !designed) || except.has(jump)) return
-    const dx = Math.sin(jump.heading * DEG)
-    const dz = -Math.cos(jump.heading * DEG)
-    const fromLip = { x: at.x - jump.lip.x, z: at.z - jump.lip.z }
-    const pastLip = fromLip.x * dx + fromLip.z * dz
-    const offLine = Math.abs(fromLip.x * -dz + fromLip.z * dx)
-    if (shown.has(i) && pastLip < 0 && offLine < ON_LANE) {
-      riding.push(i)
-      return
-    }
-    const start = jump.runUp[0]
-    const toStart = Math.hypot(start.x - at.x, start.z - at.z)
-    if (toStart > settings.showWithin) return
-    const facing = Math.abs(turnBetween(Math.atan2(start.x - at.x, -(start.z - at.z)) / DEG, heading))
-    if (toStart > CLOSE && facing > AHEAD) return
-    const turn = Math.abs(turnBetween(jump.heading, heading))
-    if (turn > YOUR_WAY) return
-    // what you're heading straight at comes first: a good jump off to the side counts for less
-    relevance.set(i, jump.score * Math.cos(Math.min(facing, AHEAD) * DEG) * Math.cos(turn * DEG))
-    if (designed) builtAhead.push(i)
-    else ahead.push(i)
-  })
-  const byRelevance = (a: number, b: number) => relevance.get(b)! - relevance.get(a)!
-  return [...riding, ...builtAhead.sort(byRelevance), ...ahead.sort(byRelevance)].slice(0, Math.max(settings.lanes, riding.length))
-}
 
 export type Marker = THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
 
 export class JumpLanes {
   private lanes: Marker[] = []
   private rings: Marker[] = []
-  private shown = new Set<number>()
-  private untilRepick = 0
   private readonly group = new THREE.Group()
   private readonly arrows = arrowTexture()
 
@@ -109,18 +48,12 @@ export class JumpLanes {
     }
     this.group.clear()
     this.jumps = jumps
-    this.shown = new Set()
     this.build()
   }
 
-  /** Call once a frame with where the bike is and its compass heading; `except` are left to the letters' gold lanes. */
-  update(at: { x: number; z: number }, heading: number, dt: number, except: ReadonlySet<JumpSpot> = new Set()): void {
-    this.untilRepick -= dt
-    if (this.untilRepick <= 0) {
-      this.untilRepick = REPICK
-      this.shown = this.settings.show ? new Set(pickLanes(this.jumps, at, heading, this.settings, this.shown, except)) : new Set()
-    }
-    this.lanes.forEach((lane, i) => fadeMarker(lane, this.rings[i], this.shown.has(i), dt))
+  /** Call once a frame: they fade in when the debug view is switched on, and out when it's off. */
+  update(dt: number): void {
+    this.lanes.forEach((lane, i) => fadeMarker(lane, this.rings[i], this.settings.show, dt))
   }
 
   private build(): void {
@@ -232,9 +165,4 @@ export function arrowTexture(): THREE.DataTexture {
   texture.magFilter = THREE.LinearFilter
   texture.needsUpdate = true
   return texture
-}
-
-/** The way from heading `b` to heading `a`, -180 to 180 degrees. */
-function turnBetween(a: number, b: number): number {
-  return ((a - b + 540) % 360) - 180
 }

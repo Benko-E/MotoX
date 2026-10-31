@@ -2,20 +2,18 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { config } from '../src/config'
 import { initPhysics } from '../src/physics/world'
 import { GhostRider } from '../src/world/ghostRider'
-import { findJumps, type JumpSpot } from '../src/world/jumpFinder'
+import { measureJump, type JumpSpot } from '../src/world/jumps'
 import { DEG, flat, ground, kicker } from './physicsSetup'
 
 beforeAll(async () => {
   await initPhysics()
 })
 
-/** The smallest difference between two compass headings, degrees. */
-const turnBetween = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180)
 const settings = () => structuredClone(config)
 
 /** The kicker's jump riding up it (toward +x), as the finder sees it. */
 function kickerJump(): JumpSpot {
-  return findJumps(ground(kicker(), 300)).find((jump) => turnBetween(jump.heading, 90) < 15)!
+  return measureJump(ground(kicker(), 300), { x: 30, z: 0 }, 90, 95, 'test', 'fast') // its crest is at x = 30
 }
 
 describe('the ghost bike', () => {
@@ -64,7 +62,7 @@ describe('the ghost bike', () => {
       const h = x <= 0 ? 0 : x <= 10 ? x * Math.tan(40 * DEG) : Math.max(0, 10 * Math.tan(40 * DEG) - (x - 10) * Math.tan(60 * DEG))
       return h * across
     }, 400)
-    const jump = findJumps(steep).find((j) => turnBetween(j.heading, 90) < 15)!
+    const jump = measureJump(steep, { x: 10, z: 0 }, 90, 95, 'test', 'fast') // its crest is at x = 10
     const ride = new GhostRider(steep, settings()).ride(jump)
     expect(ride.landed, ride.reason).toBe(true)
     expect(ride.airtime).toBeGreaterThan(2)

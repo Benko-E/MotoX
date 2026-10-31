@@ -1,5 +1,5 @@
 import type { GhostRide } from './ghostRider'
-import type { JumpSpot, Point } from './jumpFinder'
+import type { JumpSpot, Point } from './jumps'
 
 /**
  * Where the letters go. The map round the middle is cut into slices like a
@@ -154,8 +154,8 @@ export function* placeLettersGradually(jumps: readonly JumpSpot[], plan: LetterP
   }
 
   for (let slice = 0; slice < slices; slice++) {
-    // easiest first, by the jump finder's guess at how much air each gives
-    const inSlice = bySlice[slice].sort((a, b) => a.score - b.score)
+    // easiest first, by how much air each gives
+    const inSlice = bySlice[slice].sort((a, b) => a.airtime - b.airtime)
     // jumps a map feature built are always tried: they're there to be used
     for (const jump of inSlice) if (jump.source !== 'found') yield* tryJump(jump, slice)
     for (const rung of rungs(inSlice.length)) {
@@ -172,7 +172,7 @@ export function* placeLettersGradually(jumps: readonly JumpSpot[], plan: LetterP
   // a letter with nowhere high enough to go: ride more, the biggest jumps first
   let spots = handOut(landed, wishes, slices)
   const untried = bySlice.flatMap((inSlice, slice) => inSlice.filter((jump) => !tried.has(jump)).map((jump) => ({ jump, slice })))
-  untried.sort((a, b) => b.jump.score - a.jump.score)
+  untried.sort((a, b) => b.jump.airtime - a.jump.airtime)
   for (let more = 0; spots.length < wishes.length && more < Math.min(MORE_RIDES, untried.length); more++) {
     if (yield* tryJump(untried[more].jump, untried[more].slice)) spots = handOut(landed, wishes, slices)
   }

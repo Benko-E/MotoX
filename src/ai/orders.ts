@@ -1,12 +1,12 @@
 /**
  * What an AI rider has been told to do: a list of plain orders, carried out
  * one at a time. The riding only ever does the current order and doesn't care
- * who gave it. Behaviours (like wandering, and later free roam, a race or a
- * letter hunt) refill the list when it runs dry, or push an urgent order to
- * the front; anything can give him orders the same way.
+ * who gave it. Behaviours (free roam, following the track, later a race or a
+ * letter hunt) refill the list when it runs dry, or change his plan for an
+ * urgent order; anything can give him orders the same way.
  */
 
-import type { JumpSpot } from '../world/jumpFinder'
+import type { JumpSpot } from '../world/jumps'
 import { turnBetween } from './riding'
 
 export type Order =
@@ -46,9 +46,10 @@ export class Orders {
     this.list.push(order)
   }
 
-  /** An urgent order: done next, before the rest. */
-  addFirst(order: Order): void {
-    this.list.unshift(order)
+  /** A change of plan: this order instead of all the others. */
+  instead(order: Order): void {
+    this.list.length = 0
+    this.list.push(order)
   }
 
   /** The current order is done (or given up): on to the next. */
@@ -61,25 +62,8 @@ export class Orders {
   }
 }
 
-/** Seconds of cruising between one spot and the next while wandering: from the first to the second. */
+/** Seconds of cruising between one spot and the next while roaming: from the first to the second. */
 const CRUISE_FOR = [3, 7]
-
-/** The simplest behaviour: ride to a random spot within the roam radius, cruise a bit, and again. */
-export class Wander implements Behaviour {
-  constructor(
-    /** Read live, so the tuning panel applies at once. */
-    readonly settings: { roamRadius: number },
-    private readonly random: () => number = Math.random,
-  ) {}
-
-  refill(orders: Orders, _rider?: RiderState): void {
-    // evenly over the round area, not bunched in the middle
-    const distance = Math.sqrt(this.random()) * this.settings.roamRadius
-    const bearing = this.random() * Math.PI * 2
-    orders.add({ kind: 'rideTo', x: Math.sin(bearing) * distance, z: -Math.cos(bearing) * distance })
-    orders.add({ kind: 'cruise', seconds: CRUISE_FOR[0] + this.random() * (CRUISE_FOR[1] - CRUISE_FOR[0]) })
-  }
-}
 
 export interface FreeRoamSettings {
   roamRadius: number
@@ -94,17 +78,25 @@ const DEG = Math.PI / 180
 const YOUR_WAY = 45
 /** A run-up starting closer than this is too close to line up for, metres. */
 const TOO_CLOSE = 15
+/** He thinks again about a jump he made up his mind about this long ago, seconds. */
+const RECONSIDER = 60
+/** A quarter whose middle is more than this many degrees off his heading is behind him. */
+const BEHIND = 90
 
 /**
  * Relaxed free riding: he rides off to the quarter of the map he's been to
- * least (within the roam radius), cruises a bit, and so on round the map.
+ * least (within the roam radius; one behind him counts as one more visit, so
+ * he'd rather not turn round for it), cruises a bit, and so on round the map.
  * Now and then, when a jump comes into view ahead of him pointing his way,
- * he goes for it: he makes up his mind once per jump, with the appetite as
- * the chance, and after a jump he cruises a while before going for another.
+ * he drops what he was doing and goes for it: he makes up his mind once per
+ * jump (for a minute), with the appetite as the chance, and after a jump he
+ * cruises a while before going for another.
  */
 export class FreeRoam implements Behaviour {
   private readonly visits = [0, 0, 0, 0]
-  private readonly considered = new Set<JumpSpot>()
+  /** The jumps he's made up his mind about, and when. */
+  private readonly considered = new Map<JumpSpot, number>()
+  private time = 0
   private sinceJump = Infinity
 
   constructor(
@@ -115,9 +107,15 @@ export class FreeRoam implements Behaviour {
     private readonly random: () => number = Math.random,
   ) {}
 
-  refill(orders: Orders, _rider?: RiderState): void {
+  refill(orders: Orders, rider: RiderState): void {
     // quarters: 0 north-west, 1 north-east, 2 south-west, 3 south-east
-    const quarter = this.visits.indexOf(Math.min(...this.visits))
+    const middle = this.settings.roamRadius / 2 / Math.SQRT2
+    const behind = (q: number) => {
+      const bearing = Math.atan2((q & 1 ? 1 : -1) * middle - rider.x, -((q & 2 ? 1 : -1) * middle - rider.z)) / DEG
+      return Math.abs(turnBetween(bearing, rider.heading)) > BEHIND ? 1 : 0
+    }
+    let quarter = 0
+    for (let q = 1; q < 4; q++) if (this.visits[q] + behind(q) < this.visits[quarter] + behind(quarter)) quarter = q
     this.visits[quarter]++
     const distance = Math.sqrt(this.random()) * this.settings.roamRadius
     const angle = this.random() * (Math.PI / 2)
@@ -129,6 +127,8 @@ export class FreeRoam implements Behaviour {
 
   watch(orders: Orders, rider: RiderState, dt: number): void {
     const { settings } = this
+    this.time += dt
+    for (const [jump, at] of this.considered) if (this.time - at > RECONSIDER) this.considered.delete(jump)
     if (orders.current?.kind === 'takeJump') {
       this.sinceJump = 0
       return
@@ -137,9 +137,10 @@ export class FreeRoam implements Behaviour {
     if (this.sinceJump < settings.jumpCooldown) return
     const spotted = this.jumpAhead(rider)
     if (!spotted) return
-    this.considered.add(spotted)
+    this.considered.set(spotted, this.time)
     if (this.random() >= settings.jumpAppetite) return
-    orders.addFirst({ kind: 'takeJump', jump: spotted })
+    // the rest of what he was doing is behind him once he's jumped: he picks again from where he lands
+    orders.instead({ kind: 'takeJump', jump: spotted })
     this.sinceJump = 0
   }
 
@@ -179,16 +180,18 @@ const KICKER_AGAIN = 20
 const ON_LINE = 35
 
 /**
- * Riding round the track: to a point a little further along it, the way he's
- * set to go, and again. Away from the track, that takes him to it first.
+ * Riding round the track: to a point a little further along it, the way the
+ * track runs, and again. Away from the track, that takes him to it first.
  */
 export class FollowTrack implements Behaviour {
   private readonly taken = new Map<JumpSpot, number>()
   private time = 0
+  /** How far out the track goes, worked out once per track. */
+  private reach: { line: readonly { x: number; z: number }[]; far: number } | null = null
 
   constructor(
-    /** Read live, so the tuning panel applies at once. */
-    readonly settings: { trackWay: string },
+    /** Which way round the track is ridden, read live from the map. */
+    private readonly way: () => 'clockwise' | 'counterclockwise',
     /** The track's line, its points about a metre apart going round clockwise; none if the map has no track. */
     private readonly line: () => readonly { x: number; z: number }[] | undefined,
     /** The jump stack: the track's own fast kickers are taken as jumps. */
@@ -208,7 +211,8 @@ export class FollowTrack implements Behaviour {
       const bearing = Math.atan2(start.x - rider.x, -(start.z - rider.z)) / DEG
       if (Math.abs(turnBetween(bearing, rider.heading)) > ON_LINE || Math.abs(turnBetween(jump.heading, rider.heading)) > ON_LINE) continue
       this.taken.set(jump, this.time)
-      orders.addFirst({ kind: 'takeJump', jump })
+      // the rest of his way round is behind him once he's jumped: he carries on from where he lands
+      orders.instead({ kind: 'takeJump', jump })
       return
     }
   }
@@ -223,7 +227,7 @@ export class FollowTrack implements Behaviour {
     for (let i = 1; i < line.length; i++) {
       if (Math.hypot(line[i].x - rider.x, line[i].z - rider.z) < Math.hypot(line[nearest].x - rider.x, line[nearest].z - rider.z)) nearest = i
     }
-    const step = this.settings.trackWay === 'counterclockwise' ? -1 : 1
+    const step = this.way() === 'counterclockwise' ? -1 : 1
     let at = nearest
     for (let gone = 0; gone < TRACK_AHEAD && Math.abs(at - nearest) < line.length; ) {
       const next = (((at + step) % line.length) + line.length) % line.length
@@ -234,9 +238,12 @@ export class FollowTrack implements Behaviour {
     orders.add({ kind: 'rideTo', x: line[at].x, z: line[at].z, onLine: true })
   }
 
-  area(): number {
-    const line = this.line() ?? []
-    return line.reduce((far, p) => Math.max(far, Math.hypot(p.x, p.z)), 0) + TRACK_AHEAD
+  /** No track: his roam radius, as anywhere else. */
+  area(): number | undefined {
+    const line = this.line()
+    if (!line?.length) return undefined
+    if (this.reach?.line !== line) this.reach = { line, far: line.reduce((far, p) => Math.max(far, Math.hypot(p.x, p.z)), 0) + TRACK_AHEAD }
+    return this.reach.far
   }
 }
 

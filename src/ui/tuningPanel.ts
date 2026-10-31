@@ -13,8 +13,6 @@ export interface PanelSection {
   choices?: Choices
   /** Hover help for each setting, by its full path in the file. */
   notes: Notes
-  /** Match notes on the setting's last name only (for lists, like a map's jumps). */
-  notesByName?: boolean
   /** Folders (full paths, like "bike.speed") that start open. Everything else starts closed. */
   open?: string[]
   /** Called after a value changes. `last` is true once a slider drag ends. */
@@ -88,7 +86,7 @@ export function createTuningPanel(sections: PanelSection[], graphs?: PanelGraphs
 
   for (const section of sections) {
     const inFile = (path: string) => [section.path, path].filter(Boolean).join('.')
-    const help = (path: string) => noteFor(section.notes, inFile(path), { lastNameOnly: section.notesByName })
+    const help = (path: string) => noteFor(section.notes, inFile(path))
     const isOpen = (path: string) => section.open?.includes(inFile(path)) ?? false
 
     const top = pane.addFolder({ title: section.title, expanded: isOpen('') })

@@ -3,7 +3,7 @@ import type { MapDef } from '../src/maps/types'
 import { heightAt, type Heightfield } from '../src/terrain/heightfield'
 import { generateTerrain } from '../src/terrain/generate'
 import { flattestSpotNear } from '../src/terrain/startingSpot'
-import { designedJumps, findJumps } from '../src/world/jumpFinder'
+import { featureJumps } from '../src/world/jumps'
 import { flat, ground } from './physicsSetup'
 
 /** A small flat test map; each test switches on the one thing it checks. */
@@ -186,7 +186,19 @@ describe('a loop channel', () => {
     expect(track(0, 0)).toBe(0) // the middle of the map
   })
 
-  it('owns its floor and banks, as the clearing owns its patch: found jumps keep off them', () => {
+  it('long straights round its jumps pull the line in from the loop: all of it is still carved', () => {
+    // four 150 m straights on a loop only 565 m round: they cut its corners, well inside the radius
+    const field = generateTerrain(testMap({ size: 300, channel: loop({ radius: 90, jumps: 4, jumpHeight: 4, jumpLength: 30, landingStraight: 3 }) }))
+    const n = field.samples
+    const line = field.trackLine!
+    const nearest = Math.min(...line.map((p) => Math.hypot(p.x, p.z)))
+    expect(nearest).toBeLessThan(70)
+    for (const p of line) expect(field.track![Math.round((p.z + field.size / 2) / field.cellSize) * n + Math.round((p.x + field.size / 2) / field.cellSize)], JSON.stringify(p)).toBe(1)
+    // and the kickers are shaped into it
+    for (const jump of field.trackJumps!) expect(heightAt(field, jump.x, jump.z)).toBeGreaterThan(3)
+  })
+
+  it('owns its floor and banks, as the clearing owns its patch', () => {
     const field = generateTerrain(big({ channel: loop(), clearing: { x: 0, z: 0, radius: 15, blend: 10, calm: 0.8 } }))
     const n = field.samples
     const owned = (x: number, z: number) => field.owned![Math.round((z + field.size / 2) / field.cellSize) * n + Math.round((x + field.size / 2) / field.cellSize)]
@@ -194,10 +206,6 @@ describe('a loop channel', () => {
     expect(owned(0, -48)).toBe(1) // on its bank
     expect(owned(0, 0)).toBe(1) // the clearing
     expect(owned(70, 70)).toBe(0) // the hills
-    // and nothing the finder finds starts, takes off or lands there
-    for (const jump of findJumps(field)) {
-      for (const p of [jump.runUp[0], jump.lip, jump.landing]) expect(owned(p.x, p.z), JSON.stringify(p)).toBe(0)
-    }
   })
 
   it('switched off, leaves the ground alone', () => {
@@ -208,19 +216,28 @@ describe('a loop channel', () => {
 
   it('builds jumps into its floor and registers them: exact, facing the way it is ridden, fast, and they throw you', () => {
     for (const [way, turn] of [['clockwise', 90], ['counterclockwise', -90]] as const) {
-      const field = generateTerrain(testMap({ size: 260, channel: loop({ way, radius: 80, jumps: 4, jumpHeight: 3, landingStraight: 3 }) }))
-      const jumps = designedJumps(field)
+      // kickers like the real ones: 4 m up, 30 m from foot to the bottom of the drop
+      const field = generateTerrain(testMap({ size: 300, channel: loop({ way, radius: 90, jumps: 4, jumpHeight: 4, jumpLength: 30, landingStraight: 3 }) }))
+      const jumps = featureJumps(field)
       expect(jumps).toHaveLength(4)
       for (const j of jumps) {
-        expect(j.source).toBe('channel')
+        expect(j.source).toBe('track')
         expect(j.kind).toBe('fast')
         expect(j.speed).toBe(80)
+        // along the track's own line where it takes off, the way the track is ridden (the line runs clockwise)
+        const line = field.trackLine!
+        let at = 0
+        for (let i = 1; i < line.length; i++) if (Math.hypot(line[i].x - j.lip.x, line[i].z - j.lip.z) < Math.hypot(line[at].x - j.lip.x, line[at].z - j.lip.z)) at = i
+        const next = line[(at + (way === 'clockwise' ? 1 : -1) + line.length) % line.length]
+        const along = Math.atan2(next.x - line[at].x, -(next.z - line[at].z)) / DEG
+        expect(Math.abs(((along - j.heading + 540) % 360) - 180), way).toBeLessThan(10)
+        // and round the middle the way it's ridden
         const bearing = Math.atan2(j.lip.x, -j.lip.z) / DEG
-        expect(Math.abs(((bearing + turn - j.heading + 540) % 360) - 180), way).toBeLessThan(10) // round the loop the way it's ridden
+        expect(Math.abs(((bearing + turn - j.heading + 540) % 360) - 180), way).toBeLessThan(45)
         expect(j.airtime).toBeGreaterThan(0.5) // it throws you
         // its run-up comes along the track to the lip
         expect(Math.hypot(j.runUp.at(-1)!.x - j.lip.x, j.runUp.at(-1)!.z - j.lip.z)).toBeLessThan(1.5)
-        expect(Math.hypot(j.runUp[0].x - j.lip.x, j.runUp[0].z - j.lip.z)).toBeGreaterThan(25)
+        expect(Math.hypot(j.runUp[0].x - j.lip.x, j.runUp[0].z - j.lip.z)).toBeGreaterThan(30) // plenty to line up on
       }
     }
   })

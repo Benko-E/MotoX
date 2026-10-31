@@ -13,8 +13,8 @@ const TRACK_EDGE = 3
 /** Round a channel jump the track runs straight at least this far before its face, metres (the jump finder looks this far back), and eases from curve to straight over this share of a jump length. */
 const STRAIGHT_RUN_IN = 30
 const STRAIGHT_EASE = 0.5
-/** A channel jump's run-up, as registered: this many points (metres) of the track's line before its lip. */
-const TRACK_RUN_UP = 30
+/** A channel jump's run-up, as registered: this many metres of the track's line before its crest (you take off up to 20 m before it). */
+const TRACK_RUN_UP = 50
 /** A channel jump's lip is rounded over about this far, metres. */
 const LIP_ROUND = 3
 /** A channel jump climbs over this share of its length, and drops away over the rest. */
@@ -133,10 +133,12 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
       if (u < jumpLength && (lip < 0 || rounded[k] > rounded[lip])) lip = k
     }
     const next = (lip + way + count) % count
-    const runUp: { x: number; z: number }[] = []
-    for (let back = TRACK_RUN_UP; back >= 0; back--) {
-      const k = (lip - way * back + 2 * count) % count
-      runUp.push({ x: xs[k], z: zs[k] })
+    const runUp = [{ x: xs[lip], z: zs[lip] }]
+    for (let k = lip, metres = 0; metres < TRACK_RUN_UP; ) {
+      const before = (k - way + count) % count
+      metres += Math.hypot(xs[k] - xs[before], zs[k] - zs[before])
+      runUp.unshift({ x: xs[before], z: zs[before] })
+      k = before
     }
     return { x: xs[lip], z: zs[lip], heading: (Math.atan2(xs[next] - xs[lip], -(zs[next] - zs[lip])) * 180) / Math.PI, runUp, speed: ch.jumpSpeed }
   })
@@ -146,19 +148,37 @@ function carveChannel(map: MapDef, noise: Noise2D, field: Heightfield): void {
   const track = (field.track ??= new Float32Array(n * n))
   const owned = (field.owned ??= new Uint8Array(n * n))
   const reach = ch.width / 2 + Math.max(ch.banks, TRACK_EDGE)
-  const outer = ch.radius * (1 + ch.winding) + reach
+  // how far in and out the line really runs: the straights round the jumps cut its corners
+  const bucket = (x: number, z: number) => Math.round(((Math.atan2(x - middle.x, -(z - middle.z)) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI) * count) % count
+  let inner = Infinity
+  let outer = 0
+  let closest = Infinity
+  const atBearing = new Int32Array(count).fill(-1)
+  for (let k = 0; k < count; k++) {
+    const r = Math.hypot(xs[k] - middle.x, zs[k] - middle.z)
+    inner = Math.min(inner, r - reach)
+    outer = Math.max(outer, r + reach)
+    closest = Math.min(closest, Math.hypot(xs[(k + 1) % count] - xs[k], zs[(k + 1) % count] - zs[k]))
+    atBearing[bucket(xs[k], zs[k])] = k
+  }
+  // the point of the line at each bearing from the middle (a straight bunches its points up, leaving gaps between)
+  let last = -1
+  for (let b = count - 1; b >= 0 && last < 0; b--) last = atBearing[b]
+  for (let b = 0; b < count; b++) {
+    if (atBearing[b] < 0) atBearing[b] = last
+    else last = atBearing[b]
+  }
   const toIndex = (w: number) => (w + field.size / 2) / field.cellSize
   // the nearest point of the line is within this many points of the one at the same bearing
-  const window = Math.ceil((reach / Math.max(ch.radius * (1 - ch.winding), 1)) * (count / (2 * Math.PI))) + 2
+  const window = Math.ceil((2 * reach) / Math.max(closest, 0.1)) + 2
   for (let iz = Math.max(0, Math.floor(toIndex(middle.z - outer))); iz <= Math.min(n - 1, Math.ceil(toIndex(middle.z + outer))); iz++) {
     for (let ix = Math.max(0, Math.floor(toIndex(middle.x - outer))); ix <= Math.min(n - 1, Math.ceil(toIndex(middle.x + outer))); ix++) {
       const x = sampleCoord(field, ix)
       const z = sampleCoord(field, iz)
       const fromMiddle = Math.hypot(x - middle.x, z - middle.z)
-      if (fromMiddle > outer || fromMiddle < ch.radius * (1 - ch.winding) - reach) continue
+      if (fromMiddle > outer || fromMiddle < inner) continue
       // the nearest point of the line: it's round about the same bearing
-      const bearing = Math.atan2(x - middle.x, -(z - middle.z))
-      const guess = Math.round(((bearing + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI) * count) % count
+      const guess = atBearing[bucket(x, z)]
       if (Math.abs(fromMiddle - Math.hypot(xs[guess] - middle.x, zs[guess] - middle.z)) > reach * 2) continue // nowhere near it
       // every 4th point first, then the ones either side of the best of those
       let nearest = Infinity

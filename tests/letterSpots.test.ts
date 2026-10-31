@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GhostRide } from '../src/world/ghostRider'
-import type { JumpSpot } from '../src/world/jumpFinder'
+import type { JumpSpot } from '../src/world/jumps'
 import { placeLetters, placeLettersGradually, pointAlong, reachGap, sliceOf, sliceTurn, type LetterPlan } from '../src/world/letterSpots'
 
 const DEG = Math.PI / 180
@@ -26,11 +26,9 @@ function jump(bearing: number, distance: number, air: number, top = 5): JumpSpot
     lip: { x, y: 0, z },
     heading: bearing,
     runUp: [{ x: x - dx * 30, y: 0, z: z - dz * 30 }, { x, y: 0, z }],
-    lipAngle: 20,
     speed: 70,
     airtime: air,
     landing: { x: x + dx * 30, y: 0, z: z + dz * 30 },
-    score: air,
     source: 'found',
     kind: air >= 2.5 ? 'bigAir' : 'fast',
   } as JumpSpot

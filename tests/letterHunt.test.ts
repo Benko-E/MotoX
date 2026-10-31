@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { config } from '../src/config'
-import type { JumpSpot } from '../src/world/jumpFinder'
+import type { JumpSpot } from '../src/world/jumps'
 import { LetterHunt } from '../src/world/letterHunt'
 import { pointAlong, type LetterSpot } from '../src/world/letterSpots'
 

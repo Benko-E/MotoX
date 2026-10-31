@@ -16,7 +16,6 @@ import type { Choices, Ranges } from './ui/tunables'
 export const AI_BEHAVIOURS = ['freeRoam', 'followTrack'] as const
 export type AiBehaviour = (typeof AI_BEHAVIOURS)[number]
 export const TRACK_WAYS = ['clockwise', 'counterclockwise'] as const
-export type TrackWay = (typeof TRACK_WAYS)[number]
 
 export const config = {
   /** The bike you ride. */
@@ -226,21 +225,13 @@ export const config = {
   },
 
   /**
-   * A debug view of the jump stack: a pink lane with arrows up the run-up of
-   * the best few jumps near whoever you're watching, ahead and pointing their
-   * way, plus a ring where they'd land. Jumps the map's features built come
-   * first, then the ones found in the hills. Only drawn: nothing about riding
-   * changes.
+   * A debug view of the jumps the map's features built: a pink lane with
+   * arrows up each run-up and a ring where you'd land. Only drawn: nothing
+   * about riding changes.
    */
   jumpGuide: {
     /** Show the lanes (a debug view). */
     show: false,
-    /** How many lanes are shown at once, at most. */
-    lanes: 3,
-    /** Only jumps whose run-up starts within this distance of you, metres. */
-    showWithin: 400,
-    /** Only jumps at least this good: about the seconds of air they give, less for cutting across the hill or a hard landing. */
-    minScore: 2,
   },
 
   /**
@@ -249,8 +240,8 @@ export const config = {
    * letter is on a jump that can really be done and landed.
    */
   letters: {
-    /** Show the letters at all. */
-    show: true,
+    /** Show the letters at all. Off for now: they'll become part of the big air feature. */
+    show: false,
     /** How far from the middle their jumps may be, run-up to landing, metres. (The wall at the edge starts at 400.) */
     spread: 350,
     /** Grabbed letters come back after a while, for trying them again. */
@@ -286,8 +277,6 @@ export const config = {
     names: ['Helga'],
     /** What they do: roam free (taking a jump now and then), or follow the track round. */
     behaviour: 'followTrack' as AiBehaviour,
-    /** Following the track, which way round. The track's jumps face clockwise: the other way they're steep step-ups. */
-    trackWay: 'counterclockwise' as TrackWay,
     /** How fast they ride when just getting about, km/h. */
     cruiseSpeed: 45,
     /** They stay within this far of the middle of the map, metres, going round every quarter of it. */
@@ -428,14 +417,10 @@ export const EARTH_GRAVITY = 9.81
 export const configChoices: Choices = {
   'hud.*.anchor': ANCHORS,
   'ai.behaviour': AI_BEHAVIOURS,
-  'ai.trackWay': TRACK_WAYS,
 }
 
 export const configRanges: Ranges = {
   'hud.size': [0.4, 2.5, 0.05],
-  'jumpGuide.lanes': [1, 20, 1],
-  'jumpGuide.showWithin': [50, 600, 10],
-  'jumpGuide.minScore': [0, 4, 0.05],
   'letters.spread': [100, 500, 10],
   'letters.each.*.difficulty': [0, 1, 0.05],
   'letters.each.*.along': [0, 1, 0.01],

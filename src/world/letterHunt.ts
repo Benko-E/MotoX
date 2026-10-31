@@ -1,5 +1,5 @@
 import type { LetterSettings } from '../config'
-import type { Point } from './jumpFinder'
+import type { Point } from './jumps'
 import { pointAlong, type LetterSpot } from './letterSpots'
 
 /** Moving further than this between two frames is the bike being put somewhere else, not riding: nothing in between is grabbed, metres. */

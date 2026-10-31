@@ -87,11 +87,6 @@ describe('noteFor', () => {
   it('borrows from the parent only, not from further up', () => {
     expect(noteFor(notes, 'bike.speed.noNote')).toBeUndefined() // not "The bike you ride."
   })
-
-  it('can match on the last name alone, for lists like a map\'s jumps', () => {
-    const shapes = { lipAngle: 'Steepness at the top.' }
-    expect(noteFor(shapes, 'lips.3.lipAngle', { lastNameOnly: true })).toBe('Steepness at the top.')
-  })
 })
 
 describe('humanize', () => {

@@ -2,10 +2,11 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { config } from '../src/config'
 import { LETTER_HEIGHT, LetterView, letterShape } from '../src/render/letterView'
-import type { JumpSpot } from '../src/world/jumpFinder'
+import type { JumpSpot } from '../src/world/jumps'
 import { pointAlong, type LetterSpot } from '../src/world/letterSpots'
 
-const settings = () => structuredClone(config.letters)
+/** The letters, switched on (they're off by default for now). */
+const settings = () => ({ ...structuredClone(config.letters), show: true })
 /** A flight over x = 0 to 20, its top 10 m up at x = 10. */
 const flight = Array.from({ length: 21 }, (_, i) => ({ x: i, y: 10 - 0.1 * (i - 10) ** 2, z: 5 }))
 const spot = (letter: number): LetterSpot => ({ letter, slice: letter, jump: {} as JumpSpot, flight, difficulty: letter / 4 })

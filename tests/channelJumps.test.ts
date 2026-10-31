@@ -5,7 +5,7 @@ import { initPhysics } from '../src/physics/world'
 import { generateTerrain } from '../src/terrain/generate'
 import type { Heightfield } from '../src/terrain/heightfield'
 import { GhostRider } from '../src/world/ghostRider'
-import { designedJumps } from '../src/world/jumpFinder'
+import { featureJumps } from '../src/world/jumps'
 
 beforeAll(async () => {
   await initPhysics()
@@ -29,8 +29,10 @@ describe('the channel jumps, ridden by the ghost', () => {
       const field = generateTerrain(map)
       const ghost = new GhostRider(field, structuredClone(config))
       // the track's kickers as the map registered them: along its own line, at the speed they're built for
-      for (const spot of designedJumps(field)) {
+      for (const spot of featureJumps(field)) {
         const ride = ghost.ride(spot)
+        // and the jump's own measure of its flight agrees with the ride
+        if (ride.landed) expect(Math.abs(spot.airtime - ride.airtime), `seed ${seed}`).toBeLessThan(0.35)
         const down = ride.flight.at(-1)
         if (!down || ride.reason === 'never took off') continue // a kicker on a downhill may barely lift you: still on the line
         flown++

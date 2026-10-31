@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { config } from '../src/config'
 import { LetterLanes } from '../src/render/letterLanes'
 import { heightAt } from '../src/terrain/heightfield'
-import type { JumpSpot } from '../src/world/jumpFinder'
+import type { JumpSpot } from '../src/world/jumps'
 import type { LetterSpot } from '../src/world/letterSpots'
 import { DEG, ground } from './physicsSetup'
 
-const settings = () => structuredClone(config.letters)
+/** The letters, switched on (they're off by default for now). */
+const settings = () => ({ ...structuredClone(config.letters), show: true })
 const field = ground((x) => Math.max(0, x) * Math.tan(15 * DEG), 300)
 const groundAt = (x: number, z: number) => heightAt(field, x, z)
 const none = [false, false, false, false, false]
