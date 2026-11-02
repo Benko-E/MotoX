@@ -6,6 +6,10 @@ import { SETTINGS, TABS } from './settings/list'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 
+/** Seconds the bike takes to lean over into a turn, and back up. */
+const LEAN_TIME = 0.15
+const DEG = Math.PI / 180
+
 /** The browser's storage, or none where it's blocked (settings then last only this visit). */
 let storage: Storage | null = null
 try {
@@ -73,6 +77,8 @@ const bike = new BikeModel()
 scene.add(bike.root)
 const ride = new Ride()
 const lines = new RideLines(scene, SETTINGS, store)
+/** How far the bike is drawn leaning, radians (positive = right). Only drawn: the riding ignores it. */
+let lean = 0
 
 const input: Input = { throttle: false, brake: false, left: false, right: false }
 const KEYS: Record<string, keyof Input> = { KeyW: 'throttle', KeyS: 'brake', KeyA: 'left', KeyD: 'right' }
@@ -111,7 +117,12 @@ renderer.setAnimationLoop(() => {
   }
   ride.step(input, tune, dt, WHEEL_RADIUS)
   bike.root.position.set(ride.x, 0, ride.z)
-  bike.root.rotation.y = -ride.heading
+  // Lean into turns, more the harder the tyres are pushing sideways: all
+  // the way to Max lean when they're at their grip.
+  const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / (store.get('bike.grip') * 9.81)
+  const leanTarget = Math.sign(ride.turnRate) * Math.min(sideways, 1) * store.get('bike.maxLean') * DEG
+  lean += (leanTarget - lean) * (1 - Math.exp(-dt / LEAN_TIME))
+  bike.root.rotation.set(0, -ride.heading, -lean, 'YXZ') // leaning about where the tyres touch the ground
   bike.update(ride.wheelAngle, ride.spin)
   lines.update(ride)
 

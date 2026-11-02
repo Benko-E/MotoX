@@ -41,6 +41,11 @@ export const SETTINGS: Setting[] = [
     note: 'How hard the tyres can push sideways. Sets how wide you turn at speed: the faster, the wider. Real tyres on dirt manage about 1.',
   },
   {
+    kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Lean (looks only)',
+    min: 0, max: 60, step: 1, default: 35, unit: '°',
+    note: 'How far the bike leans into a turn when the tyres are at their grip; gentler turns lean less. Only drawn: it does not change how the bike turns.',
+  },
+  {
     kind: 'line', id: 'line.forward', name: 'Forward', tab: 'Bike', section: 'Debug lines',
     default: false, color: 0x2ee66b,
     note: 'From the front wheel, the way the bike is going. Longer is faster.',
