@@ -13,6 +13,11 @@ import { WHEELBASE } from './bike/bikeModel'
  * A/D ask for a share of that tightest turn: all of it held, none let go,
  * swinging between them over barsSwing. So turning in and straightening up
  * are equally quick at any speed.
+ *
+ * Up and down, just as simple: on the ground the bike follows it, and leaves
+ * it wherever the ground drops away faster than gravity could pull the bike
+ * down after it (off a ramp's lip). In the air, gravity pulls it down and
+ * nothing else changes: no throttle, brakes or turning until it lands.
  */
 export const HANDLING = {
   /** Fastest backwards, holding S from a stop, km/h. */
@@ -47,11 +52,28 @@ export interface Input {
 const KMH = 1 / 3.6
 const DEG = Math.PI / 180
 const G = 9.81
+/** How far ahead and behind the bike the ground is felt to find its slope, metres. */
+const SLOPE_FEEL = 0.3
+/** Air shorter than this is a bump, not a jump: the airtime isn't shown, seconds. */
+export const MIN_AIRTIME = 0.15
+
+/** The height of the ground at a point, metres. */
+export type Ground = (x: number, z: number) => number
 
 export class Ride {
-  /** Where the bike is on the ground, metres. */
+  /** Where the bike is, metres: across the ground, and its height (of the ground under the middle of the bike while on it). */
   x = 0
   z = 0
+  y = 0
+  /** How fast it's going up, m/s (negative coming down). */
+  vy = 0
+  /** Whether it's in the air, and its speed along the ground while it is, m/s. */
+  airborne = false
+  private airSpeed = 0
+  /** How long it's been in the air this jump (or was, once landed), seconds. */
+  airtime = 0
+  /** How far its nose points up, radians: along the ground's slope, or the way it's flying. */
+  pitch = 0
   /** Which way it points, radians: 0 toward -z, growing as it turns right. */
   heading = 0
   /** Forward speed, m/s (negative rolling backwards). */
@@ -75,8 +97,12 @@ export class Ride {
   /** How far the wheels have rolled, radians. */
   spin = 0
 
-  step(input: Input, tune: Tuning, dt: number, radius: number): void {
+  step(input: Input, tune: Tuning, dt: number, radius: number, ground: Ground): void {
     const h = HANDLING
+    if (this.airborne) {
+      this.fly(dt, radius, ground)
+      return
+    }
     const top = tune.topSpeed * KMH
     const hundred = 100 * KMH
     const before = this.speed
@@ -113,8 +139,49 @@ export class Ride {
     this.turnRate = rate / DEG
     this.heading += rate * dt
 
-    this.x += Math.sin(this.heading) * this.speed * dt
-    this.z -= Math.cos(this.heading) * this.speed * dt
+    // Along the ground: up or down a slope, part of the speed goes into climbing.
+    const sin = Math.sin(this.heading)
+    const cos = Math.cos(this.heading)
+    const slope = (ground(this.x + sin * SLOPE_FEEL, this.z - cos * SLOPE_FEEL) - ground(this.x - sin * SLOPE_FEEL, this.z + cos * SLOPE_FEEL)) / (2 * SLOPE_FEEL)
+    const across = this.speed / Math.sqrt(1 + slope * slope)
+    this.x += sin * across * dt
+    this.z -= cos * across * dt
     this.spin += (this.speed * dt) / radius
+    this.pitch = Math.atan(slope)
+
+    // Following the ground takes this upward speed; if gravity can't pull the
+    // bike down that fast, it leaves the ground with the speed it had.
+    const height = ground(this.x, this.z)
+    const follow = (height - this.y) / dt
+    if (follow < this.vy - G * dt) {
+      this.airborne = true
+      this.airSpeed = across
+      this.airtime = 0
+      this.vy -= G * dt
+      this.y += this.vy * dt
+    } else {
+      this.y = height
+      this.vy = follow
+    }
+  }
+
+  /** A step in the air: gravity pulls it down, the rest carries on as it left the ground. */
+  private fly(dt: number, radius: number, ground: Ground): void {
+    this.vy -= G * dt
+    this.x += Math.sin(this.heading) * this.airSpeed * dt
+    this.z -= Math.cos(this.heading) * this.airSpeed * dt
+    this.y += this.vy * dt
+    this.spin += (this.speed * dt) / radius
+    this.airtime += dt
+    this.pitch = Math.atan2(this.vy, Math.abs(this.airSpeed))
+    Object.assign(this, { steer: 0, steering: 0, bars: 0, wheelAngle: 0, turnRate: 0, turnRadius: Infinity, limit: null, slowing: 0 })
+
+    const height = ground(this.x, this.z)
+    if (this.y <= height) {
+      this.airborne = false
+      this.y = height
+      this.vy = 0
+      this.speed = Math.sign(this.speed) * Math.abs(this.airSpeed)
+    }
   }
 }

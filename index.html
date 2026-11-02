@@ -40,6 +40,23 @@
       #turn[hidden] {
         display: none;
       }
+      #airtime {
+        position: fixed;
+        top: 12%;
+        left: 50%;
+        transform: translateX(-50%);
+        font: 56px/1 Impact, 'Arial Black', sans-serif;
+        color: #fff;
+        text-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+        pointer-events: none;
+      }
+      #airtime[hidden] {
+        display: none;
+      }
+      /* frozen on the last jump's time once landed */
+      #airtime.landed {
+        color: #ffc21a;
+      }
       #help {
         position: fixed;
         top: 8%;
@@ -93,6 +110,7 @@
     <div id="app"></div>
     <div id="hud"></div>
     <div id="turn" hidden></div>
+    <div id="airtime" hidden></div>
     <div id="help">
       <h1>MOTO<span>X</span></h1>
       <dl>

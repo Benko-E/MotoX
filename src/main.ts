@@ -1,13 +1,20 @@
 import * as THREE from 'three'
 import { BikeModel, WHEEL_RADIUS } from './bike/bikeModel'
 import { RideLines } from './debug/rideLines'
-import { Ride, type Input, type Tuning } from './ride'
+import { MIN_AIRTIME, Ride, type Input, type Tuning } from './ride'
 import { SETTINGS, TABS } from './settings/list'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
+import { Ramp, type RampShape } from './world/ramp'
 
 /** Seconds the bike takes to lean over into a turn, and back up. */
 const LEAN_TIME = 0.15
+/** Seconds the bike takes to pitch to a new slope, or to the way it's flying. */
+const PITCH_TIME = 0.06
+/** Seconds the camera takes to follow the bike up and down. */
+const CAMERA_RISE = 0.15
+/** Seconds the airtime stays on screen after landing. */
+const AIRTIME_SHOWN = 3
 const DEG = Math.PI / 180
 
 /** The browser's storage, or none where it's blocked (settings then last only this visit). */
@@ -56,12 +63,31 @@ dirt.wrapS = dirt.wrapT = THREE.RepeatWrapping
 dirt.repeat.set(100, 100) // one tile every 4 m
 dirt.colorSpace = THREE.SRGBColorSpace
 dirt.anisotropy = renderer.capabilities.getMaxAnisotropy()
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ map: dirt, roughness: 1 }))
+const dirtMaterial = new THREE.MeshStandardMaterial({ map: dirt, roughness: 1 })
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), dirtMaterial)
 ground.rotation.x = -Math.PI / 2
 ground.receiveShadow = true
 scene.add(ground)
 
-// Cones scattered about, something to ride round.
+// The test ramp, shaped in the debug menu's Temporary tab: a touch darker, packed dirt.
+const rampShape = (): RampShape => ({
+  angle: store.get('ramp.angle'),
+  height: store.get('ramp.height'),
+  width: store.get('ramp.width'),
+  top: store.get('ramp.top'),
+  landing: store.get('ramp.landing'),
+  distance: store.get('ramp.distance'),
+})
+const rampMaterial = new THREE.MeshStandardMaterial({ map: dirt.clone(), color: 0xd9c2a0, roughness: 1 })
+rampMaterial.map!.repeat.set(1, 1)
+rampMaterial.map!.needsUpdate = true
+const ramp = new Ramp(scene, rampShape(), rampMaterial)
+store.onChange((id) => {
+  if (id.startsWith('ramp.')) ramp.build(rampShape())
+})
+const groundAt = (x: number, z: number) => ramp.heightAt(x, z)
+
+// Cones scattered about, something to ride round (none in the ramp's lane).
 const cone = new THREE.ConeGeometry(0.25, 0.7, 12).translate(0, 0.35, 0)
 const orange = new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.6 })
 for (let i = 0; i < 120; i++) {
@@ -69,6 +95,7 @@ for (let i = 0; i < 120; i++) {
   const r = 8 + Math.random() * 150
   const a = Math.random() * Math.PI * 2
   mesh.position.set(Math.cos(a) * r, 0, Math.sin(a) * r)
+  if (Math.abs(mesh.position.x) < 12 && mesh.position.z < 0) continue
   mesh.castShadow = true
   scene.add(mesh)
 }
@@ -79,6 +106,8 @@ const ride = new Ride()
 const lines = new RideLines(scene, SETTINGS, store)
 /** How far the bike is drawn leaning, radians (positive = right). Only drawn: the riding ignores it. */
 let lean = 0
+/** How far the bike is drawn pitched nose up, radians: follows the ride's pitch, smoothed. */
+let pitch = 0
 
 const input: Input = { throttle: false, brake: false, left: false, right: false }
 const KEYS: Record<string, keyof Input> = { KeyW: 'throttle', KeyS: 'brake', KeyA: 'left', KeyD: 'right' }
@@ -87,7 +116,7 @@ const setKey = (event: KeyboardEvent, down: boolean) => {
   const key = KEYS[event.code]
   if (key) input[key] = down
   if (down && key) document.getElementById('help')!.hidden = true
-  if (down && event.code === 'KeyR') Object.assign(ride, { x: 0, z: 0, heading: 0, speed: 0 })
+  if (down && event.code === 'KeyR') Object.assign(ride, { x: 0, z: 0, y: 0, vy: 0, heading: 0, speed: 0, airborne: false })
 }
 addEventListener('keydown', (event) => setKey(event, true))
 addEventListener('keyup', (event) => setKey(event, false))
@@ -102,8 +131,12 @@ addEventListener('resize', resize)
 resize()
 
 const hud = document.getElementById('hud')!
-/** Which way the camera looks from, radians; it swings round after the bike's heading. */
+const airtime = document.getElementById('airtime')!
+/** Seconds since the last landing, for how long the airtime stays up. */
+let sinceLanding = Infinity
+/** Which way the camera looks from, radians; it swings round after the bike's heading; and how high it follows. */
 let cameraHeading = 0
+let cameraY = 0
 const clock = new THREE.Clock()
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1)
@@ -115,25 +148,37 @@ renderer.setAnimationLoop(() => {
     frontWheelLock: store.get('bike.frontWheelLock'),
     grip: store.get('bike.grip'),
   }
-  ride.step(input, tune, dt, WHEEL_RADIUS)
-  bike.root.position.set(ride.x, 0, ride.z)
+  const wasAirborne = ride.airborne
+  ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)
+  bike.root.position.set(ride.x, ride.y, ride.z)
+  pitch += (ride.pitch - pitch) * (1 - Math.exp(-dt / PITCH_TIME))
   // Lean into turns, more the harder the tyres are pushing sideways: all
   // the way to Max lean when they're at their grip.
   const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / (store.get('bike.grip') * 9.81)
   const leanTarget = Math.sign(ride.turnRate) * Math.min(sideways, 1) * store.get('bike.maxLean') * DEG
   lean += (leanTarget - lean) * (1 - Math.exp(-dt / LEAN_TIME))
-  bike.root.rotation.set(0, -ride.heading, -lean, 'YXZ') // leaning about where the tyres touch the ground
+  bike.root.rotation.set(pitch, -ride.heading, -lean, 'YXZ') // leaning about where the tyres touch the ground
   bike.update(ride.wheelAngle, ride.spin)
   lines.update(ride)
 
   const lag = store.get('camera.lag')
   cameraHeading = lag > 0 ? cameraHeading + (ride.heading - cameraHeading) * (1 - Math.exp(-dt / lag)) : ride.heading
   const back = store.get('camera.back')
-  camera.position.set(ride.x - Math.sin(cameraHeading) * back, store.get('camera.up'), ride.z + Math.cos(cameraHeading) * back)
-  camera.lookAt(ride.x, 0.9, ride.z)
+  cameraY += (ride.y - cameraY) * (1 - Math.exp(-dt / CAMERA_RISE))
+  camera.position.set(ride.x - Math.sin(cameraHeading) * back, cameraY + store.get('camera.up'), ride.z + Math.cos(cameraHeading) * back)
+  camera.lookAt(ride.x, cameraY + 0.9, ride.z)
 
-  sun.position.set(ride.x + 10, 20, ride.z + 6)
-  sun.target.position.set(ride.x, 0, ride.z)
+  sun.position.set(ride.x + 10, ride.y + 20, ride.z + 6)
+  sun.target.position.set(ride.x, ride.y, ride.z)
+
+  // Airtime: ticks up in the middle of the screen while in the air, and
+  // stays up a few seconds after landing to show how long the jump was.
+  const jumped = wasAirborne && !ride.airborne && ride.airtime >= MIN_AIRTIME
+  sinceLanding = jumped ? 0 : sinceLanding + dt
+  const flying = ride.airborne && ride.airtime >= MIN_AIRTIME
+  airtime.hidden = !flying && sinceLanding > AIRTIME_SHOWN
+  airtime.classList.toggle('landed', !flying)
+  if (flying || jumped) airtime.textContent = `${ride.airtime.toFixed(2)} s`
   hud.textContent = `${Math.round(Math.abs(ride.speed) * 3.6)} km/h`
   renderer.render(scene, camera)
 })

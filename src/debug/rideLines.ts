@@ -60,14 +60,14 @@ export class RideLines {
 
   update(ride: Ride): void {
     const forward = new THREE.Vector3(Math.sin(ride.heading), 0, -Math.cos(ride.heading))
-    const frontWheel = new THREE.Vector3(ride.x, WHEEL_RADIUS, ride.z).addScaledVector(forward, WHEELBASE / 2)
+    const frontWheel = new THREE.Vector3(ride.x, ride.y + WHEEL_RADIUS, ride.z).addScaledVector(forward, WHEELBASE / 2)
 
     // Forward: the way the bike is going, longer the faster.
     const going = ride.speed < 0 ? -1 : 1
     this.show('line.forward', frontWheel, this.dir.copy(forward).multiplyScalar(going), 0.5 + Math.abs(ride.speed) * PER_SPEED)
 
     // Slowing down: backwards from the centre of mass, longer the harder it slows.
-    this.from.set(ride.x, CENTRE_OF_MASS.up, ride.z).addScaledVector(forward, -CENTRE_OF_MASS.back)
+    this.from.set(ride.x, ride.y + CENTRE_OF_MASS.up, ride.z).addScaledVector(forward, -CENTRE_OF_MASS.back)
     const length = ride.slowing * PER_SLOWING
     this.show('line.braking', this.from, this.dir.copy(forward).multiplyScalar(-going), length, length > 0.02)
 
@@ -82,7 +82,7 @@ export class RideLines {
     if (this.circle.visible) {
       const side = Math.sign(ride.wheelAngle)
       const right = this.dir.set(Math.cos(ride.heading), 0, Math.sin(ride.heading))
-      this.circle.position.set(ride.x, CIRCLE_LIFT, ride.z).addScaledVector(right, side * ride.turnRadius)
+      this.circle.position.set(ride.x, ride.y + CIRCLE_LIFT, ride.z).addScaledVector(right, side * ride.turnRadius)
       this.circle.scale.setScalar(ride.turnRadius)
     }
 

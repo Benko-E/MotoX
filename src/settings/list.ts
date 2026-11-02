@@ -1,7 +1,7 @@
 import type { Setting } from './types'
 
 /** The debug menu's tabs, left to right. */
-export const TABS = ['Bike', 'Camera'] as const
+export const TABS = ['Bike', 'Camera', 'Temporary'] as const
 
 /**
  * Every setting in the debug menu, in the order it's shown. The defaults
@@ -84,5 +84,34 @@ export const SETTINGS: Setting[] = [
     kind: 'slider', id: 'camera.lag', name: 'Swing lag', tab: 'Camera', section: 'Chase camera',
     min: 0, max: 1.5, step: 0.01, default: 0.25, unit: 's',
     note: 'How long the camera takes to swing round behind the bike after a turn. 0 is locked on.',
+  },
+  // Temporary: things here for trying out, not to stay
+  {
+    kind: 'slider', id: 'ramp.angle', name: 'Ramp angle', tab: 'Temporary', section: 'Ramp',
+    min: 5, max: 60, step: 1, default: 25, unit: '°',
+    note: 'How steep the run-up rises.',
+  },
+  {
+    kind: 'slider', id: 'ramp.height', name: 'Height', tab: 'Temporary', section: 'Ramp',
+    min: 0.3, max: 8, step: 0.1, default: 2, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'ramp.width', name: 'Width', tab: 'Temporary', section: 'Ramp',
+    min: 1, max: 20, step: 0.5, default: 6, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'ramp.top', name: 'Flat top', tab: 'Temporary', section: 'Ramp',
+    min: 0, max: 30, step: 0.5, default: 4, unit: 'm',
+    note: 'How much flat top there is after the lip, before the back side drops. 0 is a pointy kicker.',
+  },
+  {
+    kind: 'slider', id: 'ramp.landing', name: 'Back side angle', tab: 'Temporary', section: 'Ramp',
+    min: 5, max: 60, step: 1, default: 20, unit: '°',
+    note: 'How steep the back side drops: land on it for a smooth landing.',
+  },
+  {
+    kind: 'slider', id: 'ramp.distance', name: 'Distance', tab: 'Temporary', section: 'Ramp',
+    min: 5, max: 150, step: 1, default: 40, unit: 'm',
+    note: 'How far ahead of the start (R) the run-up begins: more room to build speed.',
   },
 ]

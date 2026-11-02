@@ -4,7 +4,9 @@ type Saved = { values: Record<string, number>; lines: Record<string, boolean> }
 
 /**
  * Holds every setting's current value. Tells listeners the moment anything
- * changes and saves to the browser so a reload keeps it.
+ * changes and saves to the browser so a reload keeps it. Only values changed
+ * from their defaults are saved, so a new default reaches every browser that
+ * hasn't changed that setting.
  */
 export class SettingsStore {
   private readonly byId = new Map<string, Setting>()
@@ -15,7 +17,7 @@ export class SettingsStore {
   constructor(
     list: Setting[],
     private readonly storage: Storage | null,
-    private readonly storageKey = 'motox3.settings',
+    private readonly storageKey = 'motox3.settings.v2',
   ) {
     for (const s of list) {
       this.byId.set(s.id, s)
@@ -118,7 +120,7 @@ export class SettingsStore {
   }
 
   private save(): void {
-    const saved: Saved = { values: Object.fromEntries(this.values), lines: Object.fromEntries(this.lines) }
+    const saved: Saved = { values: this.changedFromDefaults(), lines: Object.fromEntries(this.lines) }
     try {
       this.storage?.setItem(this.storageKey, JSON.stringify(saved))
     } catch {
