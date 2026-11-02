@@ -1,0 +1,123 @@
+.menu-window {
+  position: fixed;
+  width: 420px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(24, 26, 30, 0.92);
+  color: #e8e8e8;
+  font: 14px/1.4 system-ui, sans-serif;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+.menu-window[hidden] { display: none; }
+
+.menu-window button {
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.menu-window button:hover { background: rgba(255, 255, 255, 0.16); }
+
+.menu-titlebar {
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+  font-weight: 600;
+  cursor: move;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.menu-titlebuttons { display: flex; gap: 6px; }
+.menu-titlebuttons button { font-size: 12px; padding: 2px 8px; }
+
+/* The body and every tab page shrink to fit, so an overfull page scrolls. */
+.menu-body, .menu-tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.menu-tabbar {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.menu-tabbar button {
+  border: none;
+  border-radius: 4px 4px 0 0;
+  padding: 6px 12px;
+  background: transparent;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #9a9a9a;
+}
+.menu-tabbar button.selected { background: rgba(255, 255, 255, 0.12); color: #fff; }
+
+.menu-page {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+  padding: 8px;
+}
+.menu-page[hidden] { display: none; }
+
+.menu-section-title {
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+.menu-section-title::before { content: '▾ '; }
+.menu-section.collapsed .menu-section-title::before { content: '▸ '; }
+.menu-section-body { padding: 6px 2px; }
+
+.menu-row {
+  display: grid;
+  grid-template-columns: 112px 1fr 64px 34px 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+.menu-range { width: 100%; }
+.menu-number {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 4px;
+  user-select: text;
+}
+.menu-unit { color: #9a9a9a; }
+.menu-reset { padding: 0; height: 24px; }
+.menu-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #a8b8c8;
+  padding-bottom: 4px;
+}
+
+/* A debug line: checkbox, colour swatch, name. */
+.menu-line {
+  display: grid;
+  grid-template-columns: 20px 14px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.menu-line input { width: 16px; height: 16px; margin: 0; cursor: pointer; }
+.menu-swatch { width: 14px; height: 4px; border-radius: 2px; }

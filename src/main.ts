@@ -1,11 +1,20 @@
 import * as THREE from 'three'
 import { BikeModel, WHEEL_RADIUS } from './bike/bikeModel'
-import { Ride, type Input } from './ride'
+import { RideLines } from './debug/rideLines'
+import { Ride, type Input, type Tuning } from './ride'
+import { SETTINGS, TABS } from './settings/list'
+import { SettingsStore } from './settings/store'
+import { buildMenu } from './ui/buildMenu'
 
-/** The camera behind the bike: how far back, how high, and how quickly it swings round after the bike, seconds. */
-const CAMERA_BACK = 4.2
-const CAMERA_UP = 1.7
-const CAMERA_LAG = 0.25
+/** The browser's storage, or none where it's blocked (settings then last only this visit). */
+let storage: Storage | null = null
+try {
+  storage = localStorage
+} catch {
+  // private window or blocked site data
+}
+const store = new SettingsStore(SETTINGS, storage)
+buildMenu(SETTINGS, TABS, store, storage)
 
 const renderer = new THREE.WebGLRenderer({ antialias: true })
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -63,10 +72,12 @@ for (let i = 0; i < 120; i++) {
 const bike = new BikeModel()
 scene.add(bike.root)
 const ride = new Ride()
+const lines = new RideLines(scene, SETTINGS, store)
 
 const input: Input = { throttle: false, brake: false, left: false, right: false }
 const KEYS: Record<string, keyof Input> = { KeyW: 'throttle', KeyS: 'brake', KeyA: 'left', KeyD: 'right' }
 const setKey = (event: KeyboardEvent, down: boolean) => {
+  if (down && event.target instanceof HTMLInputElement) return // typing a number in the menu
   const key = KEYS[event.code]
   if (key) input[key] = down
   if (down && key) document.getElementById('help')!.hidden = true
@@ -90,13 +101,23 @@ let cameraHeading = 0
 const clock = new THREE.Clock()
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1)
-  ride.step(input, dt, WHEEL_RADIUS)
+  const tune: Tuning = {
+    topSpeed: store.get('bike.topSpeed'),
+    zeroToHundred: store.get('bike.zeroToHundred'),
+    coastToStop: store.get('bike.coastToStop'),
+    brakeToStop: store.get('bike.brakeToStop'),
+    frontWheelLock: store.get('bike.frontWheelLock'),
+  }
+  ride.step(input, tune, dt, WHEEL_RADIUS)
   bike.root.position.set(ride.x, 0, ride.z)
   bike.root.rotation.y = -ride.heading
   bike.update(ride.bars, ride.spin)
+  lines.update(ride)
 
-  cameraHeading += (ride.heading - cameraHeading) * (1 - Math.exp(-dt / CAMERA_LAG))
-  camera.position.set(ride.x - Math.sin(cameraHeading) * CAMERA_BACK, CAMERA_UP, ride.z + Math.cos(cameraHeading) * CAMERA_BACK)
+  const lag = store.get('camera.lag')
+  cameraHeading = lag > 0 ? cameraHeading + (ride.heading - cameraHeading) * (1 - Math.exp(-dt / lag)) : ride.heading
+  const back = store.get('camera.back')
+  camera.position.set(ride.x - Math.sin(cameraHeading) * back, store.get('camera.up'), ride.z + Math.cos(cameraHeading) * back)
   camera.lookAt(ride.x, 0.9, ride.z)
 
   sun.position.set(ride.x + 10, 20, ride.z + 6)

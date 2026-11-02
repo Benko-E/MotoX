@@ -1,0 +1,30 @@
+/** A number picked with a slider and a number box. */
+export type SliderSetting = {
+  kind: 'slider'
+  id: string
+  name: string
+  tab: string
+  section: string
+  min: number
+  max: number
+  step: number
+  default: number
+  unit: string
+  /** Shown under the row, to explain what the number means. */
+  note?: string
+}
+
+/** A debug line drawn in the world, switched on and off with a checkbox. Never in "Copy changes". */
+export type LineSetting = {
+  kind: 'line'
+  id: string
+  name: string
+  tab: string
+  section: string
+  default: boolean
+  /** The colour it's drawn in, so the menu can show it. */
+  color: number
+  note?: string
+}
+
+export type Setting = SliderSetting | LineSetting
