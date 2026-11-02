@@ -149,12 +149,16 @@ export class BikeModel {
     return mesh
   }
 
-  /** Turns the bars `steer` degrees (positive = right) and the wheels to `spin` radians rolled. */
-  update(steer: number, spin: number): void {
+  /**
+   * Turns the bars `steer` degrees (positive = right) and the wheels to
+   * `spin` radians rolled, the rear `rearSpin` further (spinning up in the dirt).
+   */
+  update(steer: number, spin: number, rearSpin = 0): void {
     const turn = (-steer * Math.PI) / 180
     this.frontEnd.rotation.y = turn
     this.bars.rotation.y = turn
-    for (const wheel of this.wheels) wheel.rotation.x = -spin
+    this.wheels[0].rotation.x = -spin
+    this.wheels[1].rotation.x = -spin - rearSpin
 
     const { from, to } = this
     for (let side = 0; side < 2; side++) {

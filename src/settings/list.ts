@@ -1,7 +1,7 @@
 import type { Setting } from './types'
 
 /** The debug menu's tabs, left to right. */
-export const TABS = ['Bike', 'Camera', 'Temporary'] as const
+export const TABS = ['Bike', 'Camera', 'Effects', 'Temporary'] as const
 
 /**
  * Every setting in the debug menu, in the order it's shown. The defaults
@@ -90,6 +90,50 @@ export const SETTINGS: Setting[] = [
     min: 0, max: 1.5, step: 0.01, default: 0.25, unit: 's',
     note: 'How long the camera takes to swing round behind the bike after a turn. 0 is locked on.',
   },
+  // Effects: only looks, never how the bike rides
+  {
+    kind: 'slider', id: 'effects.wheelspinUntil', name: 'Wheelspin until', tab: 'Effects', section: 'Dirt',
+    min: 0, max: 80, step: 1, default: 25, unit: 'km/h',
+    note: 'Below this speed, W spins the rear tyre up in the dirt: it throws dirt back and leaves a dark track. The slower, the harder.',
+  },
+  {
+    kind: 'slider', id: 'effects.carving', name: 'Carving', tab: 'Effects', section: 'Dirt',
+    min: 0, max: 1, step: 0.05, default: 0.3, unit: '',
+    note: 'How hard the tyres scrub turning at the grip limit, flinging dirt to the outside of the turn. 0 is none.',
+  },
+  {
+    kind: 'slider', id: 'effects.dirtAmount', name: 'Amount', tab: 'Effects', section: 'Dirt',
+    min: 0, max: 300, step: 1, default: 80, unit: '/s',
+    note: 'Clods thrown per second by a tyre scrubbing flat out.',
+  },
+  {
+    kind: 'slider', id: 'effects.dirtThrow', name: 'Throw', tab: 'Effects', section: 'Dirt',
+    min: 0, max: 15, step: 0.1, default: 5, unit: 'm/s',
+  },
+  {
+    kind: 'slider', id: 'effects.dirtSize', name: 'Clod size', tab: 'Effects', section: 'Dirt',
+    min: 0.02, max: 0.2, step: 0.01, default: 0.07, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'effects.trackLasts', name: 'Lasts', tab: 'Effects', section: 'Tyre tracks',
+    min: 1, max: 120, step: 1, default: 30, unit: 's',
+    note: 'Seconds a track takes to fade away.',
+  },
+  {
+    kind: 'slider', id: 'effects.trackWidth', name: 'Width', tab: 'Effects', section: 'Tyre tracks',
+    min: 0.05, max: 0.4, step: 0.01, default: 0.14, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'effects.trackRolling', name: 'Rolling', tab: 'Effects', section: 'Tyre tracks',
+    min: 0, max: 1, step: 0.01, default: 0.15, unit: '',
+    note: 'How dark the track is where the tyre just rolls, 0 (none) to 1 (black).',
+  },
+  {
+    kind: 'slider', id: 'effects.trackScrubbing', name: 'Scrubbing', tab: 'Effects', section: 'Tyre tracks',
+    min: 0, max: 1, step: 0.01, default: 0.6, unit: '',
+    note: 'How dark it gets where the tyre spins, skids or carves.',
+  },
+
   // Temporary: things here for trying out, not to stay
   {
     kind: 'slider', id: 'ramp.angle', name: 'Ramp angle', tab: 'Temporary', section: 'Ramp',

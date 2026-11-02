@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { BikeModel, WHEEL_RADIUS } from './bike/bikeModel'
 import { RampArcs } from './debug/rampArcs'
 import { RideLines } from './debug/rideLines'
+import { GroundEffects } from './effects/groundEffects'
 import { MIN_AIRTIME, Ride, type Input, type Tuning } from './ride'
 import { SETTINGS, TABS } from './settings/list'
 import type { LineSetting } from './settings/types'
@@ -114,6 +115,25 @@ const bike = new BikeModel()
 scene.add(bike.root)
 const ride = new Ride()
 const lines = new RideLines(scene, SETTINGS, store)
+const effects = new GroundEffects(
+  scene,
+  {
+    get lasts() { return store.get('effects.trackLasts') },
+    get width() { return store.get('effects.trackWidth') },
+    get rolling() { return store.get('effects.trackRolling') },
+    get skidding() { return store.get('effects.trackScrubbing') },
+  },
+  {
+    get amount() { return store.get('effects.dirtAmount') },
+    get throw() { return store.get('effects.dirtThrow') },
+    get size() { return store.get('effects.dirtSize') },
+  },
+  {
+    get wheelspinUntil() { return store.get('effects.wheelspinUntil') },
+    get carving() { return store.get('effects.carving') },
+  },
+  groundAt,
+)
 /** How far the bike is drawn leaning, radians (positive = right). Only drawn: the riding ignores it. */
 let lean = 0
 /** How far the bike is drawn pitched nose up, radians: follows the ride's pitch, smoothed. */
@@ -169,7 +189,8 @@ renderer.setAnimationLoop(() => {
   const leanTarget = Math.sign(ride.turnRate) * Math.min(sideways, 1) * store.get('bike.maxLean') * DEG
   lean += (leanTarget - lean) * (1 - Math.exp(-dt / LEAN_TIME))
   bike.root.rotation.set(pitch, -ride.heading, -lean, 'YXZ') // leaning about where the tyres touch the ground
-  bike.update(ride.wheelAngle, ride.spin)
+  effects.update(ride, input, dt)
+  bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin)
   lines.update(ride)
 
   const lag = store.get('camera.lag')
