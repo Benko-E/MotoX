@@ -156,18 +156,19 @@ let lean = 0
 /** How far the bike is drawn pitched nose up, radians: follows the ride's pitch, smoothed. */
 let pitch = 0
 
-const input: Input = { throttle: false, brake: false, left: false, right: false }
-const KEYS: Record<string, keyof Input> = { KeyW: 'throttle', KeyS: 'brake', KeyA: 'left', KeyD: 'right' }
+const input: Input = { throttle: false, brake: false, left: false, right: false, slide: false }
+const KEYS: Record<string, keyof Input> = { KeyW: 'throttle', KeyS: 'brake', KeyA: 'left', KeyD: 'right', Space: 'slide' }
 const setKey = (event: KeyboardEvent, down: boolean) => {
   if (down && event.target instanceof HTMLInputElement) return // typing a number in the menu
   const key = KEYS[event.code]
   if (key) input[key] = down
+  if (key) event.preventDefault() // Space mustn't press a focused menu button
   if (down && key) document.getElementById('help')!.hidden = true
   if (down && event.code === 'KeyR') Object.assign(ride, { x: 0, z: 0, y: 0, vy: 0, heading: 0, speed: 0, airborne: false })
 }
 addEventListener('keydown', (event) => setKey(event, true))
 addEventListener('keyup', (event) => setKey(event, false))
-addEventListener('blur', () => Object.assign(input, { throttle: false, brake: false, left: false, right: false }))
+addEventListener('blur', () => Object.assign(input, { throttle: false, brake: false, left: false, right: false, slide: false }))
 
 const resize = () => {
   renderer.setSize(innerWidth, innerHeight)
@@ -195,17 +196,23 @@ renderer.setAnimationLoop(() => {
     frontWheelLock: store.get('bike.frontWheelLock'),
     grip: store.get('bike.grip'),
     slopePull: store.get('bike.slopePull') / 100,
+    slideAngle: store.get('slide.angle'),
+    kickOut: store.get('slide.kickOut'),
+    hookUp: store.get('slide.hookUp'),
+    slideCircle: store.get('slide.tighterTurn') / 100,
+    slideScrub: store.get('slide.scrub'),
+    slideMinSpeed: store.get('slide.minSpeed'),
   }
   const wasAirborne = ride.airborne
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)
-  bike.root.position.set(ride.x, ride.y, ride.z)
+  bike.root.position.set(ride.bodyX, ride.y, ride.bodyZ)
   pitch += (ride.pitch - pitch) * (1 - Math.exp(-dt / PITCH_TIME))
   // Lean into turns, more the harder the tyres are pushing sideways: all
   // the way to Max lean when they're at their grip.
   const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / (store.get('bike.grip') * 9.81)
   const leanTarget = Math.sign(ride.turnRate) * Math.min(sideways, 1) * store.get('bike.maxLean') * DEG
   lean += (leanTarget - lean) * (1 - Math.exp(-dt / LEAN_TIME))
-  bike.root.rotation.set(pitch, -ride.heading, -lean, 'YXZ') // leaning about where the tyres touch the ground
+  bike.root.rotation.set(pitch, -ride.bodyHeading, -lean, 'YXZ') // leaning about where the tyres touch the ground
   effects.update(ride, input, dt)
   riderMotion.update(ride, dt)
   bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin, riderMotion)

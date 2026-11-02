@@ -46,6 +46,36 @@ export const SETTINGS: Setting[] = [
     note: 'How hard the tyres can push sideways. Sets how wide you turn at speed: the faster, the wider. Real tyres on dirt manage about 1.',
   },
   {
+    kind: 'slider', id: 'slide.angle', name: 'Slide angle', tab: 'Bike', section: 'Powerslide',
+    min: 0, max: 70, step: 1, default: 30, unit: '°',
+    note: 'Hold Space and steer: how far the rear swings out at full steering, so you slide round side-on.',
+  },
+  {
+    kind: 'slider', id: 'slide.kickOut', name: 'Kick-out time', tab: 'Bike', section: 'Powerslide',
+    min: 0, max: 0.6, step: 0.01, default: 0.15, unit: 's',
+    note: 'How long the rear takes to swing out once you press Space.',
+  },
+  {
+    kind: 'slider', id: 'slide.hookUp', name: 'Hook-up time', tab: 'Bike', section: 'Powerslide',
+    min: 0.05, max: 1.5, step: 0.01, default: 0.3, unit: 's',
+    note: 'How long the rear takes to hook back up after you let go.',
+  },
+  {
+    kind: 'slider', id: 'slide.tighterTurn', name: 'Slide turn circle', tab: 'Bike', section: 'Powerslide',
+    min: 20, max: 150, step: 5, default: 60, unit: '%',
+    note: 'How big the slide turns compared to your normal turn at that speed: 60 is a circle 40% smaller.',
+  },
+  {
+    kind: 'slider', id: 'slide.scrub', name: 'Speed scrub', tab: 'Bike', section: 'Powerslide',
+    min: 0, max: 80, step: 1, default: 20, unit: 'km/h/s',
+    note: 'How much speed sliding scrubs off at full steering. The throttle earns some back.',
+  },
+  {
+    kind: 'slider', id: 'slide.minSpeed', name: 'Slowest slide', tab: 'Bike', section: 'Powerslide',
+    min: 0, max: 60, step: 1, default: 15, unit: 'km/h',
+    note: 'Slower than this, Space does nothing.',
+  },
+  {
     kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Lean (looks only)',
     min: 0, max: 60, step: 1, default: 40, unit: '°',
     note: 'How far the bike leans into a turn when the tyres are at their grip; gentler turns lean less. Only drawn: it does not change how the bike turns.',
@@ -138,23 +168,23 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'rider.footOutFrom', name: 'From steering', tab: 'Rider', section: 'Foot out',
-    min: 0, max: 95, step: 5, default: 50, unit: '%',
+    min: 0, max: 95, step: 5, default: 20, unit: '%',
     note: 'Only steering harder than this (a share of full A or D): all the way out at full steering.',
   },
   {
     kind: 'slider', id: 'rider.headTurn', name: 'Head turn', tab: 'Rider', section: 'Looking',
-    min: 0, max: 60, step: 1, default: 25, unit: '°',
+    min: 0, max: 60, step: 1, default: 40, unit: '°',
     note: 'How far he turns his head to look into a turn at full steering. His shoulders already twist with the bars.',
   },
 
   // Camera
   {
     kind: 'slider', id: 'camera.back', name: 'Distance', tab: 'Camera', section: 'Chase camera',
-    min: 1, max: 12, step: 0.1, default: 8, unit: 'm',
+    min: 1, max: 12, step: 0.1, default: 12, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.up', name: 'Height', tab: 'Camera', section: 'Chase camera',
-    min: 0.3, max: 6, step: 0.1, default: 2.3, unit: 'm',
+    min: 0.3, max: 6, step: 0.1, default: 5, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.lag', name: 'Swing lag', tab: 'Camera', section: 'Chase camera',
@@ -169,7 +199,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'effects.carving', name: 'Carving', tab: 'Effects', section: 'Dirt',
-    min: 0, max: 1, step: 0.05, default: 0.3, unit: '',
+    min: 0, max: 1, step: 0.05, default: 0.5, unit: '',
     note: 'How hard the tyres scrub turning at the grip limit, flinging dirt to the outside of the turn. 0 is none.',
   },
   {
@@ -208,12 +238,12 @@ export const SETTINGS: Setting[] = [
   // Temporary: things here for trying out, not to stay
   {
     kind: 'slider', id: 'ramp.angle', name: 'Ramp angle', tab: 'Temporary', section: 'Ramp',
-    min: 5, max: 60, step: 1, default: 35, unit: '°',
+    min: 5, max: 60, step: 1, default: 15, unit: '°',
     note: 'How steep the run-up rises.',
   },
   {
     kind: 'slider', id: 'ramp.height', name: 'Height', tab: 'Temporary', section: 'Ramp',
-    min: 0.3, max: 60, step: 0.1, default: 8, unit: 'm',
+    min: 0.3, max: 60, step: 0.1, default: 3.6, unit: 'm',
   },
   {
     kind: 'slider', id: 'ramp.width', name: 'Width', tab: 'Temporary', section: 'Ramp',
@@ -226,7 +256,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'ramp.landing', name: 'Back side angle', tab: 'Temporary', section: 'Ramp',
-    min: 5, max: 60, step: 1, default: 20, unit: '°',
+    min: 5, max: 60, step: 1, default: 45, unit: '°',
     note: 'How steep the back side drops: land on it for a smooth landing.',
   },
   {

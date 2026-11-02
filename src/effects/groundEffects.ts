@@ -18,13 +18,15 @@ const SKID_FULL = 3
 const FRONT_SKID = 0.4
 /** The front tyre scrubs this much less than the rear carving. */
 const FRONT_CARVE = 0.5
+/** The front tyre scrubs this much less than the rear powersliding. */
+const FRONT_SLIDE = 0.4
 /** Spinning up in the dirt flat out, the rear tyre's surface runs this much faster than the ground, m/s. */
 const WHEELSPIN_SURFACE = 12
 
 /**
  * Where the tyres meet the dirt: the tracks they leave, and the clods they
  * throw up spinning up (throttle from low speed), skidding (braking) and
- * carving (turning at the grip limit). Only looks: it reads the ride and
+ * carving (turning at the grip limit) and powersliding. Only looks: it reads the ride and
  * never changes it.
  */
 export class GroundEffects {
@@ -53,16 +55,17 @@ export class GroundEffects {
 
   /** Call once a frame, after the ride has stepped. */
   update(ride: Ride, input: { throttle: boolean; brake: boolean }, dt: number): void {
-    const forward = new THREE.Vector3(Math.sin(ride.heading), 0, -Math.cos(ride.heading))
+    // the way the bike's body points (sliding, the rear is swung out)
+    const forward = new THREE.Vector3(Math.sin(ride.bodyHeading), 0, -Math.cos(ride.bodyHeading))
     // up out of the ground, tipped with the bike's pitch along the slope
     this.normal.set(0, Math.cos(ride.pitch), 0).addScaledVector(forward, -Math.sin(ride.pitch))
-    this.velocity.copy(forward).multiplyScalar(ride.speed).setY(ride.vy)
+    this.velocity.set(Math.sin(ride.heading), 0, -Math.cos(ride.heading)).multiplyScalar(ride.speed).setY(ride.vy)
     const kmh = Math.abs(ride.speed) * 3.6
 
     for (let i = 0; i < 2; i++) {
       const sign = i === 0 ? 1 : -1
-      const x = ride.x + forward.x * sign * (WHEELBASE / 2)
-      const z = ride.z + forward.z * sign * (WHEELBASE / 2)
+      const x = ride.bodyX + forward.x * sign * (WHEELBASE / 2)
+      const z = ride.bodyZ + forward.z * sign * (WHEELBASE / 2)
       if (ride.airborne) {
         this.tracks.touch(i, null, this.normal, 0)
         continue
@@ -73,7 +76,8 @@ export class GroundEffects {
       const spin = i === 1 && input.throttle && ride.speed >= 0 ? clamp(1 - kmh / Math.max(this.scrub.wheelspinUntil, 1e-6)) : 0
       const skid = input.brake && ride.speed > 0 ? Math.min(ride.speed / SKID_FULL, 1) * (i === 0 ? FRONT_SKID : 1) : 0
       const carve = ride.limit === 'grip' ? Math.abs(ride.steering) * this.scrub.carving * (i === 0 ? FRONT_CARVE : 1) : 0
-      const amount = Math.min(spin + skid + carve, 1)
+      const slide = ride.sliding * Math.abs(ride.steering) * (i === 0 ? FRONT_SLIDE : 1)
+      const amount = Math.min(spin + skid + carve + slide, 1)
       if (i === 1) this.rearWheelspin += (spin * WHEELSPIN_SURFACE * dt) / WHEEL_RADIUS
       this.tracks.touch(i, at, this.normal, amount)
 
@@ -83,11 +87,11 @@ export class GroundEffects {
         if (i === 0) this.pointing.applyAxisAngle(this.normal, (-ride.wheelAngle * Math.PI) / 180)
         this.side.crossVectors(this.pointing, this.normal)
         // Spinning up throws dirt out behind, skidding pushes it on ahead,
-        // carving flings it out to the outside of the turn.
+        // carving and sliding fling it out to the outside of the turn.
         this.thrown
           .copy(this.pointing)
           .multiplyScalar(0.5 * skid - spin)
-          .addScaledVector(this.side, -Math.sign(ride.turnRate) * carve)
+          .addScaledVector(this.side, -Math.sign(ride.turnRate) * (carve + slide))
         if (this.thrown.lengthSq() < 1e-6) this.thrown.copy(this.pointing).negate()
         this.dirt.throwFrom(at, this.thrown.normalize(), this.velocity, amount, dt)
       }

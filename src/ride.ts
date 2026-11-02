@@ -15,6 +15,10 @@ import { WHEELBASE } from './bike/bikeModel'
  * swinging between them over barsSwing. So turning in and straightening up
  * are equally quick at any speed.
  *
+ * Powerslides (Space and steer, like a handbrake): the rear swings out so
+ * the bike points into the turn while it carries on along its line, the
+ * turn tightens, and sliding scrubs off speed. Let go and the rear hooks up.
+ *
  * Up and down, just as simple: on the ground the bike follows it, gravity
  * pulling it back down slopes (Slope pull), and it leaves
  * it wherever the ground drops away faster than gravity could pull the bike
@@ -44,6 +48,17 @@ export interface Tuning {
   grip: number
   /** How much of gravity along a slope pulls the bike back uphill and on downhill, 0 to 1.5. */
   slopePull: number
+  /** How far the rear swings out sliding at full steering, degrees. */
+  slideAngle: number
+  /** Seconds the rear takes to swing out, and to hook back up. */
+  kickOut: number
+  hookUp: number
+  /** How big the slide's turn is next to the normal turn at that speed, 0.2 to 1.5. */
+  slideCircle: number
+  /** Speed sliding scrubs off at full steering, km/h per second. */
+  slideScrub: number
+  /** Slowest speed a slide starts at, km/h. */
+  slideMinSpeed: number
 }
 
 export interface Input {
@@ -51,6 +66,8 @@ export interface Input {
   brake: boolean
   left: boolean
   right: boolean
+  /** Space: powerslide. */
+  slide: boolean
 }
 
 const KMH = 1 / 3.6
@@ -100,13 +117,41 @@ export class Ride {
   turnRadius = Infinity
   /** How fast the bike swings round, degrees per second (positive = right). */
   turnRate = 0
-  /** What's setting the turn radius: the front wheel's lock, grip, or nothing (going straight). */
-  limit: 'front wheel' | 'grip' | null = null
+  /** What's setting the turn radius: the front wheel's lock, grip, a powerslide, or nothing (going straight). */
+  limit: 'front wheel' | 'grip' | 'powerslide' | null = null
+  /** How far into a powerslide it is, 0 (hooked up) to 1 (rear all the way out). */
+  sliding = 0
+  /** How far the bike's body points off the way it's going, radians (positive = nose to the right): the rear swung out. */
+  slideYaw = 0
   /** How far the wheels have rolled, radians. */
   spin = 0
 
+  /** Which way the bike's body points, radians: the way it's going, plus the rear swung out sliding. */
+  get bodyHeading(): number {
+    return this.heading + this.slideYaw
+  }
+
+  /**
+   * Where the middle of the bike's body is drawn: sliding, it swings about
+   * the front wheel, which stays on the line, so the rear swings out.
+   */
+  get bodyX(): number {
+    return this.x + (Math.sin(this.heading) - Math.sin(this.bodyHeading)) * (WHEELBASE / 2)
+  }
+
+  get bodyZ(): number {
+    return this.z - (Math.cos(this.heading) - Math.cos(this.bodyHeading)) * (WHEELBASE / 2)
+  }
+
   step(input: Input, tune: Tuning, dt: number, radius: number, ground: Ground): void {
     const h = HANDLING
+    // Powerslide: Space while steering, on the ground and fast enough. The
+    // rear swings out toward the steering's share of the slide angle.
+    const wantSlide = input.slide && !this.airborne && this.steer !== 0 && Math.abs(this.speed) >= tune.slideMinSpeed * KMH
+    this.sliding += ((wantSlide ? 1 : 0) - this.sliding) * (1 - Math.exp(-dt / Math.max(wantSlide ? tune.kickOut : tune.hookUp, 1e-6)))
+    if (this.sliding < 1e-3) this.sliding = 0
+    this.slideYaw += (this.sliding * this.steering * tune.slideAngle * DEG - this.slideYaw) * (1 - Math.exp(-dt / Math.max(wantSlide ? tune.kickOut : tune.hookUp, 1e-6)))
+
     if (this.airborne) {
       this.fly(dt, radius, ground)
       return
@@ -142,6 +187,9 @@ export class Ride {
       const roll = (hundred / tune.coastToStop) * dt
       this.speed = Math.sign(this.speed) * Math.max(Math.abs(this.speed) - roll, 0)
     }
+    // sliding scrubs off speed, more the harder it's steered
+    const scrub = tune.slideScrub * KMH * this.sliding * Math.abs(this.steering) * dt
+    this.speed = Math.sign(this.speed) * Math.max(Math.abs(this.speed) - scrub, 0)
     // lowering top speed below how fast you're going slows you down to it
     if (this.speed > top) this.speed = Math.max(top, this.speed - (hundred / tune.coastToStop) * dt)
     this.slowing = dt > 0 ? Math.max(Math.abs(before) - Math.abs(this.speed), 0) / dt : 0
@@ -150,16 +198,17 @@ export class Ride {
     this.steering += (this.steer - this.steering) * (1 - Math.exp(-dt / h.barsSwing))
     if (Math.abs(this.steering) < 1e-3) this.steering = 0
     this.bars = this.steering * tune.frontWheelLock
-    // the tightest turn: whichever of the two circles is bigger
+    // the tightest turn: whichever of the two circles is bigger, tightened sliding
     const wheelRadius = WHEELBASE / Math.tan(tune.frontWheelLock * DEG)
     const gripRadius = (this.speed * this.speed) / (tune.grip * G)
-    const tightest = Math.max(wheelRadius, gripRadius)
+    const tightest = Math.max(wheelRadius, gripRadius) * (1 + (tune.slideCircle - 1) * this.sliding)
     // curvature (1 / radius), signed: positive turns right
     const curve = this.steering / tightest
     this.turnRadius = curve === 0 ? Infinity : 1 / Math.abs(curve)
-    this.limit = curve === 0 ? null : gripRadius > wheelRadius ? 'grip' : 'front wheel'
-    // the front wheel turns only as far as that circle takes
-    this.wheelAngle = Math.atan(WHEELBASE * curve) / DEG
+    this.limit = curve === 0 ? null : this.sliding > 0.5 ? 'powerslide' : gripRadius > wheelRadius ? 'grip' : 'front wheel'
+    // the front wheel turns only as far as that circle takes; sliding, the
+    // body swings into the turn and the wheel keeps pointing along the line (opposite lock)
+    this.wheelAngle = Math.atan(WHEELBASE * curve) / DEG - this.slideYaw / DEG
     // round the circle at this speed; backwards, it swings the other way
     const rate = this.speed * curve
     this.turnRate = rate / DEG

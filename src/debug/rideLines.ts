@@ -89,7 +89,7 @@ export class RideLines {
     this.readout.hidden = !this.store.isOn('line.turnReadout')
     if (!this.readout.hidden) {
       this.readout.textContent = turning
-        ? [`turn radius ${ride.turnRadius.toFixed(1)} m`, `${Math.abs(ride.turnRate).toFixed(0)}°/s`, `limited by ${ride.limit}`].join('\n')
+        ? [`turn radius ${ride.turnRadius.toFixed(1)} m`, `${Math.abs(ride.turnRate).toFixed(0)}°/s`, `limited by ${ride.limit}`, ...(ride.sliding > 0 ? [`sliding ${Math.abs(ride.slideYaw / (Math.PI / 180)).toFixed(0)}°`] : [])].join('\n')
         : 'going straight'
     }
   }

@@ -87,12 +87,12 @@ export class RiderMotion {
     const leanTo = speeding > 0 ? -shift * s.leanBack : shift * s.leanForward
     this.lean += (leanTo - this.lean) * ease(dt, s.shiftTime)
 
-    // The inside foot comes out in slow, tight turns.
+    // The inside foot comes out in slow, tight turns, and powersliding.
     let legTo = 0
     if (!ride.airborne) {
       const tight = smoothstep((Math.abs(ride.steering) - s.footOutFrom) / Math.max(1 - s.footOutFrom, 1e-6))
       const slow = clamp((s.footOutBelow + FOOT_FADE - kmh) / FOOT_FADE)
-      legTo = tight * slow * Math.sign(ride.steering)
+      legTo = Math.max(ride.sliding * Math.abs(ride.steering), tight * slow) * Math.sign(ride.steering)
     }
     const outward = Math.abs(legTo) > Math.abs(this.legOut) && legTo * this.legOut >= 0
     this.legOut += (legTo - this.legOut) * ease(dt, outward ? FOOT_OUT_TIME : FOOT_IN_TIME)
