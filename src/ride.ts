@@ -169,14 +169,17 @@ export class Ride {
     this.riderLean = (input.leanForward ? 1 : 0) - (input.leanBack ? 1 : 0)
     // Wheelie: leaning back with W lifts the front; it stays up while he
     // leans back, with W or fast enough. In the air it stays as it left the ground.
+    const up = !this.airborne && input.leanBack && this.speed > 0 && (input.throttle || (this.wheelie > 0 && this.speed >= tune.wheelieHold * KMH))
+    // Powerslide: Space while steering, on the ground and fast enough (not
+    // holding a wheelie; one dropping doesn't wait for the front to land, it
+    // comes down as fast as the rear kicks out). The rear swings out toward
+    // the steering's share of the slide angle.
+    const wantSlide = input.slide && !this.airborne && !up && this.steer !== 0 && Math.abs(this.speed) >= tune.slideMinSpeed * KMH
     if (!this.airborne) {
-      const up = input.leanBack && this.speed > 0 && (input.throttle || (this.wheelie > 0 && this.speed >= tune.wheelieHold * KMH))
-      this.wheelie += ((up ? 1 : 0) - this.wheelie) * (1 - Math.exp(-dt / Math.max(up ? tune.liftTime : tune.dropTime, 1e-6)))
+      const easing = up ? tune.liftTime : wantSlide ? Math.min(tune.dropTime, tune.kickOut) : tune.dropTime
+      this.wheelie += ((up ? 1 : 0) - this.wheelie) * (1 - Math.exp(-dt / Math.max(easing, 1e-6)))
       if (this.wheelie < 1e-3) this.wheelie = 0
     }
-    // Powerslide: Space while steering, on the ground and fast enough (not on
-    // one wheel). The rear swings out toward the steering's share of the slide angle.
-    const wantSlide = input.slide && !this.airborne && this.wheelie === 0 && this.steer !== 0 && Math.abs(this.speed) >= tune.slideMinSpeed * KMH
     this.sliding += ((wantSlide ? 1 : 0) - this.sliding) * (1 - Math.exp(-dt / Math.max(wantSlide ? tune.kickOut : tune.hookUp, 1e-6)))
     if (this.sliding < 1e-3) this.sliding = 0
     this.slideYaw += (this.sliding * this.steering * tune.slideAngle * DEG - this.slideYaw) * (1 - Math.exp(-dt / Math.max(wantSlide ? tune.kickOut : tune.hookUp, 1e-6)))
