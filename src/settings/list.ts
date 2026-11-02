@@ -82,11 +82,11 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'wheelie.liftTime', name: 'Lift time', tab: 'Bike', section: 'Wheelie',
-    min: 0.05, max: 2, step: 0.01, default: 0.4, unit: 's',
+    min: 0.05, max: 2, step: 0.01, default: 0.2, unit: 's',
   },
   {
     kind: 'slider', id: 'wheelie.dropTime', name: 'Drop time', tab: 'Bike', section: 'Wheelie',
-    min: 0.05, max: 2, step: 0.01, default: 0.25, unit: 's',
+    min: 0.05, max: 2, step: 0.01, default: 0.2, unit: 's',
   },
   {
     kind: 'slider', id: 'wheelie.holdAbove', name: 'Hold above', tab: 'Bike', section: 'Wheelie',
@@ -95,7 +95,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'wheelie.accel', name: 'Acceleration', tab: 'Bike', section: 'Wheelie',
-    min: 50, max: 150, step: 5, default: 100, unit: '%',
+    min: 50, max: 150, step: 5, default: 120, unit: '%',
     note: 'Speeding up with the front up, next to normal. Real bikes do no better (the rear wheel drives either way); above 100 is an arcade boost.',
   },
   {
@@ -110,7 +110,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Lean (looks only)',
-    min: 0, max: 60, step: 1, default: 46, unit: '°',
+    min: 0, max: 60, step: 1, default: 40, unit: '°',
     note: 'How far the bike leans into a turn when the tyres are at their grip; gentler turns lean less. Only drawn: it does not change how the bike turns.',
   },
   {
