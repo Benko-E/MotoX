@@ -6,15 +6,18 @@ import { WHEELBASE } from './bike/bikeModel'
  * turn it. The numbers you tune live in the debug menu (Tuning); the rest are
  * in HANDLING.
  *
- * Turning: the bike rides round whichever circle is bigger of
- * - the front wheel's: wheelbase / tan(front wheel angle), tight at full lock;
+ * Turning: the tightest turn the bike can make is whichever circle is bigger of
+ * - the front wheel's: wheelbase / tan(front wheel lock);
  * - grip's: speed² / grip, how tight the tyres can hold at this speed.
  * Slow, the front wheel decides; fast, grip does, and turns get wider.
+ * A/D ask for a share of that tightest turn: all of it held, none let go,
+ * swinging between them over barsSwing. So turning in and straightening up
+ * are equally quick at any speed.
  */
 export const HANDLING = {
   /** Fastest backwards, holding S from a stop, km/h. */
   reverseSpeed: 8,
-  /** Seconds the bars take to swing over (and back when you let go). */
+  /** Seconds the steering takes to swing over (and back when you let go). */
   barsSwing: 0.12,
 }
 
@@ -55,11 +58,13 @@ export class Ride {
   speed = 0
   /** How hard it slowed down this step, m/s² (0 when speeding up or standing). */
   slowing = 0
-  /** How far the rider is turning the bars, degrees (positive = right): toward full lock while A or D is held. */
+  /** How much of the tightest turn the rider is asking for: -1 all of it left, 0 straight, 1 all of it right. */
+  steering = 0
+  /** How far the rider is asking the bars to turn, degrees (positive = right): the steering share of full lock. */
   bars = 0
   /** How far the front wheel actually turns, degrees: the bars, or less where grip can't hold that tight a turn. */
   wheelAngle = 0
-  /** Where the bars are heading: -1 full left, 0 straight, 1 full right. */
+  /** What A/D are asking for: -1 full left, 0 straight, 1 full right. */
   steer = 0
   /** The circle the bike is riding round, metres (Infinity going straight). */
   turnRadius = Infinity
@@ -90,15 +95,21 @@ export class Ride {
     this.slowing = dt > 0 ? Math.max(Math.abs(before) - Math.abs(this.speed), 0) / dt : 0
 
     this.steer = (input.right ? 1 : 0) - (input.left ? 1 : 0)
-    this.bars += (this.steer * tune.frontWheelLock - this.bars) * (1 - Math.exp(-dt / h.barsSwing))
-    const wheelRadius = Math.abs(this.bars) > 0.05 ? WHEELBASE / Math.tan(Math.abs(this.bars) * DEG) : Infinity
+    this.steering += (this.steer - this.steering) * (1 - Math.exp(-dt / h.barsSwing))
+    if (Math.abs(this.steering) < 1e-3) this.steering = 0
+    this.bars = this.steering * tune.frontWheelLock
+    // the tightest turn: whichever of the two circles is bigger
+    const wheelRadius = WHEELBASE / Math.tan(tune.frontWheelLock * DEG)
     const gripRadius = (this.speed * this.speed) / (tune.grip * G)
-    this.turnRadius = Math.max(wheelRadius, gripRadius)
-    this.limit = this.turnRadius === Infinity ? null : gripRadius > wheelRadius ? 'grip' : 'front wheel'
+    const tightest = Math.max(wheelRadius, gripRadius)
+    // curvature (1 / radius), signed: positive turns right
+    const curve = this.steering / tightest
+    this.turnRadius = curve === 0 ? Infinity : 1 / Math.abs(curve)
+    this.limit = curve === 0 ? null : gripRadius > wheelRadius ? 'grip' : 'front wheel'
     // the front wheel turns only as far as that circle takes
-    this.wheelAngle = (Math.sign(this.bars) * Math.atan(WHEELBASE / this.turnRadius)) / DEG
+    this.wheelAngle = Math.atan(WHEELBASE * curve) / DEG
     // round the circle at this speed; backwards, it swings the other way
-    const rate = this.turnRadius === Infinity ? 0 : (Math.sign(this.bars) * this.speed) / this.turnRadius
+    const rate = this.speed * curve
     this.turnRate = rate / DEG
     this.heading += rate * dt
 
