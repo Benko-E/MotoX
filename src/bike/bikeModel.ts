@@ -144,6 +144,16 @@ export class BikeModel {
     this.update(0, 0)
   }
 
+  /** Where the rider's head is drawn, in world space. */
+  headPosition(target: THREE.Vector3): THREE.Vector3 {
+    return this.rider.headPosition(target)
+  }
+
+  /** Hides the rider's helmet, for looking out through it. */
+  set headVisible(on: boolean) {
+    this.rider.headVisible = on
+  }
+
   /** A rod of `thickness` on the bike, stretched between two points with `placeBetween`. */
   private rod(thickness: number, material: THREE.Material): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, thickness, 1), material)

@@ -222,6 +222,11 @@ export class RiderView {
     return this.head.getWorldPosition(target)
   }
 
+  /** Hides the helmet, for looking out through it. */
+  set headVisible(on: boolean) {
+    this.head.visible = on
+  }
+
   /** A box limb `thickness` across, stretched between two points by `place`. */
   private limb(thickness: number, material: THREE.Material): THREE.Mesh {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, thickness, 1), material)

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { BikeModel, WHEEL_RADIUS } from './bike/bikeModel'
+import { CameraRig, VIEW_NAMES } from './camera/cameraRig'
 import { RiderMotion } from './bike/riderMotion'
 import { RampArcs } from './debug/rampArcs'
 import { RideLines } from './debug/rideLines'
@@ -15,8 +16,8 @@ import { Ramp, type RampShape } from './world/ramp'
 const LEAN_TIME = 0.15
 /** Seconds the bike takes to pitch to a new slope, or to the way it's flying. */
 const PITCH_TIME = 0.06
-/** Seconds the camera takes to follow the bike up and down. */
-const CAMERA_RISE = 0.15
+/** Seconds the camera's name stays on screen after C switches it. */
+const VIEW_NAME_SHOWN = 1.5
 /** Seconds the airtime stays on screen after landing. */
 const AIRTIME_SHOWN = 3
 const DEG = Math.PI / 180
@@ -156,15 +157,28 @@ let lean = 0
 /** How far the bike is drawn pitched nose up, radians: follows the ride's pitch, smoothed. */
 let pitch = 0
 
+const rig = new CameraRig(camera, store, renderer.domElement)
+const viewName = document.getElementById('view')!
+/** Seconds since C last switched the camera, for how long its name stays up. */
+let sinceSwitch = Infinity
+const switchView = () => {
+  const view = rig.next()
+  viewName.textContent = VIEW_NAMES[view]
+  sinceSwitch = 0
+  if (view === 'free') Object.assign(input, { throttle: false, brake: false, left: false, right: false, slide: false })
+}
+
 const input: Input = { throttle: false, brake: false, left: false, right: false, slide: false }
 const KEYS: Record<string, keyof Input> = { KeyW: 'throttle', KeyS: 'brake', KeyA: 'left', KeyD: 'right', Space: 'slide' }
 const setKey = (event: KeyboardEvent, down: boolean) => {
   if (down && event.target instanceof HTMLInputElement) return // typing a number in the menu
-  const key = KEYS[event.code]
+  if (down && event.code === 'KeyC' && !event.repeat) switchView()
+  const key = rig.flying ? undefined : KEYS[event.code] // flying free, the keys fly the camera
+  if (rig.flying && KEYS[event.code]) event.preventDefault()
   if (key) input[key] = down
   if (key) event.preventDefault() // Space mustn't press a focused menu button
   if (down && key) document.getElementById('help')!.hidden = true
-  if (down && event.code === 'KeyR') Object.assign(ride, { x: 0, z: 0, y: 0, vy: 0, heading: 0, speed: 0, airborne: false })
+  if (down && event.code === 'KeyR' && !rig.flying) Object.assign(ride, { x: 0, z: 0, y: 0, vy: 0, heading: 0, speed: 0, airborne: false })
 }
 addEventListener('keydown', (event) => setKey(event, true))
 addEventListener('keyup', (event) => setKey(event, false))
@@ -182,9 +196,6 @@ const hud = document.getElementById('hud')!
 const airtime = document.getElementById('airtime')!
 /** Seconds since the last landing, for how long the airtime stays up. */
 let sinceLanding = Infinity
-/** Which way the camera looks from, radians; it swings round after the bike's heading; and how high it follows. */
-let cameraHeading = 0
-let cameraY = 0
 const clock = new THREE.Clock()
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1)
@@ -218,12 +229,9 @@ renderer.setAnimationLoop(() => {
   bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin, riderMotion)
   lines.update(ride)
 
-  const lag = store.get('camera.lag')
-  cameraHeading = lag > 0 ? cameraHeading + (ride.heading - cameraHeading) * (1 - Math.exp(-dt / lag)) : ride.heading
-  const back = store.get('camera.back')
-  cameraY += (ride.y - cameraY) * (1 - Math.exp(-dt / CAMERA_RISE))
-  camera.position.set(ride.x - Math.sin(cameraHeading) * back, cameraY + store.get('camera.up'), ride.z + Math.cos(cameraHeading) * back)
-  camera.lookAt(ride.x, cameraY + 0.9, ride.z)
+  rig.update(ride, bike, dt)
+  sinceSwitch += dt
+  viewName.hidden = sinceSwitch > VIEW_NAME_SHOWN
 
   sun.position.set(ride.x + 10, ride.y + 20, ride.z + 6)
   sun.target.position.set(ride.x, ride.y, ride.z)

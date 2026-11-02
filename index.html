@@ -57,6 +57,21 @@
       #airtime.landed {
         color: #ffc21a;
       }
+      #view {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 4px 12px;
+        font: 600 15px/1.4 system-ui, sans-serif;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 4px;
+        pointer-events: none;
+      }
+      #view[hidden] {
+        display: none;
+      }
       #help {
         position: fixed;
         top: 8%;
@@ -111,6 +126,7 @@
     <div id="hud"></div>
     <div id="turn" hidden></div>
     <div id="airtime" hidden></div>
+    <div id="view" hidden></div>
     <div id="help">
       <h1>MOTO<span>X</span></h1>
       <dl>
@@ -120,6 +136,8 @@
         <dd>turn</dd>
         <dt><kbd>Space</kbd></dt>
         <dd>powerslide: hold it while you steer</dd>
+        <dt><kbd>C</kbd></dt>
+        <dd>camera: chase, close, high, helmet, free roam</dd>
         <dt><kbd>R</kbd></dt>
         <dd>back to the start</dd>
         <dt><kbd>`</kbd></dt>

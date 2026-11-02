@@ -179,6 +179,21 @@ export const SETTINGS: Setting[] = [
 
   // Camera
   {
+    kind: 'slider', id: 'camera.fov', name: 'Field of view', tab: 'Camera', section: 'All views',
+    min: 30, max: 110, step: 1, default: 65, unit: '°',
+    note: 'How wide the view is. Wider feels faster but stretches the edges. C switches views.',
+  },
+  {
+    kind: 'slider', id: 'camera.lag', name: 'Swing lag', tab: 'Camera', section: 'All views',
+    min: 0, max: 1.5, step: 0.01, default: 0.25, unit: 's',
+    note: 'How long the views behind the bike take to swing round behind it after a turn. 0 is locked on.',
+  },
+  {
+    kind: 'slider', id: 'camera.speedPull', name: 'Pull back with speed', tab: 'Camera', section: 'All views',
+    min: 0, max: 50, step: 1, default: 0, unit: '%',
+    note: 'How much further back the views behind the bike sit per 100 km/h, so speed feels faster.',
+  },
+  {
     kind: 'slider', id: 'camera.back', name: 'Distance', tab: 'Camera', section: 'Chase camera',
     min: 1, max: 12, step: 0.1, default: 12, unit: 'm',
   },
@@ -187,9 +202,46 @@ export const SETTINGS: Setting[] = [
     min: 0.3, max: 6, step: 0.1, default: 5, unit: 'm',
   },
   {
-    kind: 'slider', id: 'camera.lag', name: 'Swing lag', tab: 'Camera', section: 'Chase camera',
-    min: 0, max: 1.5, step: 0.01, default: 0.25, unit: 's',
-    note: 'How long the camera takes to swing round behind the bike after a turn. 0 is locked on.',
+    kind: 'slider', id: 'camera.look', name: 'Looks at', tab: 'Camera', section: 'Chase camera',
+    min: -1, max: 3, step: 0.05, default: 0.9, unit: 'm',
+    note: 'How high above the bike the camera aims.',
+  },
+  {
+    kind: 'slider', id: 'camera.close.back', name: 'Distance', tab: 'Camera', section: 'Close camera',
+    min: 1, max: 12, step: 0.1, default: 3.4, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'camera.close.up', name: 'Height', tab: 'Camera', section: 'Close camera',
+    min: 0.3, max: 6, step: 0.1, default: 1.3, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'camera.close.look', name: 'Looks at', tab: 'Camera', section: 'Close camera',
+    min: -1, max: 3, step: 0.05, default: 1, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'camera.high.back', name: 'Distance', tab: 'Camera', section: 'High camera',
+    min: 1, max: 40, step: 0.5, default: 20, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'camera.high.up', name: 'Height', tab: 'Camera', section: 'High camera',
+    min: 1, max: 30, step: 0.5, default: 12, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'camera.high.look', name: 'Looks at', tab: 'Camera', section: 'High camera',
+    min: -1, max: 3, step: 0.05, default: 0.6, unit: 'm',
+  },
+  {
+    kind: 'slider', id: 'camera.flySpeed', name: 'Speed', tab: 'Camera', section: 'Free roam',
+    min: 2, max: 100, step: 1, default: 25, unit: 'm/s',
+    note: 'W A S D fly, Space up, Q down, hold the right mouse button to look around. The bike waits.',
+  },
+  {
+    kind: 'slider', id: 'camera.flyFast', name: 'Shift speeds up', tab: 'Camera', section: 'Free roam',
+    min: 1, max: 10, step: 0.5, default: 4, unit: '×',
+  },
+  {
+    kind: 'slider', id: 'camera.flyLook', name: 'Mouse look', tab: 'Camera', section: 'Free roam',
+    min: 0.02, max: 0.5, step: 0.01, default: 0.15, unit: '°/px',
   },
   // Effects: only looks, never how the bike rides
   {
