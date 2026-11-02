@@ -37,8 +37,8 @@ document.getElementById('app')!.appendChild(renderer.domElement)
 
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(0x9cc3e6)
-scene.fog = new THREE.Fog(0x9cc3e6, 60, 220)
-const camera = new THREE.PerspectiveCamera(65, 1, 0.1, 500)
+scene.fog = new THREE.Fog(0x9cc3e6, 80, 400)
+const camera = new THREE.PerspectiveCamera(65, 1, 0.1, 1000)
 
 scene.add(new THREE.HemisphereLight(0xdfeeff, 0x6b5a40, 1.4))
 const sun = new THREE.DirectionalLight(0xfff4e0, 2.4)
@@ -62,11 +62,11 @@ paint.lineWidth = 3
 paint.strokeRect(0, 0, 256, 256)
 const dirt = new THREE.CanvasTexture(tile)
 dirt.wrapS = dirt.wrapT = THREE.RepeatWrapping
-dirt.repeat.set(100, 100) // one tile every 4 m
+dirt.repeat.set(500, 500) // one tile every 4 m
 dirt.colorSpace = THREE.SRGBColorSpace
 dirt.anisotropy = renderer.capabilities.getMaxAnisotropy()
 const dirtMaterial = new THREE.MeshStandardMaterial({ map: dirt, roughness: 1 })
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), dirtMaterial)
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), dirtMaterial)
 ground.rotation.x = -Math.PI / 2
 ground.receiveShadow = true
 scene.add(ground)
@@ -157,6 +157,7 @@ renderer.setAnimationLoop(() => {
     brakeToStop: store.get('bike.brakeToStop'),
     frontWheelLock: store.get('bike.frontWheelLock'),
     grip: store.get('bike.grip'),
+    slopePull: store.get('bike.slopePull') / 100,
   }
   const wasAirborne = ride.airborne
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)

@@ -31,6 +31,11 @@ export const SETTINGS: Setting[] = [
     note: 'Seconds from 100 km/h to a stop, holding S. Lower brakes harder.',
   },
   {
+    kind: 'slider', id: 'bike.slopePull', name: 'Slope pull', tab: 'Bike', section: 'Speed',
+    min: 0, max: 150, step: 5, default: 100, unit: '%',
+    note: 'How hard slopes pull the bike back going up and push it on going down. 100 is real gravity, 0 is none.',
+  },
+  {
     kind: 'slider', id: 'bike.frontWheelLock', name: 'Front wheel lock', tab: 'Bike', section: 'Steering',
     min: 10, max: 80, step: 1, default: 60, unit: '°',
     note: 'How far the front wheel turns either way, holding A or D. Sets the tightest turn, at low speed: 45° turns in a 1.5 m circle. A real dirt bike turns about 40 to 45.',
@@ -78,7 +83,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'camera.up', name: 'Height', tab: 'Camera', section: 'Chase camera',
-    min: 0.3, max: 6, step: 0.1, default: 5, unit: 'm',
+    min: 0.3, max: 6, step: 0.1, default: 2.3, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.lag', name: 'Swing lag', tab: 'Camera', section: 'Chase camera',
@@ -88,20 +93,20 @@ export const SETTINGS: Setting[] = [
   // Temporary: things here for trying out, not to stay
   {
     kind: 'slider', id: 'ramp.angle', name: 'Ramp angle', tab: 'Temporary', section: 'Ramp',
-    min: 5, max: 60, step: 1, default: 25, unit: '°',
+    min: 5, max: 60, step: 1, default: 35, unit: '°',
     note: 'How steep the run-up rises.',
   },
   {
     kind: 'slider', id: 'ramp.height', name: 'Height', tab: 'Temporary', section: 'Ramp',
-    min: 0.3, max: 8, step: 0.1, default: 2, unit: 'm',
+    min: 0.3, max: 60, step: 0.1, default: 8, unit: 'm',
   },
   {
     kind: 'slider', id: 'ramp.width', name: 'Width', tab: 'Temporary', section: 'Ramp',
-    min: 1, max: 20, step: 0.5, default: 6, unit: 'm',
+    min: 1, max: 40, step: 0.5, default: 6, unit: 'm',
   },
   {
     kind: 'slider', id: 'ramp.top', name: 'Flat top', tab: 'Temporary', section: 'Ramp',
-    min: 0, max: 30, step: 0.5, default: 4, unit: 'm',
+    min: 0, max: 60, step: 0.5, default: 12, unit: 'm',
     note: 'How much flat top there is after the lip, before the back side drops. 0 is a pointy kicker.',
   },
   {
@@ -111,7 +116,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'ramp.distance', name: 'Distance', tab: 'Temporary', section: 'Ramp',
-    min: 5, max: 150, step: 1, default: 40, unit: 'm',
+    min: 5, max: 150, step: 1, default: 33, unit: 'm',
     note: 'How far ahead of the start (R) the run-up begins: more room to build speed.',
   },
   {

@@ -14,7 +14,8 @@ import { WHEELBASE } from './bike/bikeModel'
  * swinging between them over barsSwing. So turning in and straightening up
  * are equally quick at any speed.
  *
- * Up and down, just as simple: on the ground the bike follows it, and leaves
+ * Up and down, just as simple: on the ground the bike follows it, gravity
+ * pulling it back down slopes (Slope pull), and it leaves
  * it wherever the ground drops away faster than gravity could pull the bike
  * down after it (off a ramp's lip). In the air, gravity pulls it down and
  * nothing else changes: no throttle, brakes or turning until it lands.
@@ -40,6 +41,8 @@ export interface Tuning {
   frontWheelLock: number
   /** How hard the tyres can push sideways, g. */
   grip: number
+  /** How much of gravity along a slope pulls the bike back uphill and on downhill, 0 to 1.5. */
+  slopePull: number
 }
 
 export interface Input {
@@ -106,6 +109,18 @@ export class Ride {
     const top = tune.topSpeed * KMH
     const hundred = 100 * KMH
     const before = this.speed
+
+    // The slope just behind the bike (the way it's going), so on the step
+    // that crosses a lip it's still the ramp's slope: rise per metre along the heading.
+    const sin = Math.sin(this.heading)
+    const cos = Math.cos(this.heading)
+    const going = this.speed < 0 ? -1 : 1
+    const behind = ground(this.x - sin * SLOPE_FEEL * going, this.z + cos * SLOPE_FEEL * going)
+    const slope = (going * (ground(this.x, this.z) - behind)) / SLOPE_FEEL
+    // Gravity along the slope pulls back down it, uphill or down (sin of its
+    // angle). Before throttle and brakes, so coasting or braking can hold the bike still.
+    this.speed -= G * tune.slopePull * (slope / Math.sqrt(1 + slope * slope)) * dt
+
     if (input.throttle) {
       this.speed = Math.min(this.speed + (hundred / tune.zeroToHundred) * dt, top)
     } else if (input.brake && this.speed > 0) {
@@ -139,18 +154,11 @@ export class Ride {
     this.turnRate = rate / DEG
     this.heading += rate * dt
 
-    // Along the ground: the slope just behind the bike (the way it's going),
-    // so on the step that crosses a lip it's still the ramp's slope. Up or
-    // down it, part of the speed goes into climbing.
-    const sin = Math.sin(this.heading)
-    const cos = Math.cos(this.heading)
-    const going = this.speed < 0 ? -1 : 1
-    const behind = ground(this.x - sin * SLOPE_FEEL * going, this.z + cos * SLOPE_FEEL * going)
-    const slope = (going * (ground(this.x, this.z) - behind)) / SLOPE_FEEL
+    // Along the ground: up or down a slope, part of the speed goes into climbing.
     const across = this.speed / Math.sqrt(1 + slope * slope)
     const climb = across * slope
-    this.x += sin * across * dt
-    this.z -= cos * across * dt
+    this.x += Math.sin(this.heading) * across * dt
+    this.z -= Math.cos(this.heading) * across * dt
     this.spin += (this.speed * dt) / radius
     this.pitch = Math.atan(slope)
 
