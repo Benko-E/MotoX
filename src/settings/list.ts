@@ -47,17 +47,17 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'slide.angle', name: 'Slide angle', tab: 'Bike', section: 'Powerslide',
-    min: 0, max: 70, step: 1, default: 30, unit: '°',
+    min: 0, max: 70, step: 1, default: 46, unit: '°',
     note: 'Hold Space and steer: how far the rear swings out at full steering, so you slide round side-on.',
   },
   {
     kind: 'slider', id: 'slide.kickOut', name: 'Kick-out time', tab: 'Bike', section: 'Powerslide',
-    min: 0, max: 0.6, step: 0.01, default: 0.15, unit: 's',
+    min: 0, max: 0.6, step: 0.01, default: 0.07, unit: 's',
     note: 'How long the rear takes to swing out once you press Space.',
   },
   {
     kind: 'slider', id: 'slide.hookUp', name: 'Hook-up time', tab: 'Bike', section: 'Powerslide',
-    min: 0.05, max: 1.5, step: 0.01, default: 0.3, unit: 's',
+    min: 0.05, max: 1.5, step: 0.01, default: 0.2, unit: 's',
     note: 'How long the rear takes to hook back up after you let go.',
   },
   {
@@ -67,7 +67,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'slide.scrub', name: 'Speed scrub', tab: 'Bike', section: 'Powerslide',
-    min: 0, max: 80, step: 1, default: 20, unit: 'km/h/s',
+    min: 0, max: 80, step: 1, default: 45, unit: 'km/h/s',
     note: 'How much speed sliding scrubs off at full steering. The throttle earns some back.',
   },
   {
@@ -77,7 +77,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Lean (looks only)',
-    min: 0, max: 60, step: 1, default: 40, unit: '°',
+    min: 0, max: 60, step: 1, default: 45, unit: '°',
     note: 'How far the bike leans into a turn when the tyres are at their grip; gentler turns lean less. Only drawn: it does not change how the bike turns.',
   },
   {

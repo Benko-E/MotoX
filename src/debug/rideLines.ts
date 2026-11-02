@@ -80,7 +80,7 @@ export class RideLines {
     const turning = ride.turnRadius < 1e4 && ride.speed !== 0
     this.circle.visible = turning && this.store.isOn('line.turnCircle')
     if (this.circle.visible) {
-      const side = Math.sign(ride.wheelAngle)
+      const side = Math.sign(ride.steering) // not the wheel: powersliding, it points the other way
       const right = this.dir.set(Math.cos(ride.heading), 0, Math.sin(ride.heading))
       this.circle.position.set(ride.x, ride.y + CIRCLE_LIFT, ride.z).addScaledVector(right, side * ride.turnRadius)
       this.circle.scale.setScalar(ride.turnRadius)
