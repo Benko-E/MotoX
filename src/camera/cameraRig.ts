@@ -4,7 +4,7 @@ import type { SettingsStore } from '../settings/store'
 import { FlyCamera } from './flyCamera'
 
 /** The views C goes through, in order. */
-export const VIEWS = ['chase', 'close', 'high', 'helmet', 'free'] as const
+export const VIEWS = ['close', 'chase', 'high', 'helmet', 'free'] as const
 export type View = (typeof VIEWS)[number]
 export const VIEW_NAMES: Record<View, string> = {
   chase: 'Chase',
@@ -17,8 +17,7 @@ export const VIEW_NAMES: Record<View, string> = {
 const BEHIND: Partial<Record<View, string>> = { chase: 'camera', close: 'camera.close', high: 'camera.high' }
 /** Seconds the camera takes to follow the bike up and down. */
 const RISE = 0.15
-/** The helmet view looks this far down from level, radians. */
-const HELMET_DIP = 6 * (Math.PI / 180)
+const DEG = Math.PI / 180
 
 /** What the camera needs to know about the drawn bike. */
 export interface BikeView {
@@ -26,8 +25,8 @@ export interface BikeView {
   root: THREE.Object3D
   /** Where the rider's head is drawn, in world space. */
   headPosition(target: THREE.Vector3): THREE.Vector3
-  /** Hidden in the helmet view, so the camera doesn't look at the inside of it. */
-  headVisible: boolean
+  /** On in the helmet view: hides the rider's helmet, chest and upper arms, which would fill it. */
+  firstPerson: boolean
 }
 
 /**
@@ -42,6 +41,7 @@ export class CameraRig {
   private y = 0
   private readonly fly: FlyCamera
   private readonly head = new THREE.Vector3()
+  private readonly offset = new THREE.Vector3()
 
   constructor(
     private readonly camera: THREE.PerspectiveCamera,
@@ -72,7 +72,7 @@ export class CameraRig {
 
   /** Call once a frame, after the bike has been drawn. */
   update(ride: Ride, bike: BikeView, dt: number): void {
-    const fov = this.store.get('camera.fov')
+    const fov = this.store.get(this.view === 'helmet' ? 'camera.helmet.fov' : 'camera.fov')
     if (this.camera.fov !== fov) {
       this.camera.fov = fov
       this.camera.updateProjectionMatrix()
@@ -81,18 +81,21 @@ export class CameraRig {
     const lag = this.store.get('camera.lag')
     this.heading = lag > 0 ? this.heading + (ride.heading - this.heading) * (1 - Math.exp(-dt / lag)) : ride.heading
     this.y += (ride.y - this.y) * (1 - Math.exp(-dt / RISE))
-    bike.headVisible = this.view !== 'helmet'
+    bike.firstPerson = this.view === 'helmet'
 
     if (this.view === 'free') {
       this.fly.update(dt)
       return
     }
     if (this.view === 'helmet') {
-      // from the rider's eyes, looking the way the bike points, tilting with it half as much
+      // from the rider's eyes, moved up and back in the bike's own frame so the bars
+      // and his arms are in view, looking the way the bike points
+      const s = (id: string) => this.store.get(`camera.helmet.${id}`)
       const r = bike.root.rotation
       bike.headPosition(this.head)
-      this.camera.position.copy(this.head)
-      this.camera.rotation.set(r.x - HELMET_DIP, r.y, r.z * 0.5, 'YXZ')
+      this.offset.set(0, s('up'), s('back')).applyQuaternion(bike.root.quaternion)
+      this.camera.position.copy(this.head).add(this.offset)
+      this.camera.rotation.set(r.x - s('down') * DEG, r.y, r.z * (s('lean') / 100), 'YXZ')
       return
     }
     const prefix = BEHIND[this.view]!

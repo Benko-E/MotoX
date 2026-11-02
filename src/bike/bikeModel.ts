@@ -149,9 +149,9 @@ export class BikeModel {
     return this.rider.headPosition(target)
   }
 
-  /** Hides the rider's helmet, for looking out through it. */
-  set headVisible(on: boolean) {
-    this.rider.headVisible = on
+  /** Looking out through the rider's eyes: hides what of him would fill the view. */
+  set firstPerson(on: boolean) {
+    this.rider.firstPerson = on
   }
 
   /** A rod of `thickness` on the bike, stretched between two points with `placeBetween`. */

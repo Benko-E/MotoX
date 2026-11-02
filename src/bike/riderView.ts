@@ -222,9 +222,9 @@ export class RiderView {
     return this.head.getWorldPosition(target)
   }
 
-  /** Hides the helmet, for looking out through it. */
-  set headVisible(on: boolean) {
-    this.head.visible = on
+  /** Looking out through his eyes: hides his helmet, chest and upper arms, which would fill the view; his forearms, hands and legs stay. */
+  set firstPerson(on: boolean) {
+    for (const part of [this.head, this.torso, ...this.upperArms]) part.visible = !on
   }
 
   /** A box limb `thickness` across, stretched between two points by `place`. */

@@ -231,6 +231,30 @@ export const SETTINGS: Setting[] = [
     min: -1, max: 3, step: 0.05, default: 0.6, unit: 'm',
   },
   {
+    kind: 'slider', id: 'camera.helmet.fov', name: 'Field of view', tab: 'Camera', section: 'Helmet camera',
+    min: 30, max: 120, step: 1, default: 80, unit: '°',
+    note: 'Its own, usually wider than the other views, so the bars fit in.',
+  },
+  {
+    kind: 'slider', id: 'camera.helmet.up', name: 'Eye height', tab: 'Camera', section: 'Helmet camera',
+    min: -0.3, max: 0.8, step: 0.01, default: 0.1, unit: 'm',
+    note: 'Above the rider’s head (he crouches and stands, and the camera goes with him).',
+  },
+  {
+    kind: 'slider', id: 'camera.helmet.back', name: 'Eye back', tab: 'Camera', section: 'Helmet camera',
+    min: -0.3, max: 1.5, step: 0.01, default: 0.25, unit: 'm',
+    note: 'Behind his head (negative is in front). His helmet, chest and upper arms are hidden in this view, so the bars and his hands show.',
+  },
+  {
+    kind: 'slider', id: 'camera.helmet.down', name: 'Look down', tab: 'Camera', section: 'Helmet camera',
+    min: -10, max: 45, step: 1, default: 15, unit: '°',
+  },
+  {
+    kind: 'slider', id: 'camera.helmet.lean', name: 'Lean with the bike', tab: 'Camera', section: 'Helmet camera',
+    min: 0, max: 100, step: 5, default: 50, unit: '%',
+    note: '100 tips the horizon all the way with the bike, 0 keeps it level.',
+  },
+  {
     kind: 'slider', id: 'camera.flySpeed', name: 'Speed', tab: 'Camera', section: 'Free roam',
     min: 2, max: 100, step: 1, default: 25, unit: 'm/s',
     note: 'W A S D fly, Space up, Q down, hold the right mouse button to look around. The bike waits.',
