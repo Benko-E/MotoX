@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import { BikeModel, WHEEL_RADIUS } from './bike/bikeModel'
+import { RampArcs } from './debug/rampArcs'
 import { RideLines } from './debug/rideLines'
 import { MIN_AIRTIME, Ride, type Input, type Tuning } from './ride'
 import { SETTINGS, TABS } from './settings/list'
+import type { LineSetting } from './settings/types'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { Ramp, type RampShape } from './world/ramp'
@@ -82,8 +84,16 @@ const rampMaterial = new THREE.MeshStandardMaterial({ map: dirt.clone(), color: 
 rampMaterial.map!.repeat.set(1, 1)
 rampMaterial.map!.needsUpdate = true
 const ramp = new Ramp(scene, rampShape(), rampMaterial)
+const arcSetting = SETTINGS.find((s): s is LineSetting => s.id === 'ramp.arcs')!
+const arcs = new RampArcs(scene, arcSetting.color!)
+const reshapeRamp = () => {
+  ramp.build(rampShape())
+  arcs.build(ramp, store.get('bike.topSpeed'))
+  arcs.visible = store.isOn('ramp.arcs')
+}
+reshapeRamp()
 store.onChange((id) => {
-  if (id.startsWith('ramp.')) ramp.build(rampShape())
+  if (id.startsWith('ramp.') || id === 'bike.topSpeed') reshapeRamp()
 })
 const groundAt = (x: number, z: number) => ramp.heightAt(x, z)
 

@@ -16,6 +16,14 @@ export interface RampShape {
   distance: number
 }
 
+/** A ramp's lip: where it is along z, how high, the slope leading up to it (degrees), and which way you fly off it along z. */
+export interface Lip {
+  z: number
+  height: number
+  angle: number
+  direction: 1 | -1
+}
+
 const DEG = Math.PI / 180
 
 /**
@@ -64,6 +72,18 @@ export class Ramp {
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 4, uv.getY(i) / 4)
     this.mesh.geometry.dispose()
     this.mesh.geometry = geometry
+  }
+
+  /**
+   * The two lips you can jump off: the run-up's, flying on toward -z, and
+   * the back side's (riding the ramp the other way), flying toward +z.
+   */
+  lips(): Lip[] {
+    const { height, top, distance, angle, landing } = this.shape
+    return [
+      { z: -(distance + this.up), height, angle, direction: -1 },
+      { z: -(distance + this.up + top), height, angle: landing, direction: 1 },
+    ]
   }
 
   /** The height of the ground at (x, z): the ramp's top surface, or 0 off it. */

@@ -34,7 +34,7 @@ export class RideLines {
     settings: Setting[],
     private readonly store: SettingsStore,
   ) {
-    for (const s of settings.filter((s): s is LineSetting => s.kind === 'line' && s.id !== 'line.turnCircle' && s.color !== undefined)) {
+    for (const s of settings.filter((s): s is LineSetting => s.kind === 'line' && s.id.startsWith('line.') && s.id !== 'line.turnCircle' && s.color !== undefined)) {
       const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(), 1, s.color, 0.3, 0.16)
       for (const part of [arrow.line, arrow.cone]) {
         const material = part.material as THREE.Material

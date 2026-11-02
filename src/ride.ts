@@ -52,8 +52,8 @@ export interface Input {
 const KMH = 1 / 3.6
 const DEG = Math.PI / 180
 const G = 9.81
-/** How far ahead and behind the bike the ground is felt to find its slope, metres. */
-const SLOPE_FEEL = 0.3
+/** How far behind the bike the ground is felt to find its slope, metres. */
+const SLOPE_FEEL = 0.05
 /** Air shorter than this is a bump, not a jump: the airtime isn't shown, seconds. */
 export const MIN_AIRTIME = 0.15
 
@@ -139,29 +139,34 @@ export class Ride {
     this.turnRate = rate / DEG
     this.heading += rate * dt
 
-    // Along the ground: up or down a slope, part of the speed goes into climbing.
+    // Along the ground: the slope just behind the bike (the way it's going),
+    // so on the step that crosses a lip it's still the ramp's slope. Up or
+    // down it, part of the speed goes into climbing.
     const sin = Math.sin(this.heading)
     const cos = Math.cos(this.heading)
-    const slope = (ground(this.x + sin * SLOPE_FEEL, this.z - cos * SLOPE_FEEL) - ground(this.x - sin * SLOPE_FEEL, this.z + cos * SLOPE_FEEL)) / (2 * SLOPE_FEEL)
+    const going = this.speed < 0 ? -1 : 1
+    const behind = ground(this.x - sin * SLOPE_FEEL * going, this.z + cos * SLOPE_FEEL * going)
+    const slope = (going * (ground(this.x, this.z) - behind)) / SLOPE_FEEL
     const across = this.speed / Math.sqrt(1 + slope * slope)
+    const climb = across * slope
     this.x += sin * across * dt
     this.z -= cos * across * dt
     this.spin += (this.speed * dt) / radius
     this.pitch = Math.atan(slope)
 
-    // Following the ground takes this upward speed; if gravity can't pull the
-    // bike down that fast, it leaves the ground with the speed it had.
+    // Thrown on along the slope, gravity would carry the bike to `thrown`; if
+    // the ground drops away below that (off a lip), it leaves the ground.
     const height = ground(this.x, this.z)
-    const follow = (height - this.y) / dt
-    if (follow < this.vy - G * dt) {
+    const thrown = this.y + climb * dt - 0.5 * G * dt * dt
+    if (height < thrown - 1e-4) {
       this.airborne = true
       this.airSpeed = across
       this.airtime = 0
-      this.vy -= G * dt
-      this.y += this.vy * dt
+      this.vy = climb - G * dt
+      this.y = thrown
     } else {
+      this.vy = (height - this.y) / dt
       this.y = height
-      this.vy = follow
     }
   }
 

@@ -114,4 +114,9 @@ export const SETTINGS: Setting[] = [
     min: 5, max: 150, step: 1, default: 40, unit: 'm',
     note: 'How far ahead of the start (R) the run-up begins: more room to build speed.',
   },
+  {
+    kind: 'line', id: 'ramp.arcs', name: 'Flight arcs', tab: 'Temporary', section: 'Ramp',
+    default: true, color: 0xff2a2a,
+    note: 'Where you fly off each lip riding straight up the middle: at top speed, and 10 and 20 km/h slower, with each airtime.',
+  },
 ]
