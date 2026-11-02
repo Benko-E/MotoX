@@ -32,7 +32,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'bike.frontWheelLock', name: 'Front wheel lock', tab: 'Bike', section: 'Steering',
-    min: 10, max: 60, step: 1, default: 45, unit: '°',
+    min: 10, max: 80, step: 1, default: 60, unit: '°',
     note: 'How far the front wheel turns either way, holding A or D. Sets the tightest turn, at low speed: 45° turns in a 1.5 m circle. A real dirt bike turns about 40 to 45.',
   },
   {
@@ -42,7 +42,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Lean (looks only)',
-    min: 0, max: 60, step: 1, default: 35, unit: '°',
+    min: 0, max: 60, step: 1, default: 40, unit: '°',
     note: 'How far the bike leans into a turn when the tyres are at their grip; gentler turns lean less. Only drawn: it does not change how the bike turns.',
   },
   {
