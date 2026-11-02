@@ -233,9 +233,9 @@ renderer.setAnimationLoop(() => {
   // the way to Max lean when they're at their grip.
   const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / (store.get('bike.grip') * 9.81)
   const turnLean = Math.sign(ride.turnRate) * Math.min(sideways, 1) * store.get('bike.maxLean') * DEG
-  // up on the rear wheel, A/D bank it over too
-  const bank = ride.steering * ride.wheelie * store.get('wheelie.bank') * DEG
-  const leanTarget = Math.abs(bank) > Math.abs(turnLean) ? bank : turnLean
+  // up on the rear wheel, A/D bank it over instead, as far as Bank says
+  const bank = ride.steering * store.get('wheelie.bank') * DEG
+  const leanTarget = turnLean + (bank - turnLean) * ride.wheelie
   lean += (leanTarget - lean) * (1 - Math.exp(-dt / LEAN_TIME))
   // Turned, then leaned over about where the tyres touch the ground, then
   // pitched: along the slope, plus a wheelie's lift. So a wheelie banks over
