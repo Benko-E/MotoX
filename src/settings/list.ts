@@ -47,7 +47,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'slide.angle', name: 'Slide angle', tab: 'Bike', section: 'Powerslide',
-    min: 0, max: 70, step: 1, default: 46, unit: '°',
+    min: 0, max: 70, step: 1, default: 50, unit: '°',
     note: 'Hold Space and steer: how far the rear swings out at full steering, so you slide round side-on.',
   },
   {
@@ -77,7 +77,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Lean (looks only)',
-    min: 0, max: 60, step: 1, default: 45, unit: '°',
+    min: 0, max: 60, step: 1, default: 46, unit: '°',
     note: 'How far the bike leans into a turn when the tyres are at their grip; gentler turns lean less. Only drawn: it does not change how the bike turns.',
   },
   {
@@ -203,7 +203,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'camera.look', name: 'Looks at', tab: 'Camera', section: 'Chase camera',
-    min: -1, max: 3, step: 0.05, default: 0.9, unit: 'm',
+    min: -1, max: 3, step: 0.05, default: 0.5, unit: 'm',
     note: 'How high above the bike the camera aims.',
   },
   {
@@ -212,11 +212,11 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'camera.close.up', name: 'Height', tab: 'Camera', section: 'Close camera',
-    min: 0.3, max: 6, step: 0.1, default: 1.3, unit: 'm',
+    min: 0.3, max: 6, step: 0.1, default: 3.5, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.close.look', name: 'Looks at', tab: 'Camera', section: 'Close camera',
-    min: -1, max: 3, step: 0.05, default: 1, unit: 'm',
+    min: -1, max: 3, step: 0.05, default: 1.5, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.high.back', name: 'Distance', tab: 'Camera', section: 'High camera',
@@ -224,11 +224,11 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'camera.high.up', name: 'Height', tab: 'Camera', section: 'High camera',
-    min: 1, max: 30, step: 0.5, default: 12, unit: 'm',
+    min: 1, max: 30, step: 0.5, default: 15.5, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.high.look', name: 'Looks at', tab: 'Camera', section: 'High camera',
-    min: -1, max: 3, step: 0.05, default: 0.6, unit: 'm',
+    min: -1, max: 3, step: 0.05, default: -0.3, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.helmet.fov', name: 'Field of view', tab: 'Camera', section: 'Helmet camera',
