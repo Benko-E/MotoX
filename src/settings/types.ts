@@ -14,7 +14,7 @@ export type SliderSetting = {
   note?: string
 }
 
-/** A debug line drawn in the world, switched on and off with a checkbox. Never in "Copy changes". */
+/** A debug line drawn in the world (or a debug readout), switched on and off with a checkbox. Never in "Copy changes". */
 export type LineSetting = {
   kind: 'line'
   id: string
@@ -22,8 +22,8 @@ export type LineSetting = {
   tab: string
   section: string
   default: boolean
-  /** The colour it's drawn in, so the menu can show it. */
-  color: number
+  /** The colour it's drawn in, so the menu can show it. None for a readout that isn't drawn in the world. */
+  color?: number
   note?: string
 }
 

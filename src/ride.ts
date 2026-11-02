@@ -1,16 +1,19 @@
+import { WHEELBASE } from './bike/bikeModel'
+
 /**
  * How the bike rides, dead simple: no physics, the bike goes where you point
  * it. W speeds it up, S slows it down (and reverses slowly from a stop), A/D
  * turn it. The numbers you tune live in the debug menu (Tuning); the rest are
  * in HANDLING.
+ *
+ * Turning: the bike rides round whichever circle is bigger of
+ * - the front wheel's: wheelbase / tan(front wheel angle), tight at full lock;
+ * - grip's: speed² / grip, how tight the tyres can hold at this speed.
+ * Slow, the front wheel decides; fast, grip does, and turns get wider.
  */
 export const HANDLING = {
   /** Fastest backwards, holding S from a stop, km/h. */
   reverseSpeed: 8,
-  /** How fast the bike turns holding A or D, degrees per second. */
-  turnRate: 110,
-  /** Below this speed the bike turns less, down to not at all standing still, km/h. */
-  fullTurnSpeed: 15,
   /** Seconds the bars take to swing over (and back when you let go). */
   barsSwing: 0.12,
 }
@@ -27,6 +30,8 @@ export interface Tuning {
   brakeToStop: number
   /** How far the front wheel turns either way, degrees. */
   frontWheelLock: number
+  /** How hard the tyres can push sideways, g. */
+  grip: number
 }
 
 export interface Input {
@@ -38,6 +43,7 @@ export interface Input {
 
 const KMH = 1 / 3.6
 const DEG = Math.PI / 180
+const G = 9.81
 
 export class Ride {
   /** Where the bike is on the ground, metres. */
@@ -49,10 +55,18 @@ export class Ride {
   speed = 0
   /** How hard it slowed down this step, m/s² (0 when speeding up or standing). */
   slowing = 0
-  /** How far the bars are turned, degrees (positive = right). */
+  /** How far the rider is turning the bars, degrees (positive = right): toward full lock while A or D is held. */
   bars = 0
+  /** How far the front wheel actually turns, degrees: the bars, or less where grip can't hold that tight a turn. */
+  wheelAngle = 0
   /** Where the bars are heading: -1 full left, 0 straight, 1 full right. */
   steer = 0
+  /** The circle the bike is riding round, metres (Infinity going straight). */
+  turnRadius = Infinity
+  /** How fast the bike swings round, degrees per second (positive = right). */
+  turnRate = 0
+  /** What's setting the turn radius: the front wheel's lock, grip, or nothing (going straight). */
+  limit: 'front wheel' | 'grip' | null = null
   /** How far the wheels have rolled, radians. */
   spin = 0
 
@@ -77,10 +91,16 @@ export class Ride {
 
     this.steer = (input.right ? 1 : 0) - (input.left ? 1 : 0)
     this.bars += (this.steer * tune.frontWheelLock - this.bars) * (1 - Math.exp(-dt / h.barsSwing))
-    // turning grows with speed up to fullTurnSpeed; going backwards it turns the other way
-    const grip = Math.min(Math.abs(this.speed) / (h.fullTurnSpeed * KMH), 1) * Math.sign(this.speed)
-    const turning = tune.frontWheelLock > 0 ? this.bars / tune.frontWheelLock : 0
-    this.heading += turning * h.turnRate * DEG * grip * dt
+    const wheelRadius = Math.abs(this.bars) > 0.05 ? WHEELBASE / Math.tan(Math.abs(this.bars) * DEG) : Infinity
+    const gripRadius = (this.speed * this.speed) / (tune.grip * G)
+    this.turnRadius = Math.max(wheelRadius, gripRadius)
+    this.limit = this.turnRadius === Infinity ? null : gripRadius > wheelRadius ? 'grip' : 'front wheel'
+    // the front wheel turns only as far as that circle takes
+    this.wheelAngle = (Math.sign(this.bars) * Math.atan(WHEELBASE / this.turnRadius)) / DEG
+    // round the circle at this speed; backwards, it swings the other way
+    const rate = this.turnRadius === Infinity ? 0 : (Math.sign(this.bars) * this.speed) / this.turnRadius
+    this.turnRate = rate / DEG
+    this.heading += rate * dt
 
     this.x += Math.sin(this.heading) * this.speed * dt
     this.z -= Math.cos(this.heading) * this.speed * dt

@@ -33,7 +33,12 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'slider', id: 'bike.frontWheelLock', name: 'Front wheel lock', tab: 'Bike', section: 'Steering',
     min: 10, max: 60, step: 1, default: 45, unit: '°',
-    note: 'How far the front wheel turns either way, holding A or D. A real dirt bike turns about 40 to 45.',
+    note: 'How far the front wheel turns either way, holding A or D. Sets the tightest turn, at low speed: 45° turns in a 1.5 m circle. A real dirt bike turns about 40 to 45.',
+  },
+  {
+    kind: 'slider', id: 'bike.grip', name: 'Grip', tab: 'Bike', section: 'Steering',
+    min: 0.3, max: 8, step: 0.1, default: 3, unit: 'g',
+    note: 'How hard the tyres can push sideways. Sets how wide you turn at speed: the faster, the wider. Real tyres on dirt manage about 1.',
   },
   {
     kind: 'line', id: 'line.forward', name: 'Forward', tab: 'Bike', section: 'Debug lines',
@@ -48,7 +53,17 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'line', id: 'line.steering', name: 'Steering', tab: 'Bike', section: 'Debug lines',
     default: false, color: 0x3aa8ff,
-    note: 'From the front wheel, the way it points while you hold A or D.',
+    note: 'From the front wheel, the way you are steering while you hold A or D. At speed the wheel itself turns less, where grip limits it.',
+  },
+  {
+    kind: 'line', id: 'line.turnCircle', name: 'Turning circle', tab: 'Bike', section: 'Debug lines',
+    default: false, color: 0xffd23a,
+    note: 'On the ground, the circle the bike is riding round while it turns.',
+  },
+  {
+    kind: 'line', id: 'line.turnReadout', name: 'Turn readout', tab: 'Bike', section: 'Debug lines',
+    default: false,
+    note: 'Bottom left: the turn radius, how fast the bike swings round, and whether the front wheel or grip is limiting it.',
   },
 
   // Camera

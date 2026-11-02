@@ -25,6 +25,21 @@
         text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
         pointer-events: none;
       }
+      #turn {
+        position: fixed;
+        bottom: 18px;
+        left: 18px;
+        padding: 6px 10px;
+        font: 14px/1.5 ui-monospace, Consolas, monospace;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 4px;
+        white-space: pre;
+        pointer-events: none;
+      }
+      #turn[hidden] {
+        display: none;
+      }
       #help {
         position: fixed;
         top: 8%;
@@ -77,6 +92,7 @@
   <body>
     <div id="app"></div>
     <div id="hud"></div>
+    <div id="turn" hidden></div>
     <div id="help">
       <h1>MOTO<span>X</span></h1>
       <dl>

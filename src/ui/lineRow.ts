@@ -16,7 +16,7 @@ export class LineRow implements Piece {
 
     const swatch = document.createElement('span')
     swatch.className = 'menu-swatch'
-    swatch.style.background = `#${s.color.toString(16).padStart(6, '0')}`
+    if (s.color !== undefined) swatch.style.background = `#${s.color.toString(16).padStart(6, '0')}`
 
     const name = document.createElement('span')
     name.className = 'menu-name'

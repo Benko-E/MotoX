@@ -107,11 +107,12 @@ renderer.setAnimationLoop(() => {
     coastToStop: store.get('bike.coastToStop'),
     brakeToStop: store.get('bike.brakeToStop'),
     frontWheelLock: store.get('bike.frontWheelLock'),
+    grip: store.get('bike.grip'),
   }
   ride.step(input, tune, dt, WHEEL_RADIUS)
   bike.root.position.set(ride.x, 0, ride.z)
   bike.root.rotation.y = -ride.heading
-  bike.update(ride.bars, ride.spin)
+  bike.update(ride.wheelAngle, ride.spin)
   lines.update(ride)
 
   const lag = store.get('camera.lag')
