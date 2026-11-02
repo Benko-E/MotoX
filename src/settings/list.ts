@@ -18,7 +18,7 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'slider', id: 'bike.zeroToHundred', name: '0 to 100', tab: 'Bike', section: 'Speed',
     min: 1, max: 15, step: 0.1, default: 3, unit: 's',
-    note: 'Seconds from standing to 100 km/h, holding W. A real 450 does it in about 3. Below 100 top speed, it tops out sooner.',
+    note: 'Seconds from standing to 100 km/h, holding W. A real 450 does it in about 3. The engine bites hardest from a standstill and runs out of push near top speed.',
   },
   {
     kind: 'slider', id: 'bike.coastToStop', name: 'Coasting', tab: 'Bike', section: 'Speed',

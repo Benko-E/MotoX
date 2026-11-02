@@ -2,7 +2,8 @@ import { WHEELBASE } from './bike/bikeModel'
 
 /**
  * How the bike rides, dead simple: no physics, the bike goes where you point
- * it. W speeds it up, S slows it down (and reverses slowly from a stop), A/D
+ * it. W speeds it up (hardest from a standstill), S slows it down (and
+ * reverses slowly from a stop), A/D
  * turn it. The numbers you tune live in the debug menu (Tuning); the rest are
  * in HANDLING.
  *
@@ -122,7 +123,13 @@ export class Ride {
     this.speed -= G * tune.slopePull * (slope / Math.sqrt(1 + slope * slope)) * dt
 
     if (input.throttle) {
-      this.speed = Math.min(this.speed + (hundred / tune.zeroToHundred) * dt, top)
+      // The engine pushes hardest from a standstill and runs out of push at
+      // top speed: push = punch x (1 - (speed / top)²). Punch is set so 0 to
+      // 100 still takes zeroToHundred (or to just under top speed, if that's
+      // below 100). Climbing, gravity eats into what's left, so you slow down.
+      const target = Math.min(hundred, 0.95 * top)
+      const punch = (top * Math.atanh(target / top)) / tune.zeroToHundred
+      this.speed += punch * Math.max(1 - (this.speed / top) ** 2, 0) * dt
     } else if (input.brake && this.speed > 0) {
       this.speed = Math.max(this.speed - (hundred / tune.brakeToStop) * dt, 0)
     } else if (input.brake) {
