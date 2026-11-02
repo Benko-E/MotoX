@@ -84,7 +84,8 @@ export class RiderMotion {
     const speeding = dt > 0 ? (Math.abs(ride.speed) - Math.abs(this.lastSpeed)) / dt : 0
     this.lastSpeed = ride.speed
     const shift = ride.airborne ? 0 : clamp(Math.abs(speeding) / Math.max(s.shiftFull, 1e-6))
-    const leanTo = speeding > 0 ? -shift * s.leanBack : shift * s.leanForward
+    // ...unless he's putting his weight back or forward himself (the arrow keys)
+    const leanTo = ride.riderLean !== 0 ? ride.riderLean : speeding > 0 ? -shift * s.leanBack : shift * s.leanForward
     this.lean += (leanTo - this.lean) * ease(dt, s.shiftTime)
 
     // The inside foot comes out in slow, tight turns, and powersliding.

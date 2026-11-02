@@ -13,6 +13,7 @@ one small step at a time.
 | W / S | go, brake (hold S when stopped to back up) |
 | A / D | turn |
 | Space | powerslide: hold it while you steer |
+| ↓ / ↑ | lean back, forward (↓ with W: wheelie) |
 | C | camera: close, chase, high, helmet, free roam |
 | R | back to the start |
 | ` | debug menu |

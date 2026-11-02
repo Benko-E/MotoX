@@ -66,7 +66,7 @@ export class GroundEffects {
       const sign = i === 0 ? 1 : -1
       const x = ride.bodyX + forward.x * sign * (WHEELBASE / 2)
       const z = ride.bodyZ + forward.z * sign * (WHEELBASE / 2)
-      if (ride.airborne) {
+      if (ride.airborne || (i === 0 && ride.wheelie > 0.3)) { // the front's up in a wheelie
         this.tracks.touch(i, null, this.normal, 0)
         continue
       }

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { BikeModel, WHEEL_RADIUS } from './bike/bikeModel'
+import { BikeModel, WHEELBASE, WHEEL_RADIUS } from './bike/bikeModel'
 import { CameraRig, VIEW_NAMES } from './camera/cameraRig'
 import { RiderMotion } from './bike/riderMotion'
 import { RampArcs } from './debug/rampArcs'
@@ -165,11 +165,13 @@ const switchView = () => {
   const view = rig.next()
   viewName.textContent = VIEW_NAMES[view]
   sinceSwitch = 0
-  if (view === 'free') Object.assign(input, { throttle: false, brake: false, left: false, right: false, slide: false })
+  if (view === 'free') Object.assign(input, LET_GO)
 }
 
-const input: Input = { throttle: false, brake: false, left: false, right: false, slide: false }
-const KEYS: Record<string, keyof Input> = { KeyW: 'throttle', KeyS: 'brake', KeyA: 'left', KeyD: 'right', Space: 'slide' }
+/** Nothing held. */
+const LET_GO: Input = { throttle: false, brake: false, left: false, right: false, slide: false, leanBack: false, leanForward: false }
+const input: Input = { ...LET_GO }
+const KEYS: Record<string, keyof Input> = { KeyW: 'throttle', KeyS: 'brake', KeyA: 'left', KeyD: 'right', Space: 'slide', ArrowDown: 'leanBack', ArrowUp: 'leanForward' }
 const setKey = (event: KeyboardEvent, down: boolean) => {
   if (down && event.target instanceof HTMLInputElement) return // typing a number in the menu
   if (down && event.code === 'KeyC' && !event.repeat) switchView()
@@ -182,7 +184,7 @@ const setKey = (event: KeyboardEvent, down: boolean) => {
 }
 addEventListener('keydown', (event) => setKey(event, true))
 addEventListener('keyup', (event) => setKey(event, false))
-addEventListener('blur', () => Object.assign(input, { throttle: false, brake: false, left: false, right: false, slide: false }))
+addEventListener('blur', () => Object.assign(input, LET_GO))
 
 const resize = () => {
   renderer.setSize(innerWidth, innerHeight)
@@ -213,17 +215,34 @@ renderer.setAnimationLoop(() => {
     slideCircle: store.get('slide.tighterTurn') / 100,
     slideScrub: store.get('slide.scrub'),
     slideMinSpeed: store.get('slide.minSpeed'),
+    liftTime: store.get('wheelie.liftTime'),
+    dropTime: store.get('wheelie.dropTime'),
+    wheelieAccel: store.get('wheelie.accel') / 100,
+    wheelieTurn: store.get('wheelie.turnCircle'),
+    wheelieHold: store.get('wheelie.holdAbove'),
   }
   const wasAirborne = ride.airborne
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)
-  bike.root.position.set(ride.bodyX, ride.y, ride.bodyZ)
+  // A wheelie pitches the bike up about the rear axle, so the rear tyre stays on the ground.
+  const lift = ride.wheelie * store.get('wheelie.angle') * DEG
+  const half = WHEELBASE / 2
+  const liftUp = WHEEL_RADIUS * (1 - Math.cos(lift)) + half * Math.sin(lift)
+  const liftBack = half * (1 - Math.cos(lift)) - WHEEL_RADIUS * Math.sin(lift)
+  bike.root.position.set(
+    ride.bodyX - Math.sin(ride.bodyHeading) * liftBack,
+    ride.y + liftUp,
+    ride.bodyZ + Math.cos(ride.bodyHeading) * liftBack,
+  )
   pitch += (ride.pitch - pitch) * (1 - Math.exp(-dt / PITCH_TIME))
   // Lean into turns, more the harder the tyres are pushing sideways: all
   // the way to Max lean when they're at their grip.
   const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / (store.get('bike.grip') * 9.81)
-  const leanTarget = Math.sign(ride.turnRate) * Math.min(sideways, 1) * store.get('bike.maxLean') * DEG
+  const turnLean = Math.sign(ride.turnRate) * Math.min(sideways, 1) * store.get('bike.maxLean') * DEG
+  // up on the rear wheel, A/D bank it over too
+  const bank = ride.steering * ride.wheelie * store.get('wheelie.bank') * DEG
+  const leanTarget = Math.abs(bank) > Math.abs(turnLean) ? bank : turnLean
   lean += (leanTarget - lean) * (1 - Math.exp(-dt / LEAN_TIME))
-  bike.root.rotation.set(pitch, -ride.bodyHeading, -lean, 'YXZ') // leaning about where the tyres touch the ground
+  bike.root.rotation.set(pitch + lift, -ride.bodyHeading, -lean, 'YXZ') // leaning about where the tyres touch the ground
   effects.update(ride, input, dt)
   riderMotion.update(ride, dt)
   bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin, riderMotion)

@@ -76,6 +76,39 @@ export const SETTINGS: Setting[] = [
     note: 'Slower than this, Space does nothing.',
   },
   {
+    kind: 'slider', id: 'wheelie.angle', name: 'Wheelie angle', tab: 'Bike', section: 'Wheelie',
+    min: 5, max: 80, step: 1, default: 35, unit: '°',
+    note: 'Hold the down arrow (lean back) and W: the front comes up this far and stays there.',
+  },
+  {
+    kind: 'slider', id: 'wheelie.liftTime', name: 'Lift time', tab: 'Bike', section: 'Wheelie',
+    min: 0.05, max: 2, step: 0.01, default: 0.4, unit: 's',
+  },
+  {
+    kind: 'slider', id: 'wheelie.dropTime', name: 'Drop time', tab: 'Bike', section: 'Wheelie',
+    min: 0.05, max: 2, step: 0.01, default: 0.25, unit: 's',
+  },
+  {
+    kind: 'slider', id: 'wheelie.holdAbove', name: 'Hold above', tab: 'Bike', section: 'Wheelie',
+    min: 0, max: 110, step: 1, default: 30, unit: 'km/h',
+    note: 'Let go of W while still leaning back: faster than this the front stays up, slower it drops.',
+  },
+  {
+    kind: 'slider', id: 'wheelie.accel', name: 'Acceleration', tab: 'Bike', section: 'Wheelie',
+    min: 50, max: 150, step: 5, default: 100, unit: '%',
+    note: 'Speeding up with the front up, next to normal. Real bikes do no better (the rear wheel drives either way); above 100 is an arcade boost.',
+  },
+  {
+    kind: 'slider', id: 'wheelie.turnCircle', name: 'Turn circle', tab: 'Bike', section: 'Wheelie',
+    min: 5, max: 100, step: 1, default: 30, unit: 'm',
+    note: 'The front wheel can\u2019t steer in the air: A/D bank the bike and it turns, no tighter than this.',
+  },
+  {
+    kind: 'slider', id: 'wheelie.bank', name: 'Bank', tab: 'Bike', section: 'Wheelie',
+    min: 0, max: 50, step: 1, default: 20, unit: '°',
+    note: 'How far A/D tip the bike over on the rear wheel. Only looks.',
+  },
+  {
     kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Lean (looks only)',
     min: 0, max: 60, step: 1, default: 46, unit: '°',
     note: 'How far the bike leans into a turn when the tyres are at their grip; gentler turns lean less. Only drawn: it does not change how the bike turns.',
