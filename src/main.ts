@@ -152,6 +152,11 @@ const effects = new GroundEffects(
   },
   groundAt,
 )
+/** The rear axle, from the middle of the bike on the ground: what a wheelie pivots about. */
+const REAR_AXLE = new THREE.Vector3(0, WHEEL_RADIUS, WHEELBASE / 2)
+const axleLift = new THREE.Vector3()
+const axleRest = new THREE.Vector3()
+const restTilt = new THREE.Euler()
 /** How far the bike is drawn leaning, radians (positive = right). Only drawn: the riding ignores it. */
 let lean = 0
 /** How far the bike is drawn pitched nose up, radians: follows the ride's pitch, smoothed. */
@@ -223,17 +228,7 @@ renderer.setAnimationLoop(() => {
   }
   const wasAirborne = ride.airborne
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)
-  // A wheelie pitches the bike up about the rear axle, so the rear tyre stays on the ground.
-  const lift = ride.wheelie * store.get('wheelie.angle') * DEG
-  const half = WHEELBASE / 2
-  const liftUp = WHEEL_RADIUS * (1 - Math.cos(lift)) + half * Math.sin(lift)
-  const liftBack = half * (1 - Math.cos(lift)) - WHEEL_RADIUS * Math.sin(lift)
-  bike.root.position.set(
-    ride.bodyX - Math.sin(ride.bodyHeading) * liftBack,
-    ride.y + liftUp,
-    ride.bodyZ + Math.cos(ride.bodyHeading) * liftBack,
-  )
-  pitch += (ride.pitch - pitch) * (1 - Math.exp(-dt / PITCH_TIME))
+  pitch +=(ride.pitch - pitch) * (1 - Math.exp(-dt / PITCH_TIME))
   // Lean into turns, more the harder the tyres are pushing sideways: all
   // the way to Max lean when they're at their grip.
   const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / (store.get('bike.grip') * 9.81)
@@ -242,7 +237,15 @@ renderer.setAnimationLoop(() => {
   const bank = ride.steering * ride.wheelie * store.get('wheelie.bank') * DEG
   const leanTarget = Math.abs(bank) > Math.abs(turnLean) ? bank : turnLean
   lean += (leanTarget - lean) * (1 - Math.exp(-dt / LEAN_TIME))
-  bike.root.rotation.set(pitch + lift, -ride.bodyHeading, -lean, 'YXZ') // leaning about where the tyres touch the ground
+  // Turned, then leaned over about where the tyres touch the ground, then
+  // pitched: along the slope, plus a wheelie's lift. So a wheelie banks over
+  // whole, like tipping a unicycle, rather than twisting about its own length.
+  const lift = ride.wheelie * store.get('wheelie.angle') * DEG
+  bike.root.rotation.set(pitch + lift, -ride.bodyHeading, -lean, 'YZX')
+  // the wheelie pivots about the rear axle, so the rear tyre stays on the ground
+  const axleLifted = axleLift.copy(REAR_AXLE).applyEuler(bike.root.rotation)
+  const axleDown = axleRest.copy(REAR_AXLE).applyEuler(restTilt.set(pitch, -ride.bodyHeading, -lean, 'YZX'))
+  bike.root.position.set(ride.bodyX, ride.y, ride.bodyZ).add(axleDown).sub(axleLifted)
   effects.update(ride, input, dt)
   riderMotion.update(ride, dt)
   bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin, riderMotion)
