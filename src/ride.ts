@@ -60,6 +60,8 @@ const G = 9.81
 const SLOPE_FEEL = 0.05
 /** Air shorter than this is a bump, not a jump: the airtime isn't shown, seconds. */
 export const MIN_AIRTIME = 0.15
+/** How far ahead of a landing the ground is felt to find the slope landed on, metres. */
+const IMPACT_FEEL = 0.3
 
 /** The height of the ground at a point, metres. */
 export type Ground = (x: number, z: number) => number
@@ -76,6 +78,8 @@ export class Ride {
   private airSpeed = 0
   /** How long it's been in the air this jump (or was, once landed), seconds. */
   airtime = 0
+  /** How hard the last landing hit, m/s straight into the ground. */
+  impact = 0
   /** How far its nose points up, radians: along the ground's slope, or the way it's flying. */
   pitch = 0
   /** Which way it points, radians: 0 toward -z, growing as it turns right. */
@@ -198,6 +202,12 @@ export class Ride {
 
     const height = ground(this.x, this.z)
     if (this.y <= height) {
+      // How hard it hit: its speed straight into the ground it landed on
+      // (landing along a down slope barely hits at all).
+      const going = this.airSpeed < 0 ? -1 : 1
+      const ahead = ground(this.x + Math.sin(this.heading) * IMPACT_FEEL * going, this.z - Math.cos(this.heading) * IMPACT_FEEL * going)
+      const slope = (ahead - height) / IMPACT_FEEL
+      this.impact = Math.max((slope * Math.abs(this.airSpeed) - this.vy) / Math.sqrt(1 + slope * slope), 0)
       this.airborne = false
       this.y = height
       this.vy = 0

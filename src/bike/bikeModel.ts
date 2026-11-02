@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { FACTORY, type Livery } from './livery'
-import { PEGS, RiderView } from './riderView'
+import { PEGS, RiderView, type RiderShape } from './riderView'
 import { buildWheel } from './wheel'
 
 /**
@@ -26,6 +26,9 @@ const SWINGARM_PIVOT = new THREE.Vector3(0.1, 0, 0.16)
 /** The top of the rear shock, and how far along the swingarm its bottom is mounted. */
 const SHOCK_TOP = new THREE.Vector3(0, 0.38, 0.12)
 const SHOCK_ALONG = 0.4
+/** What the rider's body is doing: how far up on the pegs, how deep in a landing crouch. */
+export type RiderMotionShape = Pick<RiderShape, 'standing' | 'absorb'>
+const STILL: RiderMotionShape = { standing: 0, absorb: 0 }
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const Z_AXIS = new THREE.Vector3(0, 0, 1)
 
@@ -153,7 +156,7 @@ export class BikeModel {
    * Turns the bars `steer` degrees (positive = right) and the wheels to
    * `spin` radians rolled, the rear `rearSpin` further (spinning up in the dirt).
    */
-  update(steer: number, spin: number, rearSpin = 0): void {
+  update(steer: number, spin: number, rearSpin = 0, motion: RiderMotionShape = STILL): void {
     const turn = (-steer * Math.PI) / 180
     this.frontEnd.rotation.y = turn
     this.bars.rotation.y = turn
@@ -167,9 +170,9 @@ export class BikeModel {
       to.set(sign * FORK_TOP.x, -AXLE_DROP, 0).applyAxisAngle(Y_AXIS, turn).add(this.frontEnd.position)
       placeBetween(this.forks[side], from, to)
     }
-    // the rider sits still; only his hands follow the bars
+    // the rider stands, sits and crouches as `motion` says; his hands follow the bars
     this.model.updateMatrixWorld(true)
-    this.rider.update(0, 0.3, steer, { standing: 0, absorb: 0, legOut: 0 })
+    this.rider.update(0, 0.3, steer, { ...motion, legOut: 0 })
   }
 }
 

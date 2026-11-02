@@ -1,7 +1,7 @@
 import type { Setting } from './types'
 
 /** The debug menu's tabs, left to right. */
-export const TABS = ['Bike', 'Camera', 'Effects', 'Temporary'] as const
+export const TABS = ['Bike', 'Rider', 'Camera', 'Effects', 'Temporary'] as const
 
 /**
  * Every setting in the debug menu, in the order it's shown. The defaults
@@ -74,6 +74,43 @@ export const SETTINGS: Setting[] = [
     kind: 'line', id: 'line.turnReadout', name: 'Turn readout', tab: 'Bike', section: 'Debug lines',
     default: false,
     note: 'Bottom left: the turn radius, how fast the bike swings round, and whether the front wheel or grip is limiting it.',
+  },
+
+  // Rider: only looks, never how the bike rides
+  {
+    kind: 'slider', id: 'rider.sitBelow', name: 'Sits below', tab: 'Rider', section: 'Standing',
+    min: 0, max: 80, step: 1, default: 15, unit: 'km/h',
+    note: 'Slower than this he sits down. In the air he always stands.',
+  },
+  {
+    kind: 'slider', id: 'rider.standAbove', name: 'Stands above', tab: 'Rider', section: 'Standing',
+    min: 0, max: 120, step: 1, default: 35, unit: 'km/h',
+    note: 'Faster than this he stands right up on the pegs; in between, part way.',
+  },
+  {
+    kind: 'slider', id: 'rider.standTime', name: 'Stand-up time', tab: 'Rider', section: 'Standing',
+    min: 0, max: 1.5, step: 0.01, default: 0.3, unit: 's',
+    note: 'How long he takes to stand up or sit down.',
+  },
+  {
+    kind: 'slider', id: 'rider.hardestLanding', name: 'Hardest landing', tab: 'Rider', section: 'Landing soak',
+    min: 1, max: 30, step: 0.5, default: 9, unit: 'm/s',
+    note: 'Hitting the ground this fast (straight into it) crouches him all the way; softer landings crouch less. Landing along a down slope barely counts.',
+  },
+  {
+    kind: 'slider', id: 'rider.crouchDepth', name: 'Crouch depth', tab: 'Rider', section: 'Landing soak',
+    min: 0, max: 150, step: 5, default: 100, unit: '%',
+    note: 'How deep "all the way" is. 0 turns the landing crouch off.',
+  },
+  {
+    kind: 'slider', id: 'rider.soakDown', name: 'Crouch time', tab: 'Rider', section: 'Landing soak',
+    min: 0, max: 0.5, step: 0.01, default: 0.05, unit: 's',
+    note: 'How quickly he sinks into the crouch when he lands.',
+  },
+  {
+    kind: 'slider', id: 'rider.soakBack', name: 'Spring-back time', tab: 'Rider', section: 'Landing soak',
+    min: 0.05, max: 2, step: 0.05, default: 0.3, unit: 's',
+    note: 'How long he takes to come back up out of it.',
   },
 
   // Camera

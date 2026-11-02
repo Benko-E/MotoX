@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { BikeModel, WHEEL_RADIUS } from './bike/bikeModel'
+import { RiderMotion } from './bike/riderMotion'
 import { RampArcs } from './debug/rampArcs'
 import { RideLines } from './debug/rideLines'
 import { GroundEffects } from './effects/groundEffects'
@@ -115,6 +116,15 @@ const bike = new BikeModel()
 scene.add(bike.root)
 const ride = new Ride()
 const lines = new RideLines(scene, SETTINGS, store)
+const riderMotion = new RiderMotion({
+  get sitBelow() { return store.get('rider.sitBelow') },
+  get standAbove() { return store.get('rider.standAbove') },
+  get standTime() { return store.get('rider.standTime') },
+  get hardestLanding() { return store.get('rider.hardestLanding') },
+  get crouchDepth() { return store.get('rider.crouchDepth') / 100 },
+  get soakDown() { return store.get('rider.soakDown') },
+  get soakBack() { return store.get('rider.soakBack') },
+})
 const effects = new GroundEffects(
   scene,
   {
@@ -190,7 +200,8 @@ renderer.setAnimationLoop(() => {
   lean += (leanTarget - lean) * (1 - Math.exp(-dt / LEAN_TIME))
   bike.root.rotation.set(pitch, -ride.heading, -lean, 'YXZ') // leaning about where the tyres touch the ground
   effects.update(ride, input, dt)
-  bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin)
+  riderMotion.update(ride, dt)
+  bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin, riderMotion)
   lines.update(ride)
 
   const lag = store.get('camera.lag')
