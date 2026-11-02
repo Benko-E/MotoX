@@ -100,7 +100,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'wheelie.turnCircle', name: 'Turn circle', tab: 'Bike', section: 'Wheelie',
-    min: 5, max: 100, step: 1, default: 30, unit: 'm',
+    min: 5, max: 100, step: 1, default: 40, unit: 'm',
     note: 'The front wheel can\u2019t steer in the air: A/D bank the bike and it turns, no tighter than this.',
   },
   {
