@@ -124,6 +124,13 @@ const riderMotion = new RiderMotion({
   get crouchDepth() { return store.get('rider.crouchDepth') / 100 },
   get soakDown() { return store.get('rider.soakDown') },
   get soakBack() { return store.get('rider.soakBack') },
+  get shiftFull() { return store.get('rider.shiftFull') },
+  get leanBack() { return store.get('rider.leanBack') / 100 },
+  get leanForward() { return store.get('rider.leanForward') / 100 },
+  get shiftTime() { return store.get('rider.shiftTime') },
+  get footOutBelow() { return store.get('rider.footOutBelow') },
+  get footOutFrom() { return store.get('rider.footOutFrom') / 100 },
+  get headTurn() { return store.get('rider.headTurn') },
 })
 const effects = new GroundEffects(
   scene,

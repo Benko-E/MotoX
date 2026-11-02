@@ -193,8 +193,12 @@ export class RiderView {
     })
   }
 
-  /** Puts the rider in shape: the lean input, suspension squash and bars (degrees), plus what his body is doing. */
-  update(lean: number, squash: number, bars: number, motion: Pick<RiderShape, 'standing' | 'absorb' | 'legOut'>): void {
+  /**
+   * Puts the rider in shape: the lean input, suspension squash and bars
+   * (degrees), plus what his body is doing and how far his head turns to
+   * look into a turn (radians, negative = right).
+   */
+  update(lean: number, squash: number, bars: number, motion: Pick<RiderShape, 'standing' | 'absorb' | 'legOut'>, look = 0): void {
     for (let side = 0; side < 2; side++) {
       this.bike.worldToLocal(this.bars.localToWorld(this.grips[side].copy(GRIPS[side])))
     }
@@ -202,7 +206,7 @@ export class RiderView {
     this.torso.position.copy(pose.hips)
     this.torso.rotation.set(-pose.torsoTip, pose.twist, 0, 'YXZ')
     this.head.position.copy(pose.head)
-    this.head.rotation.set(-pose.torsoTip * 0.5, pose.twist * 0.5, 0, 'YXZ') // keeps looking ahead
+    this.head.rotation.set(-pose.torsoTip * 0.5, pose.twist * 0.5 + look, 0, 'YXZ') // keeps looking ahead, or into the turn
     for (let side = 0; side < 2; side++) {
       this.place(this.upperArms[side], pose.shoulders[side], pose.elbows[side])
       this.place(this.forearms[side], pose.elbows[side], pose.hands[side])

@@ -112,6 +112,40 @@ export const SETTINGS: Setting[] = [
     min: 0.05, max: 2, step: 0.05, default: 0.3, unit: 's',
     note: 'How long he takes to come back up out of it.',
   },
+  {
+    kind: 'slider', id: 'rider.shiftFull', name: 'Full shift at', tab: 'Rider', section: 'Weight shift',
+    min: 1, max: 30, step: 0.5, default: 10, unit: 'm/s²',
+    note: 'Speeding up or slowing down this hard shifts his weight all the way. 10 is about 1 g; your bike pulls about 15 off the line, brakes about 18.',
+  },
+  {
+    kind: 'slider', id: 'rider.leanBack', name: 'Lean back', tab: 'Rider', section: 'Weight shift',
+    min: 0, max: 100, step: 5, default: 60, unit: '%',
+    note: 'How far he leans back speeding up (and riding downhill), at most.',
+  },
+  {
+    kind: 'slider', id: 'rider.leanForward', name: 'Lean forward', tab: 'Rider', section: 'Weight shift',
+    min: 0, max: 100, step: 5, default: 80, unit: '%',
+    note: 'How far he leans forward over the bars slowing down (braking, climbing), at most.',
+  },
+  {
+    kind: 'slider', id: 'rider.shiftTime', name: 'Shift time', tab: 'Rider', section: 'Weight shift',
+    min: 0, max: 1, step: 0.01, default: 0.2, unit: 's',
+  },
+  {
+    kind: 'slider', id: 'rider.footOutBelow', name: 'Foot out below', tab: 'Rider', section: 'Foot out',
+    min: 0, max: 100, step: 1, default: 40, unit: 'km/h',
+    note: 'In turns slower than this he puts the inside foot out (it goes back on the peg by 10 km/h faster).',
+  },
+  {
+    kind: 'slider', id: 'rider.footOutFrom', name: 'From steering', tab: 'Rider', section: 'Foot out',
+    min: 0, max: 95, step: 5, default: 50, unit: '%',
+    note: 'Only steering harder than this (a share of full A or D): all the way out at full steering.',
+  },
+  {
+    kind: 'slider', id: 'rider.headTurn', name: 'Head turn', tab: 'Rider', section: 'Looking',
+    min: 0, max: 60, step: 1, default: 25, unit: '°',
+    note: 'How far he turns his head to look into a turn at full steering. His shoulders already twist with the bars.',
+  },
 
   // Camera
   {

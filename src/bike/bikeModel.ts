@@ -26,9 +26,9 @@ const SWINGARM_PIVOT = new THREE.Vector3(0.1, 0, 0.16)
 /** The top of the rear shock, and how far along the swingarm its bottom is mounted. */
 const SHOCK_TOP = new THREE.Vector3(0, 0.38, 0.12)
 const SHOCK_ALONG = 0.4
-/** What the rider's body is doing: how far up on the pegs, how deep in a landing crouch. */
-export type RiderMotionShape = Pick<RiderShape, 'standing' | 'absorb'>
-const STILL: RiderMotionShape = { standing: 0, absorb: 0 }
+/** What the rider's body is doing (see RiderMotion), and where he looks (radians, negative = right). */
+export type RiderMotionShape = Pick<RiderShape, 'standing' | 'absorb' | 'lean' | 'legOut'> & { look: number }
+const STILL: RiderMotionShape = { standing: 0, absorb: 0, lean: 0, legOut: 0, look: 0 }
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const Z_AXIS = new THREE.Vector3(0, 0, 1)
 
@@ -170,9 +170,9 @@ export class BikeModel {
       to.set(sign * FORK_TOP.x, -AXLE_DROP, 0).applyAxisAngle(Y_AXIS, turn).add(this.frontEnd.position)
       placeBetween(this.forks[side], from, to)
     }
-    // the rider stands, sits and crouches as `motion` says; his hands follow the bars
+    // the rider moves as `motion` says; his hands follow the bars
     this.model.updateMatrixWorld(true)
-    this.rider.update(0, 0.3, steer, { ...motion, legOut: 0 })
+    this.rider.update(motion.lean, 0.3, steer, motion, motion.look)
   }
 }
 
