@@ -4,6 +4,7 @@ import { CameraRig, VIEW_NAMES } from './camera/cameraRig'
 import { RiderMotion } from './bike/riderMotion'
 import { RampArcs } from './debug/rampArcs'
 import { RideLines } from './debug/rideLines'
+import { TrackGrid } from './debug/trackGrid'
 import { GroundEffects } from './effects/groundEffects'
 import { MIN_AIRTIME, Ride, type Input, type Tuning } from './ride'
 import { SETTINGS, TABS } from './settings/list'
@@ -11,6 +12,7 @@ import type { LineSetting } from './settings/types'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { Ramp, type RampShape } from './world/ramp'
+import { layOut } from './track/layout'
 
 /** Seconds the bike takes to lean over into a turn, and back up. */
 const LEAN_TIME = 0.15
@@ -99,6 +101,28 @@ store.onChange((id) => {
   if (id.startsWith('ramp.') || id === 'bike.topSpeed') reshapeRamp()
 })
 const groundAt = (x: number, z: number) => ramp.heightAt(x, z)
+
+// The track's layout, laid out from the Track tab's seed. Only debug lines for now.
+const lineColor = (id: string) => SETTINGS.find((s): s is LineSetting => s.id === id)!.color!
+const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track.path'))
+const layOutTrack = () => {
+  trackGrid.build(layOut({
+    seed: store.get('track.seed'),
+    across: store.get('track.across'),
+    square: store.get('track.square'),
+    length: store.get('track.length'),
+  }))
+}
+const showTrack = () => {
+  trackGrid.showGrid = store.isOn('track.grid')
+  trackGrid.showPath = store.isOn('track.path')
+}
+layOutTrack()
+showTrack()
+store.onChange((id) => {
+  if (id === 'track.grid' || id === 'track.path') showTrack()
+  else if (id.startsWith('track.')) layOutTrack()
+})
 
 // Cones scattered about, something to ride round (none in the ramp's lane).
 const cone = new THREE.ConeGeometry(0.25, 0.7, 12).translate(0, 0.35, 0)

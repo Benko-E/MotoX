@@ -1,7 +1,7 @@
 import type { Setting } from './types'
 
 /** The debug menu's tabs, left to right. */
-export const TABS = ['Bike', 'Rider', 'Camera', 'Effects', 'Temporary'] as const
+export const TABS = ['Bike', 'Rider', 'Camera', 'Effects', 'Track', 'Temporary'] as const
 
 /**
  * Every setting in the debug menu, in the order it's shown. The defaults
@@ -342,6 +342,38 @@ export const SETTINGS: Setting[] = [
     kind: 'slider', id: 'effects.trackScrubbing', name: 'Scrubbing', tab: 'Effects', section: 'Tyre tracks',
     min: 0, max: 1, step: 0.01, default: 0.6, unit: '',
     note: 'How dark it gets where the tyre spins, skids or carves.',
+  },
+
+  // Track
+  {
+    kind: 'slider', id: 'track.seed', name: 'Seed', tab: 'Track', section: 'Layout',
+    min: 1, max: 1000, step: 1, default: 1, unit: '',
+    note: 'Picks which loop you get. The same seed always lays out the same loop.',
+  },
+  {
+    kind: 'slider', id: 'track.across', name: 'Grid size', tab: 'Track', section: 'Layout',
+    min: 4, max: 30, step: 1, default: 10, unit: 'squares',
+    note: 'How many squares across the grid is, both ways. The loop stays inside it.',
+  },
+  {
+    kind: 'slider', id: 'track.square', name: 'Square size', tab: 'Track', section: 'Layout',
+    min: 10, max: 60, step: 1, default: 24, unit: 'm',
+    note: 'How big each square is. Two bits of track side by side are at least this far apart, middle to middle.',
+  },
+  {
+    kind: 'slider', id: 'track.length', name: 'Length', tab: 'Track', section: 'Layout',
+    min: 4, max: 200, step: 2, default: 30, unit: 'squares',
+    note: 'How many squares the loop runs through. The lap is roughly this times the square size. Stops early if the grid is full.',
+  },
+  {
+    kind: 'line', id: 'track.grid', name: 'Grid', tab: 'Track', section: 'Debug lines',
+    default: true, color: 0xffffff,
+    note: 'The grid’s squares on the ground, the ones the loop runs through filled in (the first one green). Best seen from above: fly up in Free roam (C).',
+  },
+  {
+    kind: 'line', id: 'track.path', name: 'Loop', tab: 'Track', section: 'Debug lines',
+    default: true, color: 0xff3bd4,
+    note: 'The loop through the squares’ middles, in riding order.',
   },
 
   // Temporary: things here for trying out, not to stay
