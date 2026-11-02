@@ -7,6 +7,9 @@ export default defineConfig({
     strictPort: true,
   },
   build: {
+    // GitHub Pages serves docs/ from main; it's wiped on every build, so nothing else may live in it
+    outDir: 'docs',
+    emptyOutDir: true,
     target: 'es2022',
     chunkSizeWarningLimit: 2000, // Three.js is big, and that's fine
   },
