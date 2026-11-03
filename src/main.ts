@@ -14,6 +14,8 @@ import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { layOut, squareCentre } from './track/layout'
 import { findJumpSpots, jumpRoom, placeJumps, straightSquares } from './track/jumpSpots'
+import { Kickers } from './track/kickers'
+import { KickerView } from './track/kickerView'
 import { LapTimer, type LapEvent } from './track/lapTimer'
 import { placeSplits } from './track/splits'
 import { Track } from './track/track'
@@ -83,14 +85,17 @@ ground.rotation.x = -Math.PI / 2
 ground.receiveShadow = true
 scene.add(ground)
 
-/** How high the ground is at (x, z): flat everywhere, for now. */
-const groundAt = (_x: number, _z: number) => 0
+/** The kickers on the jumps, built with the track. */
+let kickers: Kickers
+/** How high the ground is at (x, z): flat, but for the kickers. */
+const groundAt = (x: number, z: number) => kickers.heightAt(x, z)
 
 // The track: laid out on a grid from the Track tab's seed, a spline drawn
 // through it, and a strip of packed dirt along that. Flat for now.
 const lineColor = (id: string) => SETTINGS.find((s): s is LineSetting => s.id === id)!.color!
 const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track.path'), lineColor('track.centre'))
 const trackView = new TrackView(scene, renderer.capabilities.getMaxAnisotropy())
+const kickerView = new KickerView(scene, renderer.capabilities.getMaxAnisotropy())
 const trackInfo = document.getElementById('trackInfo')!
 const jumpMarks = new JumpMarks(scene)
 const splitLines = new SplitLines(scene, lineColor('split.lines'))
@@ -118,6 +123,8 @@ const layOutTrack = () => {
   )
   trackGrid.build(layout, track)
   trackView.build(track)
+  kickers = Kickers.onJumps(layout, jumps, { height: store.get('jump.height'), angle: store.get('jump.angle') * DEG, width: store.get('jump.width') })
+  kickerView.build(kickers)
   jumpMarks.build(layout, spots, jumps)
   // the lap cut into stretches, the splits drawn to the middle of the jumps' roll-outs where they're near
   const rollOuts = jumps.map(({ at }) => {
@@ -130,6 +137,7 @@ const layOutTrack = () => {
   const onRollOuts = splits.filter((at) => rollOuts.includes(at)).length
   for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
   trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njumps ${jumps.length} (room for ${jumpRoom(spots, need)})
+kicker face ${kickers.face.toFixed(1)} m, back ${kickers.back.toFixed(1)} m
 splits ${splits.length} (${onRollOuts} on roll-outs)`
 }
 const showTrack = () => {

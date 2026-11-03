@@ -4,7 +4,7 @@ import type { Track } from './track'
 /** How far above the ground the strip is drawn: under the tyre tracks (0.015), over the ground. */
 const LIFT = 0.005
 /** Metres of strip per repeat of its texture, along and across. */
-const TILE = 4
+export const TILE = 4
 
 /**
  * The track on the ground: a strip of darker, packed dirt along the
@@ -52,7 +52,7 @@ export class TrackView {
 }
 
 /** A tile of packed dirt: darker and smoother than the loose dirt around it, with streaks along the way you ride. */
-function packedDirt(anisotropy: number): THREE.CanvasTexture {
+export function packedDirt(anisotropy: number): THREE.CanvasTexture {
   const tile = document.createElement('canvas')
   tile.width = tile.height = 256
   const paint = tile.getContext('2d')!

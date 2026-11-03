@@ -416,6 +416,21 @@ export const SETTINGS: Setting[] = [
     note: 'How many squares in a straight line a jump needs: run-up, face, flight and roll-out. 5 squares of 18 m fits a normal jump at top speed.',
   },
   {
+    kind: 'slider', id: 'jump.height', name: 'Height', tab: 'Track', section: 'Jumps',
+    min: 0.5, max: 15, step: 0.1, default: 3.6, unit: 'm',
+    note: 'How high each kicker’s lip is. 3.6 m at 15° is a good normal jump; 15 m at 30° is ridiculous big air.',
+  },
+  {
+    kind: 'slider', id: 'jump.angle', name: 'Angle', tab: 'Track', section: 'Jumps',
+    min: 5, max: 30, step: 1, default: 15, unit: '°',
+    note: 'How steep the face is. The face is as long as it takes to reach the Height (the Track readout shows it), its lip at the end of the orange square; the back and sides drop twice as steep.',
+  },
+  {
+    kind: 'slider', id: 'jump.width', name: 'Width', tab: 'Track', section: 'Jumps',
+    min: 2, max: 30, step: 0.5, default: 12, unit: 'm',
+    note: 'How wide the top of each kicker is, side to side. Its own size, not the track’s: the sides slope down past it.',
+  },
+  {
     kind: 'slider', id: 'split.count', name: 'Splits', tab: 'Track', section: 'Splits',
     min: 1, max: 20, step: 1, default: 4, unit: 'stretches',
     note: 'How many stretches the lap is cut into, about the same length each, from the start line round to it again. The lines between them are checkpoints, for timing a lap.',
