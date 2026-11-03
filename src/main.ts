@@ -331,7 +331,8 @@ renderer.setAnimationLoop(() => {
   }
   const wasAirborne = ride.airborne
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)
-  pitch +=(ride.pitch - pitch) * (1 - Math.exp(-dt / PITCH_TIME))
+  // the short way round, so landing a flip doesn't unwind it
+  pitch += Math.atan2(Math.sin(ride.pitch - pitch), Math.cos(ride.pitch - pitch)) * (1 - Math.exp(-dt / PITCH_TIME))
   // Lean into turns, more the harder the tyres are pushing sideways: all
   // the way to Max lean when they're at their grip.
   const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / (store.get('bike.grip') * 9.81)

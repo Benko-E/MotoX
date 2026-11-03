@@ -111,12 +111,12 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'slider', id: 'air.tilt', name: 'Tilt', tab: 'Bike', section: 'In the air',
     min: 0, max: 360, step: 10, default: 120, unit: '°/s',
-    note: 'How fast the arrows tilt the bike in the air: down lifts the nose, up drops it. Let go and it holds that angle. Hands off, it holds the angle it took off at.',
+    note: 'How fast the arrows tilt the bike in the air: down lifts the nose, up drops it. Let go and it holds that angle. Hands off, it holds the angle it took off at. All the way round is a flip: land it level and it counts.',
   },
   {
     kind: 'slider', id: 'air.spin', name: 'Spin', tab: 'Bike', section: 'In the air',
-    min: 0, max: 720, step: 10, default: 360, unit: '°/s',
-    note: 'Holding A or D as you leave the lip spins the bike round sideways, this fast with the steering all the way over. Under half the steering doesn’t spin at all, so a nudge at the lip is safe. A/D do nothing once you’re in the air.',
+    min: 0, max: 720, step: 10, default: 270, unit: '°/s',
+    note: 'How fast A/D spin the bike round sideways in the air, while you hold them. Let go and it stops. Only one way per jump: the first key you press spins, the other only turns you back as far as straight (or the last whole turn), so you can line up the landing but not wiggle about. A whole turn round counts as straight.',
   },
   {
     kind: 'slider', id: 'crash.sideways', name: 'Sideways limit', tab: 'Bike', section: 'Crash',

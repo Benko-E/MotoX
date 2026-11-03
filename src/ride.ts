@@ -30,7 +30,9 @@ import { WHEELBASE } from './bike/bikeModel'
  * down after it (off a ramp's lip). In the air, gravity pulls it down: no
  * throttle, brakes or turning until it lands. It holds the angle it left
  * the lip at, unless the arrows tilt it (and it holds the new angle when
- * let go). Steering hard as it takes off spins it round sideways.
+ * let go): all the way round is a flip. A/D spin it round sideways while
+ * held, but only one way per jump: the other key only turns it back as far
+ * as straight, so you can line up a landing but not wiggle about.
  *
  * Crashes: landing too far sideways to the way it's flying (fast enough),
  * or too far nose-down or tail-down to the ground. The bike falls over and
@@ -87,7 +89,7 @@ export interface Tuning {
   sideMinSpeed: number
   /** Landing more than this nose-down or tail-down to the ground crashes it, degrees. */
   noseTailLimit: number
-  /** How fast steering all the way at takeoff spins it round in the air, degrees per second. */
+  /** How fast A/D spin it round in the air, degrees per second. */
   spinRate: number
   /** How fast the arrows tilt it in the air, degrees per second. */
   tiltRate: number
@@ -120,8 +122,9 @@ export const MIN_AIRTIME = 0.15
 /** How far ahead of a landing the ground is felt to find the slope landed on, metres. */
 const IMPACT_FEEL = 0.3
 
-/** How much of the steering at takeoff starts no spin at all: a nudge at the lip doesn't spin you. */
-const SPIN_DEADZONE = 0.5
+const TURN = 2 * Math.PI
+/** An angle brought round to between -half a turn and half a turn, radians. */
+const wrap = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle))
 /** How fast the bike slides to a stop on its side, m/s². */
 const CRASH_SLIDE = 9
 
@@ -176,8 +179,8 @@ export class Ride {
   riderLean = 0
   /** How far the body has spun round in the air off the way it's flying, radians (positive = nose to the right). */
   airYaw = 0
-  /** How fast it's spinning round in the air, radians per second. */
-  private airSpin = 0
+  /** Which way it's been spun this jump: 1 right, -1 left, 0 not yet. */
+  private spinWay = 0
   /** Down: which way it went, and for how long, seconds. Null while riding. */
   crash: { way: CrashWay; time: number } | null = null
 
@@ -306,10 +309,8 @@ export class Ride {
       // it flies at the angle it left at, a wheelie's lift and all
       this.pitch += this.wheelie * tune.wheelieAngle * DEG
       this.wheelie = 0
-      // steering hard at the lip spins it round
-      const spin = Math.max(Math.abs(this.steering) - SPIN_DEADZONE, 0) / (1 - SPIN_DEADZONE)
-      this.airSpin = Math.sign(this.steering) * spin * tune.spinRate * DEG
       this.airYaw = 0
+      this.spinWay = 0
       this.vy = climb - G * dt
       this.y = thrown
     } else {
@@ -328,7 +329,7 @@ export class Ride {
     this.airtime += dt
     // the arrows tilt it: back (down) lifts the nose, forward (up) drops it
     this.pitch += ((input.leanBack ? 1 : 0) - (input.leanForward ? 1 : 0)) * tune.tiltRate * DEG * dt
-    this.airYaw += this.airSpin * dt
+    this.spinAround(input, tune, dt)
     Object.assign(this, { steer: 0, steering: 0, bars: 0, wheelAngle: 0, turnRate: 0, turnRadius: Infinity, limit: null, slowing: 0 })
 
     const height = ground(this.x, this.z)
@@ -353,8 +354,10 @@ export class Ride {
    * the ground it lands on. Otherwise it rides on the way it's pointing.
    */
   private land(tune: Tuning, groundAngle: number): void {
-    const off = Math.atan2(Math.sin(this.airYaw + this.slideYaw), Math.cos(this.airYaw + this.slideYaw))
-    const tilt = this.pitch - groundAngle
+    // a whole turn round, either way, is as good as none
+    const off = wrap(this.airYaw + this.slideYaw)
+    const tilt = wrap(this.pitch - groundAngle)
+    this.pitch = groundAngle + tilt
     let way: CrashWay | null = null
     if (Math.abs(off) > tune.sideLimit * DEG && Math.abs(this.speed) >= tune.sideMinSpeed * KMH) way = off > 0 ? 'left' : 'right'
     else if (tilt < -tune.noseTailLimit * DEG) way = 'front'
@@ -362,8 +365,22 @@ export class Ride {
     // landed it: it carries on the way it points
     this.heading += this.airYaw
     this.airYaw = 0
-    this.airSpin = 0
     if (way) Object.assign(this, { crash: { way, time: 0 }, sliding: 0, slideYaw: 0, wheelie: 0 })
+  }
+
+  /**
+   * A/D in the air: the first one held spins it round that way, as long as
+   * it's held. The other one turns it back, but only as far as the last
+   * whole turn (straight again), never on past it.
+   */
+  private spinAround(input: Input, tune: Tuning, dt: number): void {
+    const key = (input.right ? 1 : 0) - (input.left ? 1 : 0)
+    if (key === 0) return
+    if (this.spinWay === 0) this.spinWay = key
+    const step = tune.spinRate * DEG * dt
+    if (key === this.spinWay) this.airYaw += key * step
+    else if (key < 0) this.airYaw = Math.max(this.airYaw - step, Math.floor(this.airYaw / TURN) * TURN)
+    else this.airYaw = Math.min(this.airYaw + step, Math.ceil(this.airYaw / TURN) * TURN)
   }
 
   /** A step lying down after a crash: it slides to a stop, then gets back up, right there, facing the way it points. */
