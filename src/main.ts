@@ -103,7 +103,7 @@ const layOutTrack = () => {
   // walk the loop for spots a jump fits, place some, and straighten the track under them
   const need = store.get('jump.squares')
   const spots = findJumpSpots(layout, need)
-  const jumps = placeJumps(spots, store.get('jump.amount'), need, store.get('track.seed'))
+  const jumps = placeJumps(spots, store.get('jump.amount'), need, store.get('track.seed'), store.get('jump.spacing') / 100, layout.squares.length)
   track = new Track(
     layout,
     { width: store.get('track.width'), wobble: store.get('track.wobble') / 100, rounding: store.get('track.rounding') / 100, relax: store.get('track.relax') },

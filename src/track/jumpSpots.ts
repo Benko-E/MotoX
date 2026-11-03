@@ -41,19 +41,60 @@ export function findJumpSpots(layout: Layout, need: number): JumpSpot[] {
 }
 
 /**
- * Places up to `amount` jumps, `need` squares each: again and again it
- * picks a spot at random from the ones left, and somewhere along it at
- * random. A jump only uses up its own squares: what's left of the spot
- * either side of it stays a spot, if it's still long enough. Same seed,
- * same jumps.
+ * Places up to `amount` jumps, `need` squares each, on a loop of `loop`
+ * squares. First it spaces `amount` targets evenly round the lap, from a
+ * random start, and lets each wander off its even place, more the less the
+ * `spacing` (0 to 1): at 1 they stay perfectly even, at 0 they could be
+ * anywhere (pure random). Then each jump goes in the free place closest to
+ * its target. The more spacing, the more starts it tries, keeping the one
+ * whose closest two jumps are farthest apart. A jump only uses up its own
+ * squares: what's left of the spot either side of it stays a spot, if it's
+ * still long enough. Same seed, same jumps.
  */
-export function placeJumps(spots: JumpSpot[], amount: number, need: number, seed: number): Jump[] {
+export function placeJumps(spots: JumpSpot[], amount: number, need: number, seed: number, spacing: number, loop: number): Jump[] {
   const random = seeded(seed * 104729 + 7)
+  const even = Math.min(Math.max(spacing, 0), 1)
+  const tries = 1 + Math.round(even * (MOST_STARTS - 1))
+  let best: { jumps: Jump[]; closest: number } = { jumps: [], closest: -1 }
+  for (let t = 0; t < tries; t++) {
+    const jumps = placeFrom(spots, amount, need, loop, random() * loop, 1 - even, random)
+    const closest = closestGap(jumps, loop)
+    if (jumps.length > best.jumps.length || (jumps.length === best.jumps.length && closest > best.closest)) best = { jumps, closest }
+  }
+  return best.jumps
+}
+
+/** At full Spacing, how many starting points round the lap it tries. */
+const MOST_STARTS = 12
+
+/** The smallest gap round the lap, in squares, between two of `jumps` (the whole lap if there's only one). */
+function closestGap(jumps: Jump[], loop: number): number {
+  const starts = jumps.map((j) => j.at[0]).sort((a, b) => a - b)
+  let closest = loop
+  starts.forEach((s, i) => (closest = Math.min(closest, (i + 1 < starts.length ? starts[i + 1] : starts[0] + loop) - s)))
+  return closest
+}
+
+/** One go at placing the jumps: targets evenly spaced from `start`, each wandering up to `wander` (0 to 1) of half a lap. */
+function placeFrom(spots: JumpSpot[], amount: number, need: number, loop: number, start: number, wander: number, random: () => number): Jump[] {
   const left = [...spots]
   const jumps: Jump[] = []
-  while (jumps.length < amount && left.length > 0) {
-    const [spot] = left.splice(Math.floor(random() * left.length), 1)
-    const from = Math.floor(random() * (spot.at.length - need + 1))
+  /** How far round the lap, in squares, from a jump starting at loop square `at` to `target`. */
+  const apart = (at: number, target: number) => {
+    const d = (((at + need / 2 - target) % loop) + loop) % loop
+    return Math.min(d, loop - d)
+  }
+  for (let k = 0; k < amount && left.length > 0; k++) {
+    const target = start + (k * loop) / amount + (random() * 2 - 1) * wander * (loop / 2)
+    let best = { spot: 0, from: 0, off: Infinity }
+    left.forEach(({ at }, spot) => {
+      for (let from = 0; from + need <= at.length; from++) {
+        const off = apart(at[from], target)
+        if (off < best.off) best = { spot, from, off }
+      }
+    })
+    const [spot] = left.splice(best.spot, 1)
+    const { from } = best
     jumps.push({ at: spot.at.slice(from, from + need) })
     for (const rest of [spot.at.slice(0, from), spot.at.slice(from + need)]) {
       if (rest.length >= need) left.push({ at: rest })

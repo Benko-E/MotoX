@@ -406,6 +406,11 @@ export const SETTINGS: Setting[] = [
     note: 'How many jumps it tries to place, picked at random (from the seed) from the spots they fit, one per spot. Fewer if there are not enough spots.',
   },
   {
+    kind: 'slider', id: 'jump.spacing', name: 'Spacing', tab: 'Track', section: 'Jumps',
+    min: 0, max: 100, step: 5, default: 50, unit: '%',
+    note: 'How evenly the jumps spread round the lap. 100 spaces them as evenly as the spots allow; 0 is pure random (they often bunch up).',
+  },
+  {
     kind: 'slider', id: 'jump.squares', name: 'Squares needed', tab: 'Track', section: 'Jumps',
     min: 3, max: 20, step: 1, default: 5, unit: 'squares',
     note: 'How many squares in a straight line a jump needs: run-up, face, flight and roll-out. 5 squares of 18 m fits a normal jump at top speed.',
