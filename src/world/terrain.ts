@@ -44,13 +44,36 @@ export class Terrain {
   readonly samples = Math.round((2 * TERRAIN_HALF) / TERRAIN_CELL) + 1
   /** The ground's height at each point of the grid, row by row (z), metres. */
   readonly heights: Float32Array
+  /** The tops of the big swells (the first noise layer, the one Width sets the size of), before the track's laid in. */
+  readonly peaks: { x: number; z: number }[] = []
 
   constructor(noise: NoiseShape, track: Track, carve: CarveShape) {
     const n = this.samples
-    const land = makeLand(noise)
+    const { land, swell } = makeLand(noise)
     this.heights = new Float32Array(n * n)
+    const swells = new Float32Array(n * n)
     for (let iz = 0; iz < n; iz++) {
-      for (let ix = 0; ix < n; ix++) this.heights[iz * n + ix] = land(coord(ix), coord(iz))
+      for (let ix = 0; ix < n; ix++) {
+        this.heights[iz * n + ix] = land(coord(ix), coord(iz))
+        swells[iz * n + ix] = swell(coord(ix), coord(iz))
+      }
+    }
+    // a top: higher than all eight grid points round it, and above the middle height
+    for (let iz = 1; iz < n - 1; iz++) {
+      for (let ix = 1; ix < n - 1; ix++) {
+        const h = swells[iz * n + ix]
+        if (h <= 0) continue
+        let top = true
+        for (let dz = -1; dz <= 1 && top; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if ((dx || dz) && swells[(iz + dz) * n + ix + dx] >= h) {
+              top = false
+              break
+            }
+          }
+        }
+        if (top) this.peaks.push({ x: coord(ix), z: coord(iz) })
+      }
     }
     this.carve(track, carve, land)
   }
@@ -140,8 +163,11 @@ function coord(i: number): number {
   return -TERRAIN_HALF + i * TERRAIN_CELL
 }
 
-/** The noise's hills, metres: big swells and smaller bumps on them, dying away to flat near the grid's edge. */
-function makeLand(noise: NoiseShape): (x: number, z: number) => number {
+/**
+ * The noise's hills, metres: big swells and smaller bumps on them, dying
+ * away to flat near the grid's edge (`land`); and the big swells alone (`swell`).
+ */
+function makeLand(noise: NoiseShape): { land: (x: number, z: number) => number; swell: (x: number, z: number) => number } {
   // each layer its own pattern, so their rises don't line up
   const layers = Array.from({ length: SMALL_LAYERS + 1 }, (_, i) => makeNoise2D(noise.seed * 31 + i + 1))
   const keep = 0.55 * Math.min(Math.max(noise.detail, 0), 1) // how much of each layer the next one keeps
@@ -149,16 +175,19 @@ function makeLand(noise: NoiseShape): (x: number, z: number) => number {
   // scaled so all the layers together never pass ± the height
   const scale = noise.height / amplitudes.reduce((a, b) => a + b, 0)
   const width = Math.max(noise.width, 1e-6)
-  return (x, z) => {
-    if (scale === 0) return 0
-    let sum = 0
-    for (let i = 0; i <= SMALL_LAYERS; i++) {
-      if (amplitudes[i] === 0) break
-      const f = 2 ** i / width
-      sum += amplitudes[i] * layers[i](x * f, z * f)
-    }
-    const edge = Math.max(Math.abs(x), Math.abs(z))
-    return scale * sum * (1 - smoothstep((edge - (TERRAIN_HALF - EDGE_FADE)) / EDGE_FADE))
+  const fade = (x: number, z: number) => 1 - smoothstep((Math.max(Math.abs(x), Math.abs(z)) - (TERRAIN_HALF - EDGE_FADE)) / EDGE_FADE)
+  return {
+    land: (x, z) => {
+      if (scale === 0) return 0
+      let sum = 0
+      for (let i = 0; i <= SMALL_LAYERS; i++) {
+        if (amplitudes[i] === 0) break
+        const f = 2 ** i / width
+        sum += amplitudes[i] * layers[i](x * f, z * f)
+      }
+      return scale * sum * fade(x, z)
+    },
+    swell: (x, z) => scale * layers[0](x / width, z / width) * fade(x, z),
   }
 }
 

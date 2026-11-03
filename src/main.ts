@@ -22,6 +22,7 @@ import { Track } from './track/track'
 import { TrackView } from './track/trackView'
 import { Terrain } from './world/terrain'
 import { TerrainView } from './world/terrainView'
+import { TerrainLines } from './debug/terrainLines'
 
 /** Seconds the bike takes to lean over into a turn, and back up. */
 const LEAN_TIME = 0.15
@@ -103,6 +104,7 @@ const kickerView = new KickerView(scene, renderer.capabilities.getMaxAnisotropy(
 const trackInfo = document.getElementById('trackInfo')!
 const jumpMarks = new JumpMarks(scene)
 const splitLines = new SplitLines(scene, lineColor('split.lines'))
+const terrainLines = new TerrainLines(scene, lineColor('terrain.poles'), lineColor('terrain.contours'))
 const lapTimer = new LapTimer()
 const cones: THREE.Mesh[] = []
 let track: Track
@@ -131,6 +133,8 @@ const layOutTrack = () => {
     { smoothing: store.get('terrain.smoothing'), camber: store.get('terrain.camber') / 100, banks: store.get('terrain.banks') },
   )
   terrainView.build(terrain)
+  terrainLines.buildPoles(terrain, hillsAt)
+  terrainLines.buildContours(terrain, store.get('contour.step'))
   trackGrid.build(layout, track, hillsAt)
   trackView.build(track)
   kickers = Kickers.onJumps(layout, track, jumps, { height: store.get('jump.height'), angle: store.get('jump.angle') * DEG, width: store.get('track.width') })
@@ -160,6 +164,8 @@ const showTrack = () => {
   trackInfo.hidden = !store.isOn('track.info')
   jumpMarks.visible = store.isOn('jump.spots')
   splitLines.visible = store.isOn('split.lines')
+  terrainLines.showPoles = store.isOn('terrain.poles')
+  terrainLines.showContours = store.isOn('terrain.contours')
 }
 
 // Cones scattered about, something to ride round (none on the track).
@@ -178,7 +184,8 @@ for (let i = 0; i < 120; i++) {
 layOutTrack()
 showTrack()
 store.onChange((id) => {
-  if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info' || id === 'jump.spots' || id === 'split.lines') showTrack()
+  if (['track.grid', 'track.path', 'track.centre', 'track.info', 'jump.spots', 'split.lines', 'terrain.poles', 'terrain.contours'].includes(id)) showTrack()
+  else if (id === 'contour.step') terrainLines.buildContours(terrain, store.get('contour.step'))
   else if (['track.', 'jump.', 'split.', 'terrain.'].some((tab) => id.startsWith(tab))) layOutTrack()
 })
 

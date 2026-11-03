@@ -14,7 +14,7 @@ export type SliderSetting = {
   note?: string
 }
 
-/** A debug line drawn in the world (or a debug readout), switched on and off with a checkbox. Never in "Copy changes". */
+/** A debug line drawn in the world (or a debug readout), switched on and off with a checkbox. In "Copy changes" when it differs from its default, like a slider. */
 export type LineSetting = {
   kind: 'line'
   id: string

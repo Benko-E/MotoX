@@ -19,10 +19,10 @@ const MENU_KEY = 'Backquote'
 export function buildMenu(settings: Setting[], tabs: readonly string[], store: SettingsStore, storage: Storage | null): MenuWindow {
   const menu = new MenuWindow('MotoX debug', storage)
 
-  // Copies the settings changed from their defaults, to paste back to Claude.
+  // Copies the settings changed from their defaults, debug lines too, to paste back to Claude.
   let restoreLabel: ReturnType<typeof setTimeout> | undefined
   const copyButton = menu.addTitleButton('Copy changes', async () => {
-    const changed = store.changedFromDefaults()
+    const changed = { ...store.changedFromDefaults(), ...store.linesChangedFromDefaults() }
     const count = Object.keys(changed).length
     let label = count === 0 ? 'No changes' : `Copied ${count}`
     try {

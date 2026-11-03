@@ -486,6 +486,21 @@ export const SETTINGS: Setting[] = [
     note: 'Past the track’s edges, the ground blends back into the hills over this far. 0 is a hard step at the edge.',
   },
   {
+    kind: 'line', id: 'terrain.poles', name: 'Hill tops', tab: 'Terrain', section: 'Debug lines',
+    default: false, color: 0xff3bd4,
+    note: 'A tall pole on top of each big swell, the hills Width sets the size of (not the smaller bumps Detail adds), so you can see how far apart they are.',
+  },
+  {
+    kind: 'line', id: 'terrain.contours', name: 'Contours', tab: 'Terrain', section: 'Debug lines',
+    default: false, color: 0xffffff,
+    note: 'Lines on the ground like on a map, each at one height: white at 0 m, orange every step higher, blue every step lower. A hill shows as orange rings, a dip as blue ones; close together is steep.',
+  },
+  {
+    kind: 'slider', id: 'contour.step', name: 'Contour every', tab: 'Terrain', section: 'Debug lines',
+    min: 0.25, max: 10, step: 0.25, default: 1, unit: 'm',
+    note: 'How many metres of height between one contour line and the next.',
+  },
+  {
     kind: 'slider', id: 'jump.amount', name: 'Amount', tab: 'Track', section: 'Jumps',
     min: 0, max: 20, step: 1, default: 4, unit: '',
     note: 'How many jumps it tries to place, picked at random (from the seed) from the spots they fit, one per spot. If there isn’t room for that many, it places as many as there’s room for (the Track readout shows how many fit).',

@@ -4,9 +4,9 @@ type Saved = { values: Record<string, number>; lines: Record<string, boolean> }
 
 /**
  * Holds every setting's current value. Tells listeners the moment anything
- * changes and saves to the browser so a reload keeps it. Only values changed
- * from their defaults are saved, so a new default reaches every browser that
- * hasn't changed that setting.
+ * changes and saves to the browser so a reload keeps it. Only settings
+ * changed from their defaults are saved (sliders and debug lines alike), so
+ * a new default reaches every browser that hasn't changed that setting.
  */
 export class SettingsStore {
   private readonly byId = new Map<string, Setting>()
@@ -72,6 +72,15 @@ export class SettingsStore {
     return changed
   }
 
+  /** Every debug line switched the other way from its default. */
+  linesChangedFromDefaults(): Record<string, boolean> {
+    const changed: Record<string, boolean> = {}
+    for (const [id, on] of this.lines) {
+      if (on !== this.line(id).default) changed[id] = on
+    }
+    return changed
+  }
+
   /** Calls `fn` with the setting's id on every change. Returns an unsubscribe. */
   onChange(fn: (id: string) => void): () => void {
     this.listeners.add(fn)
@@ -120,7 +129,7 @@ export class SettingsStore {
   }
 
   private save(): void {
-    const saved: Saved = { values: this.changedFromDefaults(), lines: Object.fromEntries(this.lines) }
+    const saved: Saved = { values: this.changedFromDefaults(), lines: this.linesChangedFromDefaults() }
     try {
       this.storage?.setItem(this.storageKey, JSON.stringify(saved))
     } catch {
