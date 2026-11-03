@@ -12,7 +12,7 @@ import type { LineSetting } from './settings/types'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { layOut } from './track/layout'
-import { findJumpSpots, placeJumps, straightSquares } from './track/jumpSpots'
+import { findJumpSpots, jumpRoom, placeJumps, straightSquares } from './track/jumpSpots'
 import { Track } from './track/track'
 import { TrackView } from './track/trackView'
 
@@ -113,7 +113,7 @@ const layOutTrack = () => {
   trackView.build(track)
   jumpMarks.build(layout, spots, jumps)
   for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
-  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njumps ${jumps.length} of ${spots.length} spots`
+  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njumps ${jumps.length} (room for ${jumpRoom(spots, need)})`
 }
 const showTrack = () => {
   trackGrid.showGrid = store.isOn('track.grid')

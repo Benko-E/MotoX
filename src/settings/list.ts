@@ -403,7 +403,7 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'slider', id: 'jump.amount', name: 'Amount', tab: 'Track', section: 'Jumps',
     min: 0, max: 20, step: 1, default: 3, unit: '',
-    note: 'How many jumps it tries to place, picked at random (from the seed) from the spots they fit, one per spot. Fewer if there are not enough spots.',
+    note: 'How many jumps it tries to place, picked at random (from the seed) from the spots they fit, one per spot. If there isn’t room for that many, it places as many as there’s room for (the Track readout shows how many fit).',
   },
   {
     kind: 'slider', id: 'jump.spacing', name: 'Spacing', tab: 'Track', section: 'Jumps',
