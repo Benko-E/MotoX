@@ -14,6 +14,7 @@ import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { layOut, squareCentre } from './track/layout'
 import { findJumpSpots, jumpRoom, placeJumps, straightSquares } from './track/jumpSpots'
+import { LapTimer, type LapEvent } from './track/lapTimer'
 import { placeSplits } from './track/splits'
 import { Track } from './track/track'
 import { TrackView } from './track/trackView'
@@ -26,6 +27,8 @@ const PITCH_TIME = 0.06
 const VIEW_NAME_SHOWN = 1.5
 /** Seconds the airtime stays on screen after landing. */
 const AIRTIME_SHOWN = 3
+/** Seconds a split or lap time stays on screen. */
+const LAP_FLASH_SHOWN = 3
 const DEG = Math.PI / 180
 
 /** The browser's storage, or none where it's blocked (settings then last only this visit). */
@@ -91,6 +94,7 @@ const trackView = new TrackView(scene, renderer.capabilities.getMaxAnisotropy())
 const trackInfo = document.getElementById('trackInfo')!
 const jumpMarks = new JumpMarks(scene)
 const splitLines = new SplitLines(scene, lineColor('split.lines'))
+const lapTimer = new LapTimer()
 const cones: THREE.Mesh[] = []
 let track: Track
 const layOutTrack = () => {
@@ -122,6 +126,7 @@ const layOutTrack = () => {
   })
   const splits = placeSplits(track, store.get('split.count'), rollOuts, store.get('split.pull') / 100)
   splitLines.build(track, splits)
+  lapTimer.setGates(track, splits)
   const onRollOuts = splits.filter((at) => rollOuts.includes(at)).length
   for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
   trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njumps ${jumps.length} (room for ${jumpRoom(spots, need)})
@@ -160,7 +165,10 @@ const bike = new BikeModel()
 scene.add(bike.root)
 const ride = new Ride()
 /** Back to the start of the track, standing still. */
-const toStart = () => Object.assign(ride, { ...track.start(), y: 0, vy: 0, speed: 0, airborne: false })
+const toStart = () => {
+  Object.assign(ride, { ...track.start(), y: 0, vy: 0, speed: 0, airborne: false })
+  lapTimer.reset()
+}
 toStart()
 const lines = new RideLines(scene, SETTINGS, store)
 const riderMotion = new RiderMotion({
@@ -247,6 +255,20 @@ resize()
 
 const hud = document.getElementById('hud')!
 const airtime = document.getElementById('airtime')!
+const lap = document.getElementById('lap')!
+const lapBest = document.getElementById('lapBest')!
+const lapFlash = document.getElementById('lapFlash')!
+/** Seconds since the last split or lap, for how long its time stays up. */
+let sinceLapEvent = Infinity
+/** A lap time as m:ss.cc. */
+const clockTime = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(2).padStart(5, '0')}`
+const showLapEvent = (event: LapEvent) => {
+  if (event.kind === 'start') return
+  sinceLapEvent = 0
+  lapFlash.classList.toggle('best', event.kind === 'lap' && event.best)
+  lapFlash.textContent =
+    event.kind === 'split' ? `split ${event.split}/${event.of}  ${clockTime(event.time)}` : `lap ${clockTime(event.time)}${event.best ? '  best!' : ''}`
+}
 /** Seconds since the last landing, for how long the airtime stays up. */
 let sinceLanding = Infinity
 const clock = new THREE.Clock()
@@ -313,5 +335,14 @@ renderer.setAnimationLoop(() => {
   airtime.classList.toggle('landed', !flying)
   if (flying || jumped) airtime.textContent = `${ride.airtime.toFixed(2)} s`
   hud.textContent = `${Math.round(Math.abs(ride.speed) * 3.6)} km/h`
+
+  // Lap time: runs from crossing the start line; each split's time and each lap's flash up under it.
+  const lapEvent = lapTimer.update(ride.x, ride.z, dt)
+  if (lapEvent) showLapEvent(lapEvent)
+  sinceLapEvent += dt
+  lapFlash.hidden = sinceLapEvent > LAP_FLASH_SHOWN
+  lap.textContent = clockTime(lapTimer.time)
+  lapBest.hidden = !Number.isFinite(lapTimer.best)
+  if (!lapBest.hidden) lapBest.textContent = `best ${clockTime(lapTimer.best)}`
   renderer.render(scene, camera)
 })

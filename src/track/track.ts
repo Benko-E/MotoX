@@ -27,8 +27,10 @@ const ROUNDING_PASSES = 3
 const SPACING = 1
 /** Corners wider than this count as straight, for finding the start, metres. */
 const STRAIGHT = 60
-/** How far into the longest straight the start is, metres. */
+/** How far into the longest straight the start line is, metres. */
 const START_IN = 10
+/** How far behind the start line the bike starts, metres. */
+const BEHIND = 6
 /** Metres outside a straight run the track takes to ease onto its line. */
 const EASE = 8
 /** Metres either side a corner's sharpness is averaged over, so one sample's wobble doesn't count as a corner. */
@@ -216,13 +218,14 @@ export class Track {
     })
   }
 
-  /** Where the bike starts: a little way into the longest straight, pointing along the track. */
+  /** Where the bike starts: a little way behind the start line, pointing along the track toward it. */
   start(): { x: number; z: number; heading: number } {
-    const s = this.samples[this.startAt()]
+    const n = this.samples.length
+    const s = this.samples[(this.startAt() - Math.round(BEHIND / SPACING) + n) % n]
     return { x: s.x, z: s.z, heading: Math.atan2(s.tx, -s.tz) }
   }
 
-  /** The sample the bike starts at: a little way into the longest straight. */
+  /** The start line's sample: a little way into the longest straight. */
   startAt(): number {
     const radii = this.radii()
     const n = radii.length
