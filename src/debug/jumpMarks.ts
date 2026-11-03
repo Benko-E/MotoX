@@ -9,8 +9,8 @@ const FLIGHT = 0xff2a2a
 const ROLL_OUT = 0x3aa8ff
 /** The rest of the spots, where a jump fits but none was placed. */
 const SPARE = 0xffffff
-/** How far above the ground they're drawn: over the track's strip and the grid. */
-const LIFT = 0.04
+/** How far above the ground they’re drawn: over the track’s strip (0.04) and the tyre tracks (0.06). */
+const LIFT = 0.08
 /** How many pieces each tile is cut into each way, so it lies over the ground's ups and downs. */
 const CUTS = 9
 

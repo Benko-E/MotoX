@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import type { Track } from './track'
 
-/** How far above the ground the strip is drawn: under the tyre tracks (0.015), over the ground. */
-const LIFT = 0.005
+/** How far above the ground the strip is drawn, clear of the ground's facets between its points. */
+const LIFT = 0.04
 /** How many pieces the strip is cut into across, so it follows the ground's tilt. */
 const ACROSS = 6
 /** Metres of strip per repeat of its texture, along and across. */
@@ -16,7 +16,7 @@ export class TrackView {
   private readonly mesh: THREE.Mesh
 
   constructor(scene: THREE.Scene, anisotropy: number) {
-    const material = new THREE.MeshStandardMaterial({ map: packedDirt(anisotropy), roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 })
+    const material = new THREE.MeshStandardMaterial({ map: packedDirt(anisotropy), roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), material)
     this.mesh.receiveShadow = true
     scene.add(this.mesh)

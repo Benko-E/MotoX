@@ -25,9 +25,11 @@ import { WHEELBASE } from './bike/bikeModel'
  * no tighter than the wheelie's turn circle. No powerslides on one wheel.
  *
  * Up and down, just as simple: on the ground the bike follows it, gravity
- * pulling it back down slopes (Slope pull), and it leaves
- * it wherever the ground drops away faster than gravity could pull the bike
- * down after it (off a ramp's lip). In the air, gravity pulls it down: no
+ * pulling it back down slopes (Slope pull), feeling the slope from wheel to
+ * wheel. Where the ground drops away faster than gravity pulls the bike
+ * down after it, the suspension stretches to keep the wheels on it; only
+ * once it drops further than the suspension's travel does the bike leave
+ * the ground (off a kicker's lip, not over a little crest). In the air, gravity pulls it down: no
  * throttle, brakes or turning until it lands. It holds the angle it left
  * the lip at, unless the arrows tilt it (and it holds the new angle when
  * let go): all the way round is a flip. Turning as it leaves the lip, it
@@ -102,6 +104,8 @@ export interface Tuning {
   tiltRate: number
   /** Seconds down after a crash, before it's back up. */
   getUp: number
+  /** How far the suspension stretches to keep the wheels on the ground as it drops away, metres. */
+  travel: number
 }
 
 /** Which way the bike went down: over to its left or right, over the front, or looped out over the back. */
@@ -122,8 +126,6 @@ export interface Input {
 const KMH = 1 / 3.6
 const DEG = Math.PI / 180
 const G = 9.81
-/** How far behind the bike the ground is felt to find its slope, metres. */
-const SLOPE_FEEL = 0.05
 /** Air shorter than this is a bump, not a jump: the airtime isn't shown, seconds. */
 export const MIN_AIRTIME = 0.15
 /** How far ahead of a landing the ground is felt to find the slope landed on, metres. */
@@ -240,13 +242,15 @@ export class Ride {
     const hundred = 100 * KMH
     const before = this.speed
 
-    // The slope just behind the bike (the way it's going), so on the step
-    // that crosses a lip it's still the ramp's slope: rise per metre along the heading.
+    // The slope from the rear wheel to the front, the way it's going: rise
+    // per metre. Over the wheelbase, so it doesn't twitch on every little bump.
     const sin = Math.sin(this.heading)
     const cos = Math.cos(this.heading)
     const going = this.speed < 0 ? -1 : 1
-    const behind = ground(this.x - sin * SLOPE_FEEL * going, this.z + cos * SLOPE_FEEL * going)
-    const slope = (going * (ground(this.x, this.z) - behind)) / SLOPE_FEEL
+    const reach = WHEELBASE / 2
+    const front = ground(this.x + sin * reach, this.z - cos * reach)
+    const rear = ground(this.x - sin * reach, this.z + cos * reach)
+    const slope = (going * (front - rear)) / WHEELBASE
     // Gravity along the slope pulls back down it, uphill or down (sin of its
     // angle). Before throttle and brakes, so coasting or braking can hold the bike still.
     this.speed -= G * tune.slopePull * (slope / Math.sqrt(1 + slope * slope)) * dt
@@ -299,32 +303,38 @@ export class Ride {
 
     // Along the ground: up or down a slope, part of the speed goes into climbing.
     const across = this.speed / Math.sqrt(1 + slope * slope)
-    const climb = across * slope
     this.x += Math.sin(this.heading) * across * dt
     this.z -= Math.cos(this.heading) * across * dt
     this.spin += (this.speed * dt) / radius
     this.pitch = Math.atan(slope)
 
-    // Thrown on along the slope, gravity would carry the bike to `thrown`; if
-    // the ground drops away below that (off a lip), it leaves the ground.
+    // Left to itself, gravity would carry the bike to `free`. The ground
+    // pushes it up if it's higher; if it's lower, the suspension stretches
+    // to keep the wheels on it, as far as its travel, and past that (off a
+    // lip) the bike leaves the ground.
     const height = ground(this.x, this.z)
-    const thrown = this.y + climb * dt - 0.5 * G * dt * dt
-    if (height < thrown - 1e-4) {
+    const vy = this.vy - G * dt
+    const free = this.y + vy * dt
+    if (free <= height) {
+      // (no time passed, the first frame, say: nothing to rise at)
+      this.vy = dt > 0 ? (height - this.y) / dt : 0
+      this.y = height
+    } else if (free - height <= tune.travel) {
+      this.vy = vy
+      this.y = free
+    } else {
       this.airborne = true
       this.airSpeed = across
       this.airtime = 0
-      // it flies at the angle it left at, a wheelie's lift and all
-      this.pitch += this.wheelie * tune.wheelieAngle * DEG
+      this.vy = vy
+      this.y = free
+      // it flies at the angle it's flying, a wheelie's lift and all
+      this.pitch = Math.atan2(vy, Math.abs(across)) + this.wheelie * tune.wheelieAngle * DEG
       this.wheelie = 0
       this.airYaw = 0
       // turning as it leaves the lip, it keeps spinning that way round
       this.airSpin = this.turnRate * DEG * tune.lipSpin
       this.airSteer = 0
-      this.vy = climb - G * dt
-      this.y = thrown
-    } else {
-      this.vy = (height - this.y) / dt
-      this.y = height
     }
   }
 

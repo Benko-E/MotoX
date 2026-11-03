@@ -109,6 +109,11 @@ export const SETTINGS: Setting[] = [
     note: 'How far A/D tip the bike over on the rear wheel. Only looks.',
   },
   {
+    kind: 'slider', id: 'bike.travel', name: 'Travel', tab: 'Bike', section: 'Suspension',
+    min: 0, max: 1, step: 0.05, default: 0.25, unit: 'm',
+    note: 'Where the ground drops away (over a crest, off a lip), the suspension stretches this far to keep the wheels on it before the bike leaves the ground. More soaks up bigger bumps without taking off; kickers still launch you, their backs drop away much faster.',
+  },
+  {
     kind: 'slider', id: 'air.tilt', name: 'Tilt', tab: 'Bike', section: 'In the air',
     min: 0, max: 360, step: 10, default: 160, unit: '°/s',
     note: 'How fast the arrows tilt the bike in the air: down lifts the nose, up drops it. Let go and it holds that angle. Hands off, it holds the angle it took off at. All the way round is a flip: land it level and it counts.',

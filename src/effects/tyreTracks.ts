@@ -23,7 +23,7 @@ const SPACING = 0.2
 /** Moving further than this between two touches isn't rolling (a reset, a teleport): start afresh, metres. */
 const TOO_FAR = 3
 /** Lifted this far off the ground so the track doesn't flicker into it, metres. */
-const LIFT = 0.015
+const LIFT = 0.06
 const COLOR = new THREE.Color(0x2b1d10)
 
 export interface TrackPiece {

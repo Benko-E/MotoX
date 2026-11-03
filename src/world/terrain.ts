@@ -55,7 +55,11 @@ export class Terrain {
     this.carve(track, carve, land)
   }
 
-  /** How high the ground is at (x, z), metres: in between the grid's points, blended from the four round it. */
+  /**
+   * How high the ground is at (x, z), metres: in between the grid's points,
+   * on the same two triangles the ground is drawn with in each square, so
+   * what you ride is exactly what you see.
+   */
   heightAt(x: number, z: number): number {
     const n = this.samples
     const fx = Math.min(Math.max((x + TERRAIN_HALF) / TERRAIN_CELL, 0), n - 1.000001)
@@ -69,7 +73,8 @@ export class Terrain {
     const b = h[iz * n + ix + 1]
     const c = h[(iz + 1) * n + ix]
     const d = h[(iz + 1) * n + ix + 1]
-    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v
+    // each square is split corner to corner from (x+1, z) to (x, z+1)
+    return u + v <= 1 ? a + (b - a) * u + (c - a) * v : d + (c - d) * (1 - u) + (b - d) * (1 - v)
   }
 
   /**
