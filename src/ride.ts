@@ -27,8 +27,14 @@ import { WHEELBASE } from './bike/bikeModel'
  * Up and down, just as simple: on the ground the bike follows it, gravity
  * pulling it back down slopes (Slope pull), and it leaves
  * it wherever the ground drops away faster than gravity could pull the bike
- * down after it (off a ramp's lip). In the air, gravity pulls it down and
- * nothing else changes: no throttle, brakes or turning until it lands.
+ * down after it (off a ramp's lip). In the air, gravity pulls it down: no
+ * throttle, brakes or turning until it lands. It holds the angle it left
+ * the lip at, unless the arrows tilt it (and it holds the new angle when
+ * let go). Steering hard as it takes off spins it round sideways.
+ *
+ * Crashes: landing too far sideways to the way it's flying (fast enough),
+ * or too far nose-down or tail-down to the ground. The bike falls over and
+ * slides to a stop; a moment later it's back up, right there.
  */
 export const HANDLING = {
   /** Fastest backwards, holding S from a stop, km/h. */
@@ -73,7 +79,24 @@ export interface Tuning {
   wheelieTurn: number
   /** Above this speed the front stays up without W, km/h. */
   wheelieHold: number
+  /** How far the front comes up in a full wheelie, degrees. */
+  wheelieAngle: number
+  /** Landing pointing more than this off the way it's flying crashes it, degrees. */
+  sideLimit: number
+  /** Slower than this, a crooked landing doesn't crash it, km/h. */
+  sideMinSpeed: number
+  /** Landing more than this nose-down or tail-down to the ground crashes it, degrees. */
+  noseTailLimit: number
+  /** How fast steering all the way at takeoff spins it round in the air, degrees per second. */
+  spinRate: number
+  /** How fast the arrows tilt it in the air, degrees per second. */
+  tiltRate: number
+  /** Seconds down after a crash, before it's back up. */
+  getUp: number
 }
+
+/** Which way the bike went down: over to its left or right, over the front, or looped out over the back. */
+export type CrashWay = 'left' | 'right' | 'front' | 'back'
 
 export interface Input {
   throttle: boolean
@@ -96,6 +119,11 @@ const SLOPE_FEEL = 0.05
 export const MIN_AIRTIME = 0.15
 /** How far ahead of a landing the ground is felt to find the slope landed on, metres. */
 const IMPACT_FEEL = 0.3
+
+/** How much of the steering at takeoff starts no spin at all: a nudge at the lip doesn't spin you. */
+const SPIN_DEADZONE = 0.5
+/** How fast the bike slides to a stop on its side, m/s². */
+const CRASH_SLIDE = 9
 
 /** The height of the ground at a point, metres. */
 export type Ground = (x: number, z: number) => number
@@ -146,10 +174,16 @@ export class Ride {
   wheelie = 0
   /** Where the rider puts his weight: -1 all the way back, 0 in the middle, 1 all the way forward. */
   riderLean = 0
+  /** How far the body has spun round in the air off the way it's flying, radians (positive = nose to the right). */
+  airYaw = 0
+  /** How fast it's spinning round in the air, radians per second. */
+  private airSpin = 0
+  /** Down: which way it went, and for how long, seconds. Null while riding. */
+  crash: { way: CrashWay; time: number } | null = null
 
   /** Which way the bike's body points, radians: the way it's going, plus the rear swung out sliding. */
   get bodyHeading(): number {
-    return this.heading + this.slideYaw
+    return this.heading + this.slideYaw + this.airYaw
   }
 
   /**
@@ -157,15 +191,19 @@ export class Ride {
    * the front wheel, which stays on the line, so the rear swings out.
    */
   get bodyX(): number {
-    return this.x + (Math.sin(this.heading) - Math.sin(this.bodyHeading)) * (WHEELBASE / 2)
+    return this.x + (Math.sin(this.heading) - Math.sin(this.heading + this.slideYaw)) * (WHEELBASE / 2)
   }
 
   get bodyZ(): number {
-    return this.z - (Math.cos(this.heading) - Math.cos(this.bodyHeading)) * (WHEELBASE / 2)
+    return this.z - (Math.cos(this.heading) - Math.cos(this.heading + this.slideYaw)) * (WHEELBASE / 2)
   }
 
   step(input: Input, tune: Tuning, dt: number, radius: number, ground: Ground): void {
     const h = HANDLING
+    if (this.crash) {
+      this.down(tune, dt, ground)
+      return
+    }
     this.riderLean = (input.leanForward ? 1 : 0) - (input.leanBack ? 1 : 0)
     // Wheelie: leaning back with W lifts the front; it stays up while he
     // leans back, with W or fast enough. In the air it stays as it left the ground.
@@ -185,7 +223,7 @@ export class Ride {
     this.slideYaw += (this.sliding * this.steering * tune.slideAngle * DEG - this.slideYaw) * (1 - Math.exp(-dt / Math.max(wantSlide ? tune.kickOut : tune.hookUp, 1e-6)))
 
     if (this.airborne) {
-      this.fly(dt, radius, ground)
+      this.fly(input, tune, dt, radius, ground)
       return
     }
     const top = tune.topSpeed * KMH
@@ -265,6 +303,13 @@ export class Ride {
       this.airborne = true
       this.airSpeed = across
       this.airtime = 0
+      // it flies at the angle it left at, a wheelie's lift and all
+      this.pitch += this.wheelie * tune.wheelieAngle * DEG
+      this.wheelie = 0
+      // steering hard at the lip spins it round
+      const spin = Math.max(Math.abs(this.steering) - SPIN_DEADZONE, 0) / (1 - SPIN_DEADZONE)
+      this.airSpin = Math.sign(this.steering) * spin * tune.spinRate * DEG
+      this.airYaw = 0
       this.vy = climb - G * dt
       this.y = thrown
     } else {
@@ -274,14 +319,16 @@ export class Ride {
   }
 
   /** A step in the air: gravity pulls it down, the rest carries on as it left the ground. */
-  private fly(dt: number, radius: number, ground: Ground): void {
+  private fly(input: Input, tune: Tuning, dt: number, radius: number, ground: Ground): void {
     this.vy -= G * dt
     this.x += Math.sin(this.heading) * this.airSpeed * dt
     this.z -= Math.cos(this.heading) * this.airSpeed * dt
     this.y += this.vy * dt
     this.spin += (this.speed * dt) / radius
     this.airtime += dt
-    this.pitch = Math.atan2(this.vy, Math.abs(this.airSpeed))
+    // the arrows tilt it: back (down) lifts the nose, forward (up) drops it
+    this.pitch += ((input.leanBack ? 1 : 0) - (input.leanForward ? 1 : 0)) * tune.tiltRate * DEG * dt
+    this.airYaw += this.airSpin * dt
     Object.assign(this, { steer: 0, steering: 0, bars: 0, wheelAngle: 0, turnRate: 0, turnRadius: Infinity, limit: null, slowing: 0 })
 
     const height = ground(this.x, this.z)
@@ -296,6 +343,38 @@ export class Ride {
       this.y = height
       this.vy = 0
       this.speed = Math.sign(this.speed) * Math.abs(this.airSpeed)
+      this.land(tune, Math.atan(slope))
     }
+  }
+
+  /**
+   * Touching down: crashes if it's too far sideways to the way it's flying
+   * (fast enough for that to matter), or too far nose-down or tail-down to
+   * the ground it lands on. Otherwise it rides on the way it's pointing.
+   */
+  private land(tune: Tuning, groundAngle: number): void {
+    const off = Math.atan2(Math.sin(this.airYaw + this.slideYaw), Math.cos(this.airYaw + this.slideYaw))
+    const tilt = this.pitch - groundAngle
+    let way: CrashWay | null = null
+    if (Math.abs(off) > tune.sideLimit * DEG && Math.abs(this.speed) >= tune.sideMinSpeed * KMH) way = off > 0 ? 'left' : 'right'
+    else if (tilt < -tune.noseTailLimit * DEG) way = 'front'
+    else if (tilt > tune.noseTailLimit * DEG) way = 'back'
+    // landed it: it carries on the way it points
+    this.heading += this.airYaw
+    this.airYaw = 0
+    this.airSpin = 0
+    if (way) Object.assign(this, { crash: { way, time: 0 }, sliding: 0, slideYaw: 0, wheelie: 0 })
+  }
+
+  /** A step lying down after a crash: it slides to a stop, then gets back up, right there, facing the way it points. */
+  private down(tune: Tuning, dt: number, ground: Ground): void {
+    const crash = this.crash!
+    crash.time += dt
+    this.speed = Math.sign(this.speed) * Math.max(Math.abs(this.speed) - CRASH_SLIDE * dt, 0)
+    this.x += Math.sin(this.heading) * this.speed * dt
+    this.z -= Math.cos(this.heading) * this.speed * dt
+    this.y = ground(this.x, this.z)
+    Object.assign(this, { vy: 0, steer: 0, steering: 0, bars: 0, wheelAngle: 0, turnRate: 0, turnRadius: Infinity, limit: null, slowing: 0, riderLean: 0 })
+    if (crash.time >= tune.getUp) Object.assign(this, { crash: null, speed: 0, pitch: 0 })
   }
 }

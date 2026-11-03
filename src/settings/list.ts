@@ -109,6 +109,36 @@ export const SETTINGS: Setting[] = [
     note: 'How far A/D tip the bike over on the rear wheel. Only looks.',
   },
   {
+    kind: 'slider', id: 'air.tilt', name: 'Tilt', tab: 'Bike', section: 'In the air',
+    min: 0, max: 360, step: 10, default: 120, unit: '°/s',
+    note: 'How fast the arrows tilt the bike in the air: down lifts the nose, up drops it. Let go and it holds that angle. Hands off, it holds the angle it took off at.',
+  },
+  {
+    kind: 'slider', id: 'air.spin', name: 'Spin', tab: 'Bike', section: 'In the air',
+    min: 0, max: 720, step: 10, default: 360, unit: '°/s',
+    note: 'Holding A or D as you leave the lip spins the bike round sideways, this fast with the steering all the way over. Under half the steering doesn’t spin at all, so a nudge at the lip is safe. A/D do nothing once you’re in the air.',
+  },
+  {
+    kind: 'slider', id: 'crash.sideways', name: 'Sideways limit', tab: 'Bike', section: 'Crash',
+    min: 10, max: 180, step: 5, default: 45, unit: '°',
+    note: 'Landing with the bike pointing more than this off the way it’s flying crashes you: it falls over sideways. Under it, you ride on the way you point.',
+  },
+  {
+    kind: 'slider', id: 'crash.minSpeed', name: 'Sideways min speed', tab: 'Bike', section: 'Crash',
+    min: 0, max: 60, step: 1, default: 15, unit: 'km/h',
+    note: 'Slower than this, a crooked landing doesn’t crash you: you just put a foot down.',
+  },
+  {
+    kind: 'slider', id: 'crash.noseTail', name: 'Nose/tail limit', tab: 'Bike', section: 'Crash',
+    min: 10, max: 90, step: 5, default: 50, unit: '°',
+    note: 'Landing more than this nose-down (over the front) or tail-down (looped out over the back), next to the ground you land on, crashes you. Landing flat, a little nose-down or a little on the rear wheel is fine, however hard.',
+  },
+  {
+    kind: 'slider', id: 'crash.getUp', name: 'Back up after', tab: 'Bike', section: 'Crash',
+    min: 0.3, max: 5, step: 0.1, default: 1.5, unit: 's',
+    note: 'How long you’re down after a crash. Then you’re back up right where you stopped, standing still, facing the way the bike points.',
+  },
+  {
     kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Lean (looks only)',
     min: 0, max: 60, step: 1, default: 35, unit: '°',
     note: 'How far the bike leans into a turn when the tyres are at their grip; gentler turns lean less. Only drawn: it does not change how the bike turns.',

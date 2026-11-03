@@ -29,6 +29,8 @@ const PITCH_TIME = 0.06
 const VIEW_NAME_SHOWN = 1.5
 /** Seconds the airtime stays on screen after landing. */
 const AIRTIME_SHOWN = 3
+/** Seconds the bike takes to fall over in a crash. */
+const FALL_TIME = 0.45
 /** Seconds a split or lap time stays on screen. */
 const LAP_FLASH_SHOWN = 3
 const DEG = Math.PI / 180
@@ -174,7 +176,7 @@ scene.add(bike.root)
 const ride = new Ride()
 /** Back to the start of the track, standing still. */
 const toStart = () => {
-  Object.assign(ride, { ...track.start(), y: 0, vy: 0, speed: 0, airborne: false })
+  Object.assign(ride, { ...track.start(), y: 0, vy: 0, speed: 0, airborne: false, crash: null, airYaw: 0 })
   lapTimer.reset()
 }
 toStart()
@@ -279,6 +281,24 @@ const showLapEvent = (event: LapEvent) => {
 }
 /** Seconds since the last landing, for how long the airtime stays up. */
 let sinceLanding = Infinity
+const fallen = new THREE.Box3()
+/**
+ * Draws the bike (and the rider on it) going down in a crash: over onto its
+ * side, or flipped over the front or back, faster as it goes, like falling.
+ * Lifted so its lowest point rests on the ground, whichever way up it ends.
+ */
+const fallOver = (crash: NonNullable<Ride['crash']>) => {
+  const t = Math.min(crash.time / FALL_TIME, 1) ** 2
+  const side = crash.way === 'left' ? -1 : crash.way === 'right' ? 1 : 0
+  const over = crash.way === 'front' ? -1 : crash.way === 'back' ? 1 : 0
+  // from how it was leaning, over onto its side
+  const roll = side ? lean + ((side * Math.PI) / 2 - lean) * t : lean
+  bike.root.rotation.set(pitch + over * Math.PI * t, -ride.bodyHeading, -roll, 'YZX')
+  bike.root.position.set(ride.bodyX, ride.y, ride.bodyZ)
+  bike.root.updateMatrixWorld(true)
+  fallen.setFromObject(bike.root)
+  bike.root.position.y += Math.max(ride.y - fallen.min.y, 0)
+}
 const clock = new THREE.Clock()
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1)
@@ -301,6 +321,13 @@ renderer.setAnimationLoop(() => {
     wheelieAccel: store.get('wheelie.accel') / 100,
     wheelieTurn: store.get('wheelie.turnCircle'),
     wheelieHold: store.get('wheelie.holdAbove'),
+    wheelieAngle: store.get('wheelie.angle'),
+    sideLimit: store.get('crash.sideways'),
+    sideMinSpeed: store.get('crash.minSpeed'),
+    noseTailLimit: store.get('crash.noseTail'),
+    spinRate: store.get('air.spin'),
+    tiltRate: store.get('air.tilt'),
+    getUp: store.get('crash.getUp'),
   }
   const wasAirborne = ride.airborne
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)
@@ -322,6 +349,7 @@ renderer.setAnimationLoop(() => {
   const axleLifted = axleLift.copy(REAR_AXLE).applyEuler(bike.root.rotation)
   const axleDown = axleRest.copy(REAR_AXLE).applyEuler(restTilt.set(pitch, -ride.bodyHeading, -lean, 'YZX'))
   bike.root.position.set(ride.bodyX, ride.y, ride.bodyZ).add(axleDown).sub(axleLifted)
+  if (ride.crash) fallOver(ride.crash)
   effects.update(ride, input, dt)
   riderMotion.update(ride, dt)
   bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin, riderMotion)
