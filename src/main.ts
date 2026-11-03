@@ -13,7 +13,6 @@ import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { layOut } from './track/layout'
 import { findJumpSpots } from './track/jumpSpots'
-import { naturalSpeeds } from './track/speed'
 import { Track } from './track/track'
 import { TrackView } from './track/trackView'
 
@@ -107,23 +106,10 @@ const layOutTrack = () => {
   for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
   findSpots()
 }
-/** Walks the track for room for jumps, at the speed you'd naturally be going round it. */
+/** Walks the loop's squares for straight runs a jump fits in. */
 const findSpots = () => {
-  const speeds = naturalSpeeds(track, {
-    topSpeed: store.get('bike.topSpeed'),
-    zeroToHundred: store.get('bike.zeroToHundred'),
-    brakeToStop: store.get('bike.brakeToStop'),
-    grip: store.get('bike.grip'),
-  })
-  const spots = findJumpSpots(track, speeds, {
-    height: store.get('jump.height'),
-    angle: store.get('jump.angle'),
-    runUp: store.get('jump.runUp'),
-    rollOut: store.get('jump.rollOut'),
-    straight: store.get('jump.straight'),
-    slopePull: store.get('bike.slopePull') / 100,
-  })
-  jumpMarks.build(track, spots)
+  const spots = findJumpSpots(track.layout, store.get('jump.squares'))
+  jumpMarks.build(track.layout, spots)
   trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njump spots ${spots.length}`
 }
 const showTrack = () => {
@@ -152,7 +138,7 @@ showTrack()
 store.onChange((id) => {
   if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info' || id === 'jump.spots') showTrack()
   else if (id.startsWith('track.')) layOutTrack()
-  else if (id.startsWith('jump.') || ['bike.topSpeed', 'bike.zeroToHundred', 'bike.brakeToStop', 'bike.grip', 'bike.slopePull'].includes(id)) findSpots()
+  else if (id.startsWith('jump.')) findSpots()
 })
 
 const bike = new BikeModel()

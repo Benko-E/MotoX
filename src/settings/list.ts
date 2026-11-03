@@ -396,34 +396,14 @@ export const SETTINGS: Setting[] = [
     note: 'How much the grid’s square corners get rounded off. 0 turns sharp at every square’s middle; more makes wider, flowing corners (and a slightly shorter lap).',
   },
   {
-    kind: 'slider', id: 'jump.height', name: 'Height', tab: 'Track', section: 'Jumps',
-    min: 0.5, max: 20, step: 0.1, default: 3.6, unit: 'm',
-    note: 'How high the lip is. The test ramp: 3.6 m was a good normal jump, 15 m big air.',
-  },
-  {
-    kind: 'slider', id: 'jump.angle', name: 'Angle', tab: 'Track', section: 'Jumps',
-    min: 5, max: 45, step: 1, default: 15, unit: '°',
-    note: 'How steep the face rises to the lip. 10 felt too shallow on the test ramp, 15 good, 30 big air.',
-  },
-  {
-    kind: 'slider', id: 'jump.runUp', name: 'Run-up', tab: 'Track', section: 'Jumps',
-    min: 0, max: 100, step: 1, default: 15, unit: 'm',
-    note: 'Straight track before the face, so you arrive lined up. How fast you arrive comes from the track: the corner before, and how much room there is to speed up.',
-  },
-  {
-    kind: 'slider', id: 'jump.rollOut', name: 'Roll-out', tab: 'Track', section: 'Jumps',
-    min: 0, max: 100, step: 1, default: 15, unit: 'm',
-    note: 'Straight track after landing, before the track may turn again.',
-  },
-  {
-    kind: 'slider', id: 'jump.straight', name: 'Straight enough', tab: 'Track', section: 'Jumps',
-    min: 10, max: 500, step: 5, default: 60, unit: 'm',
-    note: 'The tightest the track may bend under a jump (corner radius) and still count as straight. Higher finds fewer, straighter spots.',
+    kind: 'slider', id: 'jump.squares', name: 'Squares needed', tab: 'Track', section: 'Jumps',
+    min: 3, max: 20, step: 1, default: 5, unit: 'squares',
+    note: 'How many squares in a straight line a jump needs: run-up, face, flight and roll-out. 5 squares of 18 m fits a normal jump at top speed.',
   },
   {
     kind: 'line', id: 'jump.spots', name: 'Jump spots', tab: 'Track', section: 'Debug lines',
     default: true,
-    note: 'Every spot a jump fits, painted on the track: run-up yellow, face orange, flight red, roll-out blue. The label over the lip: how fast you\u2019d naturally get there, how long you\u2019d fly, and how far.',
+    note: 'Every straight run of squares a jump fits in, painted in: the first square run-up (yellow), the second the face (orange), the last roll-out (blue), the ones between red. A long run only means the jump can go anywhere along it.',
   },
   {
     kind: 'line', id: 'track.grid', name: 'Grid', tab: 'Track', section: 'Debug lines',
