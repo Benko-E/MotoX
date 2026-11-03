@@ -3,6 +3,7 @@ import { BikeModel, WHEELBASE, WHEEL_RADIUS } from './bike/bikeModel'
 import { CameraRig, VIEW_NAMES } from './camera/cameraRig'
 import { RiderMotion } from './bike/riderMotion'
 import { RideLines } from './debug/rideLines'
+import { JumpMarks } from './debug/jumpMarks'
 import { TrackGrid } from './debug/trackGrid'
 import { GroundEffects } from './effects/groundEffects'
 import { MIN_AIRTIME, Ride, type Input, type Tuning } from './ride'
@@ -11,6 +12,8 @@ import type { LineSetting } from './settings/types'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { layOut } from './track/layout'
+import { findJumpSpots } from './track/jumpSpots'
+import { naturalSpeeds } from './track/speed'
 import { Track } from './track/track'
 import { TrackView } from './track/trackView'
 
@@ -85,6 +88,7 @@ const lineColor = (id: string) => SETTINGS.find((s): s is LineSetting => s.id ==
 const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track.path'), lineColor('track.centre'))
 const trackView = new TrackView(scene, renderer.capabilities.getMaxAnisotropy())
 const trackInfo = document.getElementById('trackInfo')!
+const jumpMarks = new JumpMarks(scene)
 const cones: THREE.Mesh[] = []
 let track: Track
 const layOutTrack = () => {
@@ -101,13 +105,33 @@ const layOutTrack = () => {
   trackGrid.build(layout, track)
   trackView.build(track)
   for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
-  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m`
+  findSpots()
+}
+/** Walks the track for room for jumps, at the speed you'd naturally be going round it. */
+const findSpots = () => {
+  const speeds = naturalSpeeds(track, {
+    topSpeed: store.get('bike.topSpeed'),
+    zeroToHundred: store.get('bike.zeroToHundred'),
+    brakeToStop: store.get('bike.brakeToStop'),
+    grip: store.get('bike.grip'),
+  })
+  const spots = findJumpSpots(track, speeds, {
+    height: store.get('jump.height'),
+    angle: store.get('jump.angle'),
+    runUp: store.get('jump.runUp'),
+    rollOut: store.get('jump.rollOut'),
+    straight: store.get('jump.straight'),
+    slopePull: store.get('bike.slopePull') / 100,
+  })
+  jumpMarks.build(track, spots)
+  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njump spots ${spots.length}`
 }
 const showTrack = () => {
   trackGrid.showGrid = store.isOn('track.grid')
   trackGrid.showPath = store.isOn('track.path')
   trackGrid.showCentre = store.isOn('track.centre')
   trackInfo.hidden = !store.isOn('track.info')
+  jumpMarks.visible = store.isOn('jump.spots')
 }
 
 // Cones scattered about, something to ride round (none on the track).
@@ -126,8 +150,9 @@ for (let i = 0; i < 120; i++) {
 layOutTrack()
 showTrack()
 store.onChange((id) => {
-  if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info') showTrack()
+  if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info' || id === 'jump.spots') showTrack()
   else if (id.startsWith('track.')) layOutTrack()
+  else if (id.startsWith('jump.') || ['bike.topSpeed', 'bike.zeroToHundred', 'bike.brakeToStop', 'bike.grip', 'bike.slopePull'].includes(id)) findSpots()
 })
 
 const bike = new BikeModel()
