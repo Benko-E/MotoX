@@ -396,6 +396,11 @@ export const SETTINGS: Setting[] = [
     note: 'How much the grid’s square corners get rounded off. 0 turns sharp at every square’s middle; more makes wider, flowing corners (and a slightly shorter lap).',
   },
   {
+    kind: 'slider', id: 'track.relax', name: 'Relax', tab: 'Track', section: 'Track',
+    min: 0, max: 500, step: 10, default: 0, unit: 'passes',
+    note: 'The last step of all, after the jumps: smooths the whole line, softening kinks. Straights stay straight; corners pull in a little. Each pass reaches about a metre further, so it takes a lot of them to smooth a big bend.',
+  },
+  {
     kind: 'slider', id: 'jump.amount', name: 'Amount', tab: 'Track', section: 'Jumps',
     min: 0, max: 20, step: 1, default: 3, unit: '',
     note: 'How many jumps it tries to place, picked at random (from the seed) from the spots they fit, one per spot. Fewer if there are not enough spots.',

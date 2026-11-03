@@ -106,7 +106,7 @@ const layOutTrack = () => {
   const jumps = placeJumps(spots, store.get('jump.amount'), need, store.get('track.seed'))
   track = new Track(
     layout,
-    { width: store.get('track.width'), wobble: store.get('track.wobble') / 100, rounding: store.get('track.rounding') / 100 },
+    { width: store.get('track.width'), wobble: store.get('track.wobble') / 100, rounding: store.get('track.rounding') / 100, relax: store.get('track.relax') },
     straightSquares(jumps),
   )
   trackGrid.build(layout, track)

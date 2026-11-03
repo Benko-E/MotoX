@@ -9,6 +9,8 @@ export interface TrackShape {
   wobble: number
   /** How much the grid's square corners get rounded off, 0 (not at all) to 1. */
   rounding: number
+  /** How many times the finished line gets relaxed, the last step of all. */
+  relax: number
 }
 
 /** A spot along the track's middle: where it is, and which way the track runs there (a unit vector). */
@@ -105,7 +107,14 @@ export class Track {
     // its wobbly points either side, so pull the track's middle right onto
     // the line there, easing back to the spline just outside them.
     for (const run of straights) this.pullStraight(run)
-    if (straights.length > 0) this.retangent()
+    // last of all, relax the whole line: smooths kinks, leaves straights straight
+    this.relax(shape.relax)
+    if (straights.length > 0 || shape.relax > 0) this.retangent()
+    // measured again round the finished line, which pulling and relaxing shortened
+    this.length = this.samples.reduce((sum, s, i, all) => {
+      const b = all[(i + 1) % all.length]
+      return sum + Math.hypot(b.x - s.x, b.z - s.z)
+    }, 0)
     this.tightest = this.radii().reduce((t, radius, i) => (radius < t.radius ? { radius, at: i } : t), { radius: Infinity, at: 0 })
   }
 
@@ -148,6 +157,25 @@ export class Track {
       s.x += dz * off * pull
       s.z -= dx * off * pull
     }
+  }
+
+  /**
+   * Relaxes the line `passes` times: each pass moves every sample halfway
+   * to the middle of its two neighbours. Bends and kinks soften (and
+   * corners pull in a little); a dead-straight bit is already in the middle
+   * of its neighbours, so it stays put. Each pass reaches about a metre
+   * further along, so it takes a lot of them to smooth a big bend.
+   */
+  private relax(passes: number): void {
+    const { samples } = this
+    const n = samples.length
+    let xs = samples.map((s) => s.x)
+    let zs = samples.map((s) => s.z)
+    for (let pass = 0; pass < passes; pass++) {
+      xs = xs.map((x, i) => (x + (xs[(i + n - 1) % n] + xs[(i + 1) % n]) / 2) / 2)
+      zs = zs.map((z, i) => (z + (zs[(i + n - 1) % n] + zs[(i + 1) % n]) / 2) / 2)
+    }
+    samples.forEach((s, i) => Object.assign(s, { x: xs[i], z: zs[i] }))
   }
 
   /** Works out which way the track runs at each sample again, from its neighbours, after they've been moved. */
