@@ -43,7 +43,9 @@ export function findJumpSpots(layout: Layout, need: number): JumpSpot[] {
 /**
  * Places up to `amount` jumps, `need` squares each: again and again it
  * picks a spot at random from the ones left, and somewhere along it at
- * random, one jump per spot. Same seed, same jumps.
+ * random. A jump only uses up its own squares: what's left of the spot
+ * either side of it stays a spot, if it's still long enough. Same seed,
+ * same jumps.
  */
 export function placeJumps(spots: JumpSpot[], amount: number, need: number, seed: number): Jump[] {
   const random = seeded(seed * 104729 + 7)
@@ -53,6 +55,9 @@ export function placeJumps(spots: JumpSpot[], amount: number, need: number, seed
     const [spot] = left.splice(Math.floor(random() * left.length), 1)
     const from = Math.floor(random() * (spot.at.length - need + 1))
     jumps.push({ at: spot.at.slice(from, from + need) })
+    for (const rest of [spot.at.slice(0, from), spot.at.slice(from + need)]) {
+      if (rest.length >= need) left.push({ at: rest })
+    }
   }
   return jumps
 }
