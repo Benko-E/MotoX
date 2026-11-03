@@ -402,7 +402,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'jump.amount', name: 'Amount', tab: 'Track', section: 'Jumps',
-    min: 0, max: 20, step: 1, default: 3, unit: '',
+    min: 0, max: 20, step: 1, default: 4, unit: '',
     note: 'How many jumps it tries to place, picked at random (from the seed) from the spots they fit, one per spot. If there isn’t room for that many, it places as many as there’s room for (the Track readout shows how many fit).',
   },
   {
@@ -417,12 +417,12 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'jump.height', name: 'Height', tab: 'Track', section: 'Jumps',
-    min: 0.5, max: 15, step: 0.1, default: 3, unit: 'm',
+    min: 0.5, max: 15, step: 0.1, default: 2, unit: 'm',
     note: 'How high each kicker’s lip is. 3.6 m at 15° is a good normal jump; 15 m at 30° is ridiculous big air.',
   },
   {
     kind: 'slider', id: 'jump.angle', name: 'Angle', tab: 'Track', section: 'Jumps',
-    min: 5, max: 30, step: 1, default: 15, unit: '°',
+    min: 5, max: 30, step: 1, default: 10, unit: '°',
     note: 'How steep the face is. The face is as long as it takes to reach the Height (the Track readout shows it), its lip at the end of the orange square; the back drops twice as steep. On the ground it’s as wide as the track; the lip is 2 m narrower (1 m on a track under 10 m wide), so the sides are steep triangles.',
   },
   {

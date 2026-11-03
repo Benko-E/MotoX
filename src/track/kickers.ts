@@ -1,5 +1,6 @@
 import { squareCentre, type Layout } from './layout'
 import type { Jump } from './jumpSpots'
+import type { Track } from './track'
 
 /** How the kickers are built, as set in the debug menu's Track tab. */
 export interface KickerShape {
@@ -62,16 +63,29 @@ export class Kickers {
     this.sideSlope = shape.height / this.side
   }
 
-  /** One on each of `jumps`: its lip at the far edge of the face square (the second), facing along the jump. */
-  static onJumps(layout: Layout, jumps: readonly Jump[], shape: KickerShape): Kickers {
+  /**
+   * One on each of `jumps`, sitting on `track` as it actually runs (relaxing
+   * can bend it a little off the grid's line): its lip on the track's middle
+   * at the far edge of the face square (the second), and turned to line up
+   * with the track from the foot of its face to the lip.
+   */
+  static onJumps(layout: Layout, track: Track, jumps: readonly Jump[], shape: KickerShape): Kickers {
+    const { samples } = track
+    const n = samples.length
+    const { face } = new Kickers([], shape)
+    const back = Math.max(1, Math.round(face / (track.length / n)))
     const list = jumps.map(({ at }) => {
       const runUp = squareCentre(layout, layout.squares[at[0]])
-      const face = squareCentre(layout, layout.squares[at[1]])
-      const long = Math.hypot(face.x - runUp.x, face.z - runUp.z) || 1
-      const dx = (face.x - runUp.x) / long
-      const dz = (face.z - runUp.z) / long
+      const faceSquare = squareCentre(layout, layout.squares[at[1]])
       const half = layout.shape.square / 2
-      return { x: face.x + dx * half, z: face.z + dz * half, dx, dz }
+      const long = Math.hypot(faceSquare.x - runUp.x, faceSquare.z - runUp.z) || 1
+      const lip = track.nearest(faceSquare.x + ((faceSquare.x - runUp.x) / long) * half, faceSquare.z + ((faceSquare.z - runUp.z) / long) * half)
+      // the jump may run either way round the spline: step back the way it comes from
+      const s = samples[lip]
+      const way = s.tx * (faceSquare.x - runUp.x) + s.tz * (faceSquare.z - runUp.z) >= 0 ? 1 : -1
+      const foot = samples[(lip - way * back + n) % n]
+      const chord = Math.hypot(s.x - foot.x, s.z - foot.z) || 1
+      return { x: s.x, z: s.z, dx: (s.x - foot.x) / chord, dz: (s.z - foot.z) / chord }
     })
     return new Kickers(list, shape)
   }
