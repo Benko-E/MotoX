@@ -347,7 +347,7 @@ export const SETTINGS: Setting[] = [
   // Track
   {
     kind: 'slider', id: 'track.seed', name: 'Seed', tab: 'Track', section: 'Layout',
-    min: 1, max: 1000, step: 1, default: 2, unit: '',
+    min: 1, max: 1000, step: 1, default: 3, unit: '',
     note: 'Picks which loop you get. The same seed always lays out the same loop.',
   },
   {
@@ -407,7 +407,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'jump.spacing', name: 'Spacing', tab: 'Track', section: 'Jumps',
-    min: 0, max: 100, step: 5, default: 50, unit: '%',
+    min: 0, max: 100, step: 5, default: 75, unit: '%',
     note: 'How evenly the jumps spread round the lap. 100 spaces them as evenly as the spots allow; 0 is pure random (they often bunch up).',
   },
   {
