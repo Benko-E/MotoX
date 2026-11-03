@@ -1,68 +1,87 @@
 import * as THREE from 'three'
+import { TERRAIN_HALF } from '../world/terrain'
 import type { Track } from './track'
 
-/** How far above the ground the strip is drawn, clear of the ground's facets between its points. */
-const LIFT = 0.04
-/** How many pieces the strip is cut into across, so it follows the ground's tilt. */
-const ACROSS = 6
-/** Metres of strip per repeat of its texture, along and across. */
+/** Metres of packed dirt per repeat of its texture. */
 export const TILE = 4
+/** How many pixels the map of where the track is has across: 4096 over the 1024 m grid is 4 to the metre. */
+const MASK_SIZE = 4096
+/** How soft the track's edge is, metres: it fades from packed to loose dirt over about this. */
+const EDGE = 0.5
 
 /**
- * The track on the ground: a strip of darker, packed dirt along the
- * spline, as wide as the track, laid over the ground's ups and downs.
+ * The track on the ground: no strip of its own, but painted onto the
+ * ground's material, the way prototype 1 did it. A big black picture of the
+ * whole grid has the track drawn on it in white, as wide as the track; the
+ * ground's shader looks up each spot in it and turns packed dirt there,
+ * fading to loose dirt at the edges. It's the same surface as the hills, so
+ * nothing can poke through it.
  */
 export class TrackView {
-  private readonly mesh: THREE.Mesh
+  private readonly canvas = document.createElement('canvas')
+  private readonly mask: THREE.CanvasTexture
 
-  constructor(scene: THREE.Scene, anisotropy: number) {
-    const material = new THREE.MeshStandardMaterial({ map: packedDirt(anisotropy), roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })
-    this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), material)
-    this.mesh.receiveShadow = true
-    scene.add(this.mesh)
+  /** Paints the track onto `ground` (the terrain's material, a MeshStandardMaterial with a map). */
+  constructor(ground: THREE.MeshStandardMaterial, anisotropy: number) {
+    this.canvas.width = this.canvas.height = MASK_SIZE
+    this.mask = new THREE.CanvasTexture(this.canvas)
+    // row 0 of the canvas is the grid's far edge (-z): no flipping
+    this.mask.flipY = false
+    this.mask.colorSpace = THREE.NoColorSpace
+    this.mask.wrapS = this.mask.wrapT = THREE.ClampToEdgeWrapping
+    this.mask.generateMipmaps = true
+    this.mask.minFilter = THREE.LinearMipmapLinearFilter
+    this.mask.anisotropy = anisotropy
+    const dirt = packedDirt(anisotropy, false)
+    ground.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, {
+        trackMask: { value: this.mask },
+        trackDirt: { value: dirt },
+        trackHalf: { value: TERRAIN_HALF },
+        trackTile: { value: TILE },
+      })
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vGroundXZ;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundXZ = (modelMatrix * vec4(transformed, 1.0)).xz;')
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nvarying vec2 vGroundXZ;\nuniform sampler2D trackMask;\nuniform sampler2D trackDirt;\nuniform float trackHalf;\nuniform float trackTile;',
+        )
+        .replace(
+          '#include <map_fragment>',
+          [
+            '#include <map_fragment>',
+            'float onTrack = texture2D(trackMask, vGroundXZ / (2.0 * trackHalf) + 0.5).r;',
+            'vec3 packed = texture2D(trackDirt, vGroundXZ / trackTile).rgb * diffuse;',
+            'diffuseColor.rgb = mix(diffuseColor.rgb, packed, onTrack);',
+          ].join('\n'),
+        )
+    }
   }
 
-  /** Lays the strip along `track`, on the ground `heightAt` gives, in place of the last one. */
-  build(track: Track, heightAt: (x: number, z: number) => number): void {
-    const { samples } = track
-    const half = track.shape.width / 2
-    const step = track.length / samples.length
-    const positions: number[] = []
-    const uvs: number[] = []
-    const index: number[] = []
-    const row = ACROSS + 1
-    // one row of points across per sample, and the first again at the end to close the loop
-    for (let i = 0; i <= samples.length; i++) {
-      const s = samples[i % samples.length]
-      const v = (i * step) / TILE
-      for (let j = 0; j < row; j++) {
-        // from the left side to the right (the left is the way the track runs, turned a quarter to the left)
-        const off = half - (j / ACROSS) * half * 2
-        const x = s.x + s.tz * off
-        const z = s.z - s.tx * off
-        positions.push(x, heightAt(x, z) + LIFT, z)
-        uvs.push(((half - off) / TILE), v)
-      }
-      if (i > 0) {
-        for (let j = 0; j < ACROSS; j++) {
-          const a = (i - 1) * row + j
-          const b = a + row
-          index.push(a, a + 1, b, a + 1, b + 1, b)
-        }
-      }
-    }
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-    geometry.setIndex(index)
-    geometry.computeVertexNormals()
-    this.mesh.geometry.dispose()
-    this.mesh.geometry = geometry
+  /** Paints `track` on, in place of the last one. */
+  build(track: Track): void {
+    const paint = this.canvas.getContext('2d')!
+    const scale = MASK_SIZE / (TERRAIN_HALF * 2)
+    const px = (x: number) => (x + TERRAIN_HALF) * scale
+    paint.fillStyle = '#000'
+    paint.fillRect(0, 0, MASK_SIZE, MASK_SIZE)
+    paint.beginPath()
+    track.samples.forEach((s, i) => (i === 0 ? paint.moveTo(px(s.x), px(s.z)) : paint.lineTo(px(s.x), px(s.z))))
+    paint.closePath()
+    paint.strokeStyle = '#fff'
+    paint.lineJoin = paint.lineCap = 'round'
+    paint.filter = `blur(${(EDGE * scale) / 2}px)`
+    paint.lineWidth = track.shape.width * scale
+    paint.stroke()
+    paint.filter = 'none'
+    this.mask.needsUpdate = true
   }
 }
 
-/** A tile of packed dirt: darker and smoother than the loose dirt around it, with streaks along the way you ride. */
-export function packedDirt(anisotropy: number): THREE.CanvasTexture {
+/** A tile of packed dirt: darker and smoother than the loose dirt around it, with streaks along the way you ride if `streaks`. */
+export function packedDirt(anisotropy: number, streaks = true): THREE.CanvasTexture {
   const tile = document.createElement('canvas')
   tile.width = tile.height = 256
   const paint = tile.getContext('2d')!
@@ -73,7 +92,7 @@ export function packedDirt(anisotropy: number): THREE.CanvasTexture {
     paint.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 3, 1 + Math.random() * 3)
   }
   // streaks along the strip (its texture runs along v, up the canvas)
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; streaks && i < 40; i++) {
     paint.fillStyle = Math.random() < 0.5 ? 'rgba(45,28,12,0.12)' : 'rgba(170,130,85,0.08)'
     paint.fillRect(Math.random() * 256, 0, 1 + Math.random() * 4, 256)
   }

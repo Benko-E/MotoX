@@ -95,10 +95,10 @@ const groundAt = (x: number, z: number) => terrain.heightAt(x, z) + kickers.heig
 
 // The track: laid out on a grid from the Track tab's seed, a spline drawn
 // through it, the hills from the Terrain tab with the track laid into them,
-// and a strip of packed dirt along it.
+// and packed dirt painted onto the ground along it.
 const lineColor = (id: string) => SETTINGS.find((s): s is LineSetting => s.id === id)!.color!
 const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track.path'), lineColor('track.centre'))
-const trackView = new TrackView(scene, renderer.capabilities.getMaxAnisotropy())
+const trackView = new TrackView(dirtMaterial, renderer.capabilities.getMaxAnisotropy())
 const kickerView = new KickerView(scene, renderer.capabilities.getMaxAnisotropy())
 const trackInfo = document.getElementById('trackInfo')!
 const jumpMarks = new JumpMarks(scene)
@@ -132,7 +132,7 @@ const layOutTrack = () => {
   )
   terrainView.build(terrain)
   trackGrid.build(layout, track, hillsAt)
-  trackView.build(track, hillsAt)
+  trackView.build(track)
   kickers = Kickers.onJumps(layout, track, jumps, { height: store.get('jump.height'), angle: store.get('jump.angle') * DEG, width: store.get('track.width') })
   kickerView.build(kickers, hillsAt)
   jumpMarks.build(layout, spots, jumps, hillsAt)
