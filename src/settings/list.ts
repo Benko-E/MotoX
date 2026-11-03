@@ -412,12 +412,12 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'jump.squares', name: 'Squares needed', tab: 'Track', section: 'Jumps',
-    min: 3, max: 20, step: 1, default: 5, unit: 'squares',
+    min: 3, max: 20, step: 1, default: 6, unit: 'squares',
     note: 'How many squares in a straight line a jump needs: run-up, face, flight and roll-out. 5 squares of 18 m fits a normal jump at top speed.',
   },
   {
     kind: 'slider', id: 'jump.height', name: 'Height', tab: 'Track', section: 'Jumps',
-    min: 0.5, max: 15, step: 0.1, default: 3.6, unit: 'm',
+    min: 0.5, max: 15, step: 0.1, default: 3, unit: 'm',
     note: 'How high each kicker’s lip is. 3.6 m at 15° is a good normal jump; 15 m at 30° is ridiculous big air.',
   },
   {
