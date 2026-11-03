@@ -114,9 +114,24 @@ export const SETTINGS: Setting[] = [
     note: 'How fast the arrows tilt the bike in the air: down lifts the nose, up drops it. Let go and it holds that angle. Hands off, it holds the angle it took off at. All the way round is a flip: land it level and it counts.',
   },
   {
-    kind: 'slider', id: 'air.spin', name: 'Spin', tab: 'Bike', section: 'In the air',
-    min: 0, max: 720, step: 10, default: 270, unit: '°/s',
-    note: 'How fast A/D spin the bike round sideways in the air, while you hold them. Let go and it stops. Only one way per jump: the first key you press spins, the other only turns you back as far as straight (or the last whole turn), so you can line up the landing but not wiggle about. A whole turn round counts as straight.',
+    kind: 'slider', id: 'air.lipSpin', name: 'Spin off the lip', tab: 'Bike', section: 'In the air',
+    min: 0, max: 5, step: 0.1, default: 1, unit: '×',
+    note: 'Turning as you leave the lip, the bike keeps spinning that way round in the air, even when you let go. This many times as fast as it was turning (1 is just as fast).',
+  },
+  {
+    kind: 'slider', id: 'air.turn', name: 'Air turn', tab: 'Bike', section: 'In the air',
+    min: 0, max: 180, step: 1, default: 45, unit: '°/s',
+    note: 'A/D in the air turn the bike gently, this fast, and stop when you let go: enough to line up a landing, no easy 180.',
+  },
+  {
+    kind: 'slider', id: 'air.spinUp', name: 'Spin up', tab: 'Bike', section: 'In the air',
+    min: 0, max: 200, step: 1, default: 20, unit: '°/s²',
+    note: 'With a spin from the lip, holding A/D the same way speeds it up by this much each second.',
+  },
+  {
+    kind: 'slider', id: 'air.spinStop', name: 'Spin stop', tab: 'Bike', section: 'In the air',
+    min: 0.05, max: 3, step: 0.05, default: 0.4, unit: 's',
+    note: 'With a spin from the lip, holding A/D against it stops it in about this long (then the gentle Air turn takes you the other way).',
   },
   {
     kind: 'slider', id: 'crash.sideways', name: 'Sideways limit', tab: 'Bike', section: 'Crash',

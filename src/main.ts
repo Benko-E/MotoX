@@ -325,7 +325,10 @@ renderer.setAnimationLoop(() => {
     sideLimit: store.get('crash.sideways'),
     sideMinSpeed: store.get('crash.minSpeed'),
     noseTailLimit: store.get('crash.noseTail'),
-    spinRate: store.get('air.spin'),
+    lipSpin: store.get('air.lipSpin'),
+    airTurn: store.get('air.turn'),
+    airSpinUp: store.get('air.spinUp'),
+    airSpinStop: store.get('air.spinStop'),
     tiltRate: store.get('air.tilt'),
     getUp: store.get('crash.getUp'),
   }
