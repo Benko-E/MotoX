@@ -2,7 +2,6 @@ import * as THREE from 'three'
 import { BikeModel, WHEELBASE, WHEEL_RADIUS } from './bike/bikeModel'
 import { CameraRig, VIEW_NAMES } from './camera/cameraRig'
 import { RiderMotion } from './bike/riderMotion'
-import { RampArcs } from './debug/rampArcs'
 import { RideLines } from './debug/rideLines'
 import { TrackGrid } from './debug/trackGrid'
 import { GroundEffects } from './effects/groundEffects'
@@ -11,7 +10,6 @@ import { SETTINGS, TABS } from './settings/list'
 import type { LineSetting } from './settings/types'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
-import { Ramp, type RampShape } from './world/ramp'
 import { layOut } from './track/layout'
 import { Track } from './track/track'
 import { TrackView } from './track/trackView'
@@ -78,31 +76,8 @@ ground.rotation.x = -Math.PI / 2
 ground.receiveShadow = true
 scene.add(ground)
 
-// The test ramp, shaped in the debug menu's Temporary tab: a touch darker, packed dirt.
-const rampShape = (): RampShape => ({
-  angle: store.get('ramp.angle'),
-  height: store.get('ramp.height'),
-  width: store.get('ramp.width'),
-  top: store.get('ramp.top'),
-  landing: store.get('ramp.landing'),
-  distance: store.get('ramp.distance'),
-})
-const rampMaterial = new THREE.MeshStandardMaterial({ map: dirt.clone(), color: 0xd9c2a0, roughness: 1 })
-rampMaterial.map!.repeat.set(1, 1)
-rampMaterial.map!.needsUpdate = true
-const ramp = new Ramp(scene, rampShape(), rampMaterial)
-const arcSetting = SETTINGS.find((s): s is LineSetting => s.id === 'ramp.arcs')!
-const arcs = new RampArcs(scene, arcSetting.color!)
-const reshapeRamp = () => {
-  ramp.build(rampShape())
-  arcs.build(ramp, store.get('bike.topSpeed'))
-  arcs.visible = store.isOn('ramp.arcs')
-}
-reshapeRamp()
-store.onChange((id) => {
-  if (id.startsWith('ramp.') || id === 'bike.topSpeed') reshapeRamp()
-})
-const groundAt = (x: number, z: number) => ramp.heightAt(x, z)
+/** How high the ground is at (x, z): flat everywhere, for now. */
+const groundAt = (_x: number, _z: number) => 0
 
 // The track: laid out on a grid from the Track tab's seed, a spline drawn
 // through it, and a strip of packed dirt along that. Flat for now.
@@ -135,7 +110,7 @@ const showTrack = () => {
   trackInfo.hidden = !store.isOn('track.info')
 }
 
-// Cones scattered about, something to ride round (none in the ramp's lane).
+// Cones scattered about, something to ride round (none on the track).
 const cone = new THREE.ConeGeometry(0.25, 0.7, 12).translate(0, 0.35, 0)
 const orange = new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.6 })
 for (let i = 0; i < 120; i++) {

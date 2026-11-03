@@ -1,7 +1,7 @@
 import type { Setting } from './types'
 
 /** The debug menu's tabs, left to right. */
-export const TABS = ['Bike', 'Rider', 'Camera', 'Effects', 'Track', 'Temporary'] as const
+export const TABS = ['Bike', 'Rider', 'Camera', 'Effects', 'Track'] as const
 
 /**
  * Every setting in the debug menu, in the order it's shown. The defaults
@@ -387,12 +387,12 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'track.wobble', name: 'Wobble', tab: 'Track', section: 'Track',
-    min: 0, max: 45, step: 1, default: 25, unit: '%',
+    min: 0, max: 45, step: 1, default: 45, unit: '%',
     note: 'How far each point of the track gets nudged off its square’s middle, as a share of the square. 0 runs dead straight through the middles. Neighbouring points lean the same way, so it sways rather than jitters.',
   },
   {
     kind: 'slider', id: 'track.rounding', name: 'Corner rounding', tab: 'Track', section: 'Track',
-    min: 0, max: 100, step: 1, default: 75, unit: '%',
+    min: 0, max: 100, step: 1, default: 80, unit: '%',
     note: 'How much the grid’s square corners get rounded off. 0 turns sharp at every square’s middle; more makes wider, flowing corners (and a slightly shorter lap).',
   },
   {
@@ -414,40 +414,5 @@ export const SETTINGS: Setting[] = [
     kind: 'line', id: 'track.info', name: 'Track readout', tab: 'Track', section: 'Debug lines',
     default: false,
     note: 'Top left: how long a lap is, and the tightest corner’s radius.',
-  },
-
-  // Temporary: things here for trying out, not to stay
-  {
-    kind: 'slider', id: 'ramp.angle', name: 'Ramp angle', tab: 'Temporary', section: 'Ramp',
-    min: 5, max: 60, step: 1, default: 15, unit: '°',
-    note: 'How steep the run-up rises.',
-  },
-  {
-    kind: 'slider', id: 'ramp.height', name: 'Height', tab: 'Temporary', section: 'Ramp',
-    min: 0.3, max: 60, step: 0.1, default: 3.6, unit: 'm',
-  },
-  {
-    kind: 'slider', id: 'ramp.width', name: 'Width', tab: 'Temporary', section: 'Ramp',
-    min: 1, max: 40, step: 0.5, default: 6, unit: 'm',
-  },
-  {
-    kind: 'slider', id: 'ramp.top', name: 'Flat top', tab: 'Temporary', section: 'Ramp',
-    min: 0, max: 60, step: 0.5, default: 12, unit: 'm',
-    note: 'How much flat top there is after the lip, before the back side drops. 0 is a pointy kicker.',
-  },
-  {
-    kind: 'slider', id: 'ramp.landing', name: 'Back side angle', tab: 'Temporary', section: 'Ramp',
-    min: 5, max: 60, step: 1, default: 45, unit: '°',
-    note: 'How steep the back side drops: land on it for a smooth landing.',
-  },
-  {
-    kind: 'slider', id: 'ramp.distance', name: 'Distance', tab: 'Temporary', section: 'Ramp',
-    min: 5, max: 150, step: 1, default: 33, unit: 'm',
-    note: 'How far ahead of the start (R) the run-up begins: more room to build speed.',
-  },
-  {
-    kind: 'line', id: 'ramp.arcs', name: 'Flight arcs', tab: 'Temporary', section: 'Ramp',
-    default: true, color: 0xff2a2a,
-    note: 'Where you fly off each lip riding straight up the middle: at top speed, and 10 and 20 km/h slower, with each airtime.',
   },
 ]
