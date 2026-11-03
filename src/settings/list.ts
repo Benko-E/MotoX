@@ -396,6 +396,11 @@ export const SETTINGS: Setting[] = [
     note: 'How much the grid’s square corners get rounded off. 0 turns sharp at every square’s middle; more makes wider, flowing corners (and a slightly shorter lap).',
   },
   {
+    kind: 'slider', id: 'jump.amount', name: 'Amount', tab: 'Track', section: 'Jumps',
+    min: 0, max: 20, step: 1, default: 3, unit: '',
+    note: 'How many jumps it tries to place, picked at random (from the seed) from the spots they fit, one per spot. Fewer if there are not enough spots.',
+  },
+  {
     kind: 'slider', id: 'jump.squares', name: 'Squares needed', tab: 'Track', section: 'Jumps',
     min: 3, max: 20, step: 1, default: 5, unit: 'squares',
     note: 'How many squares in a straight line a jump needs: run-up, face, flight and roll-out. 5 squares of 18 m fits a normal jump at top speed.',
@@ -403,7 +408,7 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'line', id: 'jump.spots', name: 'Jump spots', tab: 'Track', section: 'Debug lines',
     default: true,
-    note: 'Every straight run of squares a jump fits in, painted in: the first square run-up (yellow), the second the face (orange), the last roll-out (blue), the ones between red. A long run only means the jump can go anywhere along it.',
+    note: 'The placed jumps, square by square: run-up yellow, face orange, flight red, roll-out blue. The track runs dead straight through the yellow, orange and blue. Every other square a jump would fit is faint white.',
   },
   {
     kind: 'line', id: 'track.grid', name: 'Grid', tab: 'Track', section: 'Debug lines',

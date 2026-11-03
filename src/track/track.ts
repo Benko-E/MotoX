@@ -27,6 +27,8 @@ const SPACING = 1
 const STRAIGHT = 60
 /** How far into the longest straight the start is, metres. */
 const START_IN = 10
+/** Metres outside a straight run the track takes to ease onto its line. */
+const EASE = 8
 /** Metres either side a corner's sharpness is averaged over, so one sample's wobble doesn't count as a corner. */
 const CORNER_SPAN = 3
 
@@ -49,7 +51,10 @@ export class Track {
   constructor(
     readonly layout: Layout,
     readonly shape: TrackShape,
+    /** Runs of the loop's squares (their places on it, in riding order, in a line) the track must run dead straight through. */
+    straights: readonly number[][] = [],
   ) {
+    const straight = new Set(straights.flat())
     const random = seeded(layout.shape.seed * 7919 + 1)
     const n = layout.squares.length
     const reach = THREE.MathUtils.clamp(shape.wobble, 0, 0.45) * layout.shape.square
@@ -73,7 +78,15 @@ export class Track {
         return { x: b.x + ((a.x + c.x) / 2 - b.x) * pull, z: b.z + ((a.z + c.z) / 2 - b.z) * pull }
       })
     }
-    const points = middles.map(({ x, z }, i) => new THREE.Vector3(x + (nudges[i][0] / biggest) * reach, 0, z + (nudges[i][1] / biggest) * reach))
+    // the `straight` squares stay dead on their middles, no wobble or rounding,
+    // so the track runs straight through them (a jump's run-up, face and roll-out)
+    const points = middles.map(({ x, z }, i) => {
+      if (straight.has(i)) {
+        const middle = squareCentre(layout, layout.squares[i])
+        return new THREE.Vector3(middle.x, 0, middle.z)
+      }
+      return new THREE.Vector3(x + (nudges[i][0] / biggest) * reach, 0, z + (nudges[i][1] / biggest) * reach)
+    })
     // centripetal: no loops or overshoot at the tight corners
     this.curve = new THREE.CatmullRomCurve3(points, true, 'centripetal')
     this.length = this.curve.getLength()
@@ -88,7 +101,77 @@ export class Track {
       const flat = Math.hypot(along.x, along.z) || 1
       this.samples.push({ x: at.x, z: at.z, tx: along.x / flat, tz: along.z / flat })
     }
+    // The spline still bends a little through the straight squares, toward
+    // its wobbly points either side, so pull the track's middle right onto
+    // the line there, easing back to the spline just outside them.
+    for (const run of straights) this.pullStraight(run)
+    if (straights.length > 0) this.retangent()
     this.tightest = this.radii().reduce((t, radius, i) => (radius < t.radius ? { radius, at: i } : t), { radius: Infinity, at: 0 })
+  }
+
+  /**
+   * Pulls the samples in `run`'s squares onto the straight line through
+   * their middles, and the ones within EASE metres either side partway, so
+   * the track bends smoothly onto the line and off it again.
+   */
+  private pullStraight(run: readonly number[]): void {
+    const { layout, samples } = this
+    const n = samples.length
+    const { square } = layout.shape
+    const squares = layout.squares
+    const first = squareCentre(layout, squares[run[0]])
+    // which way the run goes: across its first square, from the one before to the one after
+    const before = squareCentre(layout, squares[(run[0] + squares.length - 1) % squares.length])
+    const after = squareCentre(layout, squares[(run[0] + 1) % squares.length])
+    const long = Math.hypot(after.x - before.x, after.z - before.z) || 1
+    const dx = (after.x - before.x) / long
+    const dz = (after.z - before.z) / long
+    // next to a corner it eases on inside the run's end square, leaving the corner alone
+    const n2 = squares.length
+    const corner = (i: number) => {
+      const [a, s, b] = [squares[(i + n2 - 1) % n2], squares[i], squares[(i + 1) % n2]]
+      return s.col - a.col !== b.col - s.col || s.row - a.row !== b.row - s.row
+    }
+    const from = -square / 2 + (corner((run[0] + n2 - 1) % n2) ? EASE : 0)
+    const to = (run.length - 0.5) * square - (corner((run[run.length - 1] + 1) % n2) ? EASE : 0)
+    // only this bit of the lap: from just before the run's first square to just after its last
+    const last = squareCentre(layout, squares[run[run.length - 1]])
+    const start = this.nearest(first.x - dx * (square / 2 + EASE), first.z - dz * (square / 2 + EASE))
+    const end = this.nearest(last.x + dx * (square / 2 + EASE), last.z + dz * (square / 2 + EASE))
+    for (let k = 0, i = start; k <= (end - start + n) % n; k++, i = (i + 1) % n) {
+      const s = samples[i]
+      const u = (s.x - first.x) * dx + (s.z - first.z) * dz
+      const off = -(s.x - first.x) * dz + (s.z - first.z) * dx
+      const outside = u < from ? from - u : u > to ? u - to : 0
+      const t = Math.min(outside / EASE, 1)
+      const pull = 1 - t * t * (3 - 2 * t)
+      s.x += dz * off * pull
+      s.z -= dx * off * pull
+    }
+  }
+
+  /** Works out which way the track runs at each sample again, from its neighbours, after they've been moved. */
+  private retangent(): void {
+    const { samples } = this
+    const n = samples.length
+    const along = samples.map((_, i) => {
+      const a = samples[(i + n - 1) % n]
+      const b = samples[(i + 1) % n]
+      const long = Math.hypot(b.x - a.x, b.z - a.z) || 1
+      return { tx: (b.x - a.x) / long, tz: (b.z - a.z) / long }
+    })
+    samples.forEach((s, i) => Object.assign(s, along[i]))
+  }
+
+  /** The sample nearest (x, z). */
+  private nearest(x: number, z: number): number {
+    let best = 0
+    let bestD = Infinity
+    this.samples.forEach((s, i) => {
+      const d = (s.x - x) ** 2 + (s.z - z) ** 2
+      if (d < bestD) [best, bestD] = [i, d]
+    })
+    return best
   }
 
   /** Each sample's corner radius, metres (Infinity where it's dead straight). */

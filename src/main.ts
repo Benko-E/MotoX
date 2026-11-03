@@ -12,7 +12,7 @@ import type { LineSetting } from './settings/types'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { layOut } from './track/layout'
-import { findJumpSpots } from './track/jumpSpots'
+import { findJumpSpots, placeJumps, straightSquares } from './track/jumpSpots'
 import { Track } from './track/track'
 import { TrackView } from './track/trackView'
 
@@ -100,17 +100,20 @@ const layOutTrack = () => {
     deepen: store.get('track.deepen') / 100,
     widest: store.get('track.widest'),
   })
-  track = new Track(layout, { width: store.get('track.width'), wobble: store.get('track.wobble') / 100, rounding: store.get('track.rounding') / 100 })
+  // walk the loop for spots a jump fits, place some, and straighten the track under them
+  const need = store.get('jump.squares')
+  const spots = findJumpSpots(layout, need)
+  const jumps = placeJumps(spots, store.get('jump.amount'), need, store.get('track.seed'))
+  track = new Track(
+    layout,
+    { width: store.get('track.width'), wobble: store.get('track.wobble') / 100, rounding: store.get('track.rounding') / 100 },
+    straightSquares(jumps),
+  )
   trackGrid.build(layout, track)
   trackView.build(track)
+  jumpMarks.build(layout, spots, jumps)
   for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
-  findSpots()
-}
-/** Walks the loop's squares for straight runs a jump fits in. */
-const findSpots = () => {
-  const spots = findJumpSpots(track.layout, store.get('jump.squares'))
-  jumpMarks.build(track.layout, spots)
-  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njump spots ${spots.length}`
+  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njumps ${jumps.length} of ${spots.length} spots`
 }
 const showTrack = () => {
   trackGrid.showGrid = store.isOn('track.grid')
@@ -137,8 +140,7 @@ layOutTrack()
 showTrack()
 store.onChange((id) => {
   if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info' || id === 'jump.spots') showTrack()
-  else if (id.startsWith('track.')) layOutTrack()
-  else if (id.startsWith('jump.')) findSpots()
+  else if (id.startsWith('track.') || id.startsWith('jump.')) layOutTrack()
 })
 
 const bike = new BikeModel()

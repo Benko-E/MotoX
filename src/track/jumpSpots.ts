@@ -1,8 +1,13 @@
-import type { Layout, Square } from './layout'
+import { seeded, type Layout } from './layout'
 
-/** A spot a jump fits: a straight run of squares on the loop, in riding order. */
+/** A spot a jump fits: a straight run of the loop's squares, as their places on the loop, in riding order. */
 export interface JumpSpot {
-  squares: Square[]
+  at: number[]
+}
+
+/** A jump placed in a spot: which squares of the loop it takes, in riding order (run-up, face, flight..., roll-out). */
+export interface Jump {
+  at: number[]
 }
 
 /**
@@ -23,14 +28,36 @@ export function findJumpSpots(layout: Layout, need: number): JumpSpot[] {
   const corner = through.indexOf(false)
   if (corner < 0) return []
   const spots: JumpSpot[] = []
-  let run: Square[] = []
+  let run: number[] = []
   for (let k = 1; k <= n; k++) {
     const i = (corner + k) % n
-    if (through[i]) run.push(squares[i])
+    if (through[i]) run.push(i)
     else {
-      if (run.length >= need) spots.push({ squares: run })
+      if (run.length >= need) spots.push({ at: run })
       run = []
     }
   }
   return spots
+}
+
+/**
+ * Places up to `amount` jumps, `need` squares each: again and again it
+ * picks a spot at random from the ones left, and somewhere along it at
+ * random, one jump per spot. Same seed, same jumps.
+ */
+export function placeJumps(spots: JumpSpot[], amount: number, need: number, seed: number): Jump[] {
+  const random = seeded(seed * 104729 + 7)
+  const left = [...spots]
+  const jumps: Jump[] = []
+  while (jumps.length < amount && left.length > 0) {
+    const [spot] = left.splice(Math.floor(random() * left.length), 1)
+    const from = Math.floor(random() * (spot.at.length - need + 1))
+    jumps.push({ at: spot.at.slice(from, from + need) })
+  }
+  return jumps
+}
+
+/** The runs of squares the track must run dead straight through under `jumps`: each one's run-up and face, and its roll-out. */
+export function straightSquares(jumps: Jump[]): number[][] {
+  return jumps.flatMap(({ at }) => [[at[0], at[1]], [at[at.length - 1]]])
 }
