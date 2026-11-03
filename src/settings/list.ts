@@ -423,12 +423,7 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'slider', id: 'jump.angle', name: 'Angle', tab: 'Track', section: 'Jumps',
     min: 5, max: 30, step: 1, default: 15, unit: '°',
-    note: 'How steep the face is. The face is as long as it takes to reach the Height (the Track readout shows it), its lip at the end of the orange square; the back and sides drop twice as steep.',
-  },
-  {
-    kind: 'slider', id: 'jump.width', name: 'Width', tab: 'Track', section: 'Jumps',
-    min: 2, max: 30, step: 0.5, default: 12, unit: 'm',
-    note: 'How wide the top of each kicker is, side to side. Its own size, not the track’s: the sides slope down past it.',
+    note: 'How steep the face is. The face is as long as it takes to reach the Height (the Track readout shows it), its lip at the end of the orange square; the back drops twice as steep. On the ground it’s as wide as the track; the lip is 2 m narrower (1 m on a track under 10 m wide), so the sides are steep triangles.',
   },
   {
     kind: 'slider', id: 'split.count', name: 'Splits', tab: 'Track', section: 'Splits',

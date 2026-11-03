@@ -123,7 +123,7 @@ const layOutTrack = () => {
   )
   trackGrid.build(layout, track)
   trackView.build(track)
-  kickers = Kickers.onJumps(layout, jumps, { height: store.get('jump.height'), angle: store.get('jump.angle') * DEG, width: store.get('jump.width') })
+  kickers = Kickers.onJumps(layout, jumps, { height: store.get('jump.height'), angle: store.get('jump.angle') * DEG, width: store.get('track.width') })
   kickerView.build(kickers)
   jumpMarks.build(layout, spots, jumps)
   // the lap cut into stretches, the splits drawn to the middle of the jumps' roll-outs where they're near

@@ -7,7 +7,7 @@ export interface KickerShape {
   height: number
   /** How steep the face is, radians. */
   angle: number
-  /** How wide the top is, side to side, metres. */
+  /** How wide it is on the ground, side to side, metres (the track's width, for now). The lip is a little narrower. */
   width: number
 }
 
@@ -19,28 +19,32 @@ export interface Kicker {
   dz: number
 }
 
-/** How many times steeper the back and sides are than the face. */
+/** How many times steeper the back is than the face. */
 const STEEPER = 2
-/** The steepest the back and sides get, radians. */
+/** The steepest the back gets, radians. */
 const STEEPEST = (60 * Math.PI) / 180
 
 /**
  * The kickers: man-made bumps of dirt you hit at speed and fly off. Each
  * is a ridge across the way you ride: a long face up to the lip, then a
- * short steep drop at the back, and steep sides, so it stands on the ground
- * like a wedge (four flat faces, the front and back ones running down to the
- * sides' corners). Their height is added on top of whatever the ground does
- * underneath, so they'll sit on a dished track just as well as a flat one.
+ * short steep drop at the back. On the ground it's a rectangle as wide as
+ * the track; its lip is a little narrower, so the sides are steep triangles
+ * leaning in from the ground's edges up to the lip's ends (four flat faces).
+ * Their height is added on top of whatever the ground does underneath, so
+ * they'll sit on a dished track just as well as a flat one.
  */
 export class Kickers {
   /** How far the face reaches back from the lip, metres. */
   readonly face: number
   /** How far the back drops away past the lip, metres. */
   readonly back: number
-  /** How far the sides reach out past the top's width, metres. */
+  /** Half the lip's width, metres. */
+  readonly lip: number
+  /** How far the sides reach out past the lip's ends, metres. */
   readonly side: number
   private readonly faceSlope: number
-  private readonly steepSlope: number
+  private readonly backSlope: number
+  private readonly sideSlope: number
 
   constructor(
     readonly list: readonly Kicker[],
@@ -48,10 +52,14 @@ export class Kickers {
   ) {
     const angle = Math.min(Math.max(shape.angle, 0.01), STEEPEST)
     this.faceSlope = Math.tan(angle)
-    this.steepSlope = Math.tan(Math.min(angle * STEEPER, STEEPEST))
+    this.backSlope = Math.tan(Math.min(angle * STEEPER, STEEPEST))
     this.face = shape.height / this.faceSlope
-    this.back = shape.height / this.steepSlope
-    this.side = this.back
+    this.back = shape.height / this.backSlope
+    // the lip 2 m narrower than the ground under it, or 1 m on a narrow track (under 10 m)
+    const half = Math.max(shape.width, 1) / 2
+    this.lip = Math.max(half - (shape.width > 10 ? 1 : 0.5), 0.25)
+    this.side = half - this.lip
+    this.sideSlope = shape.height / this.side
   }
 
   /** One on each of `jumps`: its lip at the far edge of the face square (the second), facing along the jump. */
@@ -75,11 +83,11 @@ export class Kickers {
       // along the way you ride from the lip (before it negative), and out to the side
       const along = (x - k.x) * k.dx + (z - k.z) * k.dz
       if (along < -this.face || along > this.back) continue
-      const across = Math.abs(-(x - k.x) * k.dz + (z - k.z) * k.dx) - this.shape.width / 2
+      const across = Math.abs(-(x - k.x) * k.dz + (z - k.z) * k.dx) - this.lip
       if (across > this.side) continue
       const { height } = this.shape
-      const lengthways = along < 0 ? height + along * this.faceSlope : height - along * this.steepSlope
-      const sideways = height - Math.max(across, 0) * this.steepSlope
+      const lengthways = along < 0 ? height + along * this.faceSlope : height - along * this.backSlope
+      const sideways = height - Math.max(across, 0) * this.sideSlope
       highest = Math.max(highest, Math.min(lengthways, sideways))
     }
     return highest

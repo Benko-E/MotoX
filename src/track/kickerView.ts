@@ -27,9 +27,8 @@ export class KickerView {
    * follow it (their height already adds on top of it).
    */
   build(kickers: Kickers): void {
-    const { height, width } = kickers.shape
-    const { face, back, side } = kickers
-    const half = width / 2
+    const { height } = kickers.shape
+    const { face, back, side, lip: half } = kickers
     const wide = half + side
     const positions: number[] = []
     const uvs: number[] = []
