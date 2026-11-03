@@ -416,6 +416,21 @@ export const SETTINGS: Setting[] = [
     note: 'How many squares in a straight line a jump needs: run-up, face, flight and roll-out. 5 squares of 18 m fits a normal jump at top speed.',
   },
   {
+    kind: 'slider', id: 'split.count', name: 'Splits', tab: 'Track', section: 'Splits',
+    min: 1, max: 20, step: 1, default: 4, unit: 'stretches',
+    note: 'How many stretches the lap is cut into, about the same length each, from the start line round to it again. The lines between them are checkpoints, for timing a lap.',
+  },
+  {
+    kind: 'slider', id: 'split.pull', name: 'Pull to roll-outs', tab: 'Track', section: 'Splits',
+    min: 0, max: 100, step: 5, default: 100, unit: '%',
+    note: 'How far a split may move off its even place to land in the middle of a jump’s roll-out (flat, straight and clear), as a share of half a stretch. 0 keeps them evenly spaced. Each roll-out takes one split at most; with no jumps, they just stay even.',
+  },
+  {
+    kind: 'line', id: 'split.lines', name: 'Splits', tab: 'Track', section: 'Debug lines',
+    default: true, color: 0xffffff,
+    note: 'A line across the track at each split, the start line green.',
+  },
+  {
     kind: 'line', id: 'jump.spots', name: 'Jump spots', tab: 'Track', section: 'Debug lines',
     default: true,
     note: 'The placed jumps, square by square: run-up yellow, face orange, flight red, roll-out blue. The track runs dead straight through the yellow, orange and blue. Every other square a jump would fit is faint white.',
@@ -438,6 +453,6 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'line', id: 'track.info', name: 'Track readout', tab: 'Track', section: 'Debug lines',
     default: false,
-    note: 'Top left: how long a lap is, and the tightest corner’s radius.',
+    note: 'Top left: how long a lap is, the tightest corner’s radius, how many jumps there are room for, and how many splits landed on roll-outs.',
   },
 ]

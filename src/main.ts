@@ -4,6 +4,7 @@ import { CameraRig, VIEW_NAMES } from './camera/cameraRig'
 import { RiderMotion } from './bike/riderMotion'
 import { RideLines } from './debug/rideLines'
 import { JumpMarks } from './debug/jumpMarks'
+import { SplitLines } from './debug/splitLines'
 import { TrackGrid } from './debug/trackGrid'
 import { GroundEffects } from './effects/groundEffects'
 import { MIN_AIRTIME, Ride, type Input, type Tuning } from './ride'
@@ -11,8 +12,9 @@ import { SETTINGS, TABS } from './settings/list'
 import type { LineSetting } from './settings/types'
 import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
-import { layOut } from './track/layout'
+import { layOut, squareCentre } from './track/layout'
 import { findJumpSpots, jumpRoom, placeJumps, straightSquares } from './track/jumpSpots'
+import { placeSplits } from './track/splits'
 import { Track } from './track/track'
 import { TrackView } from './track/trackView'
 
@@ -88,6 +90,7 @@ const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track
 const trackView = new TrackView(scene, renderer.capabilities.getMaxAnisotropy())
 const trackInfo = document.getElementById('trackInfo')!
 const jumpMarks = new JumpMarks(scene)
+const splitLines = new SplitLines(scene, lineColor('split.lines'))
 const cones: THREE.Mesh[] = []
 let track: Track
 const layOutTrack = () => {
@@ -112,8 +115,17 @@ const layOutTrack = () => {
   trackGrid.build(layout, track)
   trackView.build(track)
   jumpMarks.build(layout, spots, jumps)
+  // the lap cut into stretches, the splits drawn to the middle of the jumps' roll-outs where they're near
+  const rollOuts = jumps.map(({ at }) => {
+    const { x, z } = squareCentre(layout, layout.squares[at[at.length - 1]])
+    return track.nearest(x, z)
+  })
+  const splits = placeSplits(track, store.get('split.count'), rollOuts, store.get('split.pull') / 100)
+  splitLines.build(track, splits)
+  const onRollOuts = splits.filter((at) => rollOuts.includes(at)).length
   for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
-  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njumps ${jumps.length} (room for ${jumpRoom(spots, need)})`
+  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njumps ${jumps.length} (room for ${jumpRoom(spots, need)})
+splits ${splits.length} (${onRollOuts} on roll-outs)`
 }
 const showTrack = () => {
   trackGrid.showGrid = store.isOn('track.grid')
@@ -121,6 +133,7 @@ const showTrack = () => {
   trackGrid.showCentre = store.isOn('track.centre')
   trackInfo.hidden = !store.isOn('track.info')
   jumpMarks.visible = store.isOn('jump.spots')
+  splitLines.visible = store.isOn('split.lines')
 }
 
 // Cones scattered about, something to ride round (none on the track).
@@ -139,8 +152,8 @@ for (let i = 0; i < 120; i++) {
 layOutTrack()
 showTrack()
 store.onChange((id) => {
-  if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info' || id === 'jump.spots') showTrack()
-  else if (id.startsWith('track.') || id.startsWith('jump.')) layOutTrack()
+  if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info' || id === 'jump.spots' || id === 'split.lines') showTrack()
+  else if (id.startsWith('track.') || id.startsWith('jump.') || id.startsWith('split.')) layOutTrack()
 })
 
 const bike = new BikeModel()

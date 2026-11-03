@@ -192,7 +192,7 @@ export class Track {
   }
 
   /** The sample nearest (x, z). */
-  private nearest(x: number, z: number): number {
+  nearest(x: number, z: number): number {
     let best = 0
     let bestD = Infinity
     this.samples.forEach((s, i) => {
@@ -218,6 +218,12 @@ export class Track {
 
   /** Where the bike starts: a little way into the longest straight, pointing along the track. */
   start(): { x: number; z: number; heading: number } {
+    const s = this.samples[this.startAt()]
+    return { x: s.x, z: s.z, heading: Math.atan2(s.tx, -s.tz) }
+  }
+
+  /** The sample the bike starts at: a little way into the longest straight. */
+  startAt(): number {
     const radii = this.radii()
     const n = radii.length
     // the longest run of straight-ish samples, going round past the end if it has to
@@ -229,8 +235,7 @@ export class Track {
         if (i - from + 1 > best.long && i - from < n) best = { from, long: i - from + 1 }
       } else from = -1
     }
-    const s = this.samples[(best.from + Math.min(Math.round(START_IN / SPACING), best.long >> 1)) % n]
-    return { x: s.x, z: s.z, heading: Math.atan2(s.tx, -s.tz) }
+    return (best.from + Math.min(Math.round(START_IN / SPACING), best.long >> 1)) % n
   }
 
   /** How far (x, z) is from the track's middle, metres. */
