@@ -110,12 +110,12 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'air.tilt', name: 'Tilt', tab: 'Bike', section: 'In the air',
-    min: 0, max: 360, step: 10, default: 120, unit: '°/s',
+    min: 0, max: 360, step: 10, default: 160, unit: '°/s',
     note: 'How fast the arrows tilt the bike in the air: down lifts the nose, up drops it. Let go and it holds that angle. Hands off, it holds the angle it took off at. All the way round is a flip: land it level and it counts.',
   },
   {
     kind: 'slider', id: 'air.lipSpin', name: 'Spin off the lip', tab: 'Bike', section: 'In the air',
-    min: 0, max: 5, step: 0.1, default: 1, unit: '×',
+    min: 0, max: 5, step: 0.1, default: 2.5, unit: '×',
     note: 'Turning as you leave the lip, the bike keeps spinning that way round in the air, even when you let go. This many times as fast as it was turning (1 is just as fast).',
   },
   {
@@ -125,7 +125,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'air.spinUp', name: 'Spin up', tab: 'Bike', section: 'In the air',
-    min: 0, max: 200, step: 1, default: 20, unit: '°/s²',
+    min: 0, max: 200, step: 1, default: 35, unit: '°/s²',
     note: 'With a spin from the lip, holding A/D the same way speeds it up by this much each second.',
   },
   {
