@@ -1,7 +1,7 @@
 import type { Setting } from './types'
 
 /** The debug menu's tabs, left to right. */
-export const TABS = ['Bike', 'Rider', 'Camera', 'Effects', 'Track'] as const
+export const TABS = ['Bike', 'Rider', 'Camera', 'Effects', 'Track', 'Terrain'] as const
 
 /**
  * Every setting in the debug menu, in the order it's shown. The defaults
@@ -444,6 +444,41 @@ export const SETTINGS: Setting[] = [
     kind: 'slider', id: 'track.relax', name: 'Relax', tab: 'Track', section: 'Track',
     min: 0, max: 500, step: 10, default: 160, unit: 'passes',
     note: 'The last step of all, after the jumps: smooths the whole line, softening kinks. Straights stay straight; corners pull in a little. Each pass reaches about a metre further, so it takes a lot of them to smooth a big bend.',
+  },
+  {
+    kind: 'slider', id: 'terrain.seed', name: 'Seed', tab: 'Terrain', section: 'Hills',
+    min: 1, max: 1000, step: 1, default: 1, unit: '',
+    note: 'Picks which hills you get. The same seed always makes the same hills, whatever the track does.',
+  },
+  {
+    kind: 'slider', id: 'terrain.height', name: 'Height', tab: 'Terrain', section: 'Hills',
+    min: 0, max: 50, step: 0.5, default: 2, unit: 'm',
+    note: 'How far up or down the ground rolls at most. 0 is flat.',
+  },
+  {
+    kind: 'slider', id: 'terrain.width', name: 'Width', tab: 'Terrain', section: 'Hills',
+    min: 10, max: 1000, step: 10, default: 100, unit: 'm',
+    note: 'How far apart the big swells are, from one rise to the next.',
+  },
+  {
+    kind: 'slider', id: 'terrain.detail', name: 'Detail', tab: 'Terrain', section: 'Hills',
+    min: 0, max: 100, step: 5, default: 30, unit: '%',
+    note: 'How much the smaller bumps add on top of the big swells. 0 is smooth rolling swells only.',
+  },
+  {
+    kind: 'slider', id: 'terrain.smoothing', name: 'Smoothing', tab: 'Terrain', section: 'Track in the hills',
+    min: 0, max: 100, step: 1, default: 18, unit: 'm',
+    note: 'The track rises and falls with the hills, its ups and downs evened out over this far. 0 follows every bump; more makes long, gentle rolls.',
+  },
+  {
+    kind: 'slider', id: 'terrain.camber', name: 'Camber', tab: 'Terrain', section: 'Track in the hills',
+    min: 0, max: 100, step: 5, default: 50, unit: '%',
+    note: 'How much of the hillside’s sideways tilt the track keeps. 0 is flat across, like a road dug into the hill; 100 leans with the ground underneath.',
+  },
+  {
+    kind: 'slider', id: 'terrain.banks', name: 'Banks', tab: 'Terrain', section: 'Track in the hills',
+    min: 0, max: 40, step: 1, default: 10, unit: 'm',
+    note: 'Past the track’s edges, the ground blends back into the hills over this far. 0 is a hard step at the edge.',
   },
   {
     kind: 'slider', id: 'jump.amount', name: 'Amount', tab: 'Track', section: 'Jumps',

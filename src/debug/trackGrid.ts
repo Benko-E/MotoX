@@ -43,8 +43,8 @@ export class TrackGrid {
     this.centre.visible = on
   }
 
-  /** Draws `layout` and the `track` through it again, in place of the last ones. */
-  build(layout: Layout, track: Track): void {
+  /** Draws `layout` and the `track` through it again, on the ground `heightAt` gives, in place of the last ones. */
+  build(layout: Layout, track: Track, heightAt: (x: number, z: number) => number): void {
     for (const group of [this.grid, this.path, this.centre]) {
       for (const child of [...group.children]) {
         group.remove(child)
@@ -66,18 +66,19 @@ export class TrackGrid {
     for (let i = 0; i <= deep; i++) lines.push(-edgeX, ABOVE, -edgeZ + i * square, edgeX, ABOVE, -edgeZ + i * square)
     const gridGeometry = new THREE.BufferGeometry()
     gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3))
-    this.grid.add(new THREE.LineSegments(gridGeometry, new THREE.LineBasicMaterial({ color: this.gridColor, transparent: true, opacity: 0.5 })))
+    // flat, and drawn through the hills: it's for looking at from above
+    this.grid.add(new THREE.LineSegments(gridGeometry, new THREE.LineBasicMaterial({ color: this.gridColor, transparent: true, opacity: 0.5, depthTest: false })))
 
     // the loop's squares, filled in
     const tile = new THREE.PlaneGeometry(square * 0.94, square * 0.94).rotateX(-Math.PI / 2)
-    const fill = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.25, depthWrite: false })
+    const fill = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.25, depthWrite: false, depthTest: false })
     const tiles = new THREE.InstancedMesh(tile, fill, layout.squares.length)
     const place = new THREE.Matrix4()
     const start = new THREE.Color(START_COLOR)
     const rest = new THREE.Color(this.pathColor)
     layout.squares.forEach((s, i) => {
       const { x, z } = squareCentre(layout, s)
-      tiles.setMatrixAt(i, place.makeTranslation(x, ABOVE, z))
+      tiles.setMatrixAt(i, place.makeTranslation(x, heightAt(x, z) + ABOVE, z))
       tiles.setColorAt(i, i === 0 ? start : rest)
     })
     this.grid.add(tiles)
@@ -85,7 +86,7 @@ export class TrackGrid {
     // the loop, through the squares' middles and back to the first
     const points = [...layout.squares, layout.squares[0]].flatMap((s) => {
       const { x, z } = squareCentre(layout, s)
-      return [x, ABOVE * 2, z]
+      return [x, heightAt(x, z) + ABOVE * 2, z]
     })
     const material = new LineMaterial({ color: this.pathColor, linewidth: LINE_WIDTH, depthTest: false })
     const line = new Line2(new LineGeometry().setPositions(points), material)
@@ -93,7 +94,7 @@ export class TrackGrid {
     this.path.add(line)
 
     // the spline the track follows, and a ring round its tightest corner
-    const spline = [...track.samples, track.samples[0]].flatMap((s) => [s.x, ABOVE * 3, s.z])
+    const spline = [...track.samples, track.samples[0]].flatMap((s) => [s.x, heightAt(s.x, s.z) + ABOVE * 3, s.z])
     const centre = new Line2(new LineGeometry().setPositions(spline), new LineMaterial({ color: this.centreColor, linewidth: LINE_WIDTH, depthTest: false }))
     centre.renderOrder = 999
     this.centre.add(centre)
@@ -107,7 +108,7 @@ export class TrackGrid {
       const s = track.samples[at]
       const before = track.samples[(at - 3 + track.samples.length) % track.samples.length]
       const inside = Math.sign(before.tx * s.tz - before.tz * s.tx) || 1
-      ring.position.set(s.x - s.tz * radius * inside, ABOVE * 3, s.z + s.tx * radius * inside)
+      ring.position.set(s.x - s.tz * radius * inside, heightAt(s.x, s.z) + ABOVE * 3, s.z + s.tx * radius * inside)
       ring.renderOrder = 999
       this.centre.add(ring)
     }

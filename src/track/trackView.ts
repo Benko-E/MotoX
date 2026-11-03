@@ -3,13 +3,14 @@ import type { Track } from './track'
 
 /** How far above the ground the strip is drawn: under the tyre tracks (0.015), over the ground. */
 const LIFT = 0.005
+/** How many pieces the strip is cut into across, so it follows the ground's tilt. */
+const ACROSS = 6
 /** Metres of strip per repeat of its texture, along and across. */
 export const TILE = 4
 
 /**
  * The track on the ground: a strip of darker, packed dirt along the
- * spline, as wide as the track. Flat for now, so the bike rides it just as
- * it rides the ground around it.
+ * spline, as wide as the track, laid over the ground's ups and downs.
  */
 export class TrackView {
   private readonly mesh: THREE.Mesh
@@ -21,24 +22,33 @@ export class TrackView {
     scene.add(this.mesh)
   }
 
-  /** Lays the strip along `track`, in place of the last one. */
-  build(track: Track): void {
+  /** Lays the strip along `track`, on the ground `heightAt` gives, in place of the last one. */
+  build(track: Track, heightAt: (x: number, z: number) => number): void {
     const { samples } = track
     const half = track.shape.width / 2
     const step = track.length / samples.length
     const positions: number[] = []
     const uvs: number[] = []
     const index: number[] = []
-    // one row of two corners per sample, and the first again at the end to close the loop
+    const row = ACROSS + 1
+    // one row of points across per sample, and the first again at the end to close the loop
     for (let i = 0; i <= samples.length; i++) {
       const s = samples[i % samples.length]
-      // the left side is the way the track runs, turned a quarter to the left
-      positions.push(s.x + s.tz * half, LIFT, s.z - s.tx * half, s.x - s.tz * half, LIFT, s.z + s.tx * half)
       const v = (i * step) / TILE
-      uvs.push(0, v, (half * 2) / TILE, v)
+      for (let j = 0; j < row; j++) {
+        // from the left side to the right (the left is the way the track runs, turned a quarter to the left)
+        const off = half - (j / ACROSS) * half * 2
+        const x = s.x + s.tz * off
+        const z = s.z - s.tx * off
+        positions.push(x, heightAt(x, z) + LIFT, z)
+        uvs.push(((half - off) / TILE), v)
+      }
       if (i > 0) {
-        const a = (i - 1) * 2
-        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2)
+        for (let j = 0; j < ACROSS; j++) {
+          const a = (i - 1) * row + j
+          const b = a + row
+          index.push(a, a + 1, b, a + 1, b + 1, b)
+        }
       }
     }
     const geometry = new THREE.BufferGeometry()

@@ -25,8 +25,8 @@ export class SplitLines {
     this.group.visible = on
   }
 
-  /** Draws `splits` (samples of `track`, the start line first) in place of the last ones. */
-  build(track: Track, splits: readonly number[]): void {
+  /** Draws `splits` (samples of `track`, the start line first) on the ground `heightAt` gives, in place of the last ones. */
+  build(track: Track, splits: readonly number[], heightAt: (x: number, z: number) => number): void {
     for (const child of [...this.group.children]) {
       this.group.remove(child)
       if (child instanceof Line2) {
@@ -38,7 +38,11 @@ export class SplitLines {
     splits.forEach((at, k) => {
       const s = track.samples[at]
       // across the track: the way it runs, turned a quarter
-      const points = [s.x + s.tz * half, ABOVE, s.z - s.tx * half, s.x - s.tz * half, ABOVE, s.z + s.tx * half]
+      const points = [-1, 1].flatMap((side) => {
+        const x = s.x + s.tz * half * side
+        const z = s.z - s.tx * half * side
+        return [x, heightAt(x, z) + ABOVE, z]
+      })
       const material = new LineMaterial({ color: k === 0 ? START_COLOR : this.color, linewidth: LINE_WIDTH, depthTest: false })
       const line = new Line2(new LineGeometry().setPositions(points), material)
       line.renderOrder = 999

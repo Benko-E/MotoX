@@ -20,6 +20,8 @@ import { LapTimer, type LapEvent } from './track/lapTimer'
 import { placeSplits } from './track/splits'
 import { Track } from './track/track'
 import { TrackView } from './track/trackView'
+import { Terrain } from './world/terrain'
+import { TerrainView } from './world/terrainView'
 
 /** Seconds the bike takes to lean over into a turn, and back up. */
 const LEAN_TIME = 0.15
@@ -63,7 +65,7 @@ sun.shadow.mapSize.set(2048, 2048)
 Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 60 })
 scene.add(sun, sun.target)
 
-// The ground: flat dirt with a faint grid, so you can see yourself moving.
+// The ground: dirt with a faint grid, so you can see yourself moving.
 const tile = document.createElement('canvas')
 tile.width = tile.height = 256
 const paint = tile.getContext('2d')!
@@ -78,22 +80,22 @@ paint.lineWidth = 3
 paint.strokeRect(0, 0, 256, 256)
 const dirt = new THREE.CanvasTexture(tile)
 dirt.wrapS = dirt.wrapT = THREE.RepeatWrapping
-dirt.repeat.set(500, 500) // one tile every 4 m
 dirt.colorSpace = THREE.SRGBColorSpace
 dirt.anisotropy = renderer.capabilities.getMaxAnisotropy()
 const dirtMaterial = new THREE.MeshStandardMaterial({ map: dirt, roughness: 1 })
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), dirtMaterial)
-ground.rotation.x = -Math.PI / 2
-ground.receiveShadow = true
-scene.add(ground)
+const terrainView = new TerrainView(scene, dirtMaterial)
 
-/** The kickers on the jumps, built with the track. */
+/** The hills, with the track laid in, and the kickers on the jumps: built with the track. */
+let terrain: Terrain
 let kickers: Kickers
-/** How high the ground is at (x, z): flat, but for the kickers. */
-const groundAt = (x: number, z: number) => kickers.heightAt(x, z)
+/** How high the hills are at (x, z), under the kickers. */
+const hillsAt = (x: number, z: number) => terrain.heightAt(x, z)
+/** How high the ground is at (x, z): the hills, and the kickers on them. */
+const groundAt = (x: number, z: number) => terrain.heightAt(x, z) + kickers.heightAt(x, z)
 
 // The track: laid out on a grid from the Track tab's seed, a spline drawn
-// through it, and a strip of packed dirt along that. Flat for now.
+// through it, the hills from the Terrain tab with the track laid into them,
+// and a strip of packed dirt along it.
 const lineColor = (id: string) => SETTINGS.find((s): s is LineSetting => s.id === id)!.color!
 const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track.path'), lineColor('track.centre'))
 const trackView = new TrackView(scene, renderer.capabilities.getMaxAnisotropy())
@@ -123,21 +125,30 @@ const layOutTrack = () => {
     { width: store.get('track.width'), wobble: store.get('track.wobble') / 100, rounding: store.get('track.rounding') / 100, relax: store.get('track.relax') },
     straightSquares(jumps),
   )
-  trackGrid.build(layout, track)
-  trackView.build(track)
+  terrain = new Terrain(
+    { seed: store.get('terrain.seed'), height: store.get('terrain.height'), width: store.get('terrain.width'), detail: store.get('terrain.detail') / 100 },
+    track,
+    { smoothing: store.get('terrain.smoothing'), camber: store.get('terrain.camber') / 100, banks: store.get('terrain.banks') },
+  )
+  terrainView.build(terrain)
+  trackGrid.build(layout, track, hillsAt)
+  trackView.build(track, hillsAt)
   kickers = Kickers.onJumps(layout, track, jumps, { height: store.get('jump.height'), angle: store.get('jump.angle') * DEG, width: store.get('track.width') })
-  kickerView.build(kickers)
-  jumpMarks.build(layout, spots, jumps)
+  kickerView.build(kickers, hillsAt)
+  jumpMarks.build(layout, spots, jumps, hillsAt)
   // the lap cut into stretches, the splits drawn to the middle of the jumps' roll-outs where they're near
   const rollOuts = jumps.map(({ at }) => {
     const { x, z } = squareCentre(layout, layout.squares[at[at.length - 1]])
     return track.nearest(x, z)
   })
   const splits = placeSplits(track, store.get('split.count'), rollOuts, store.get('split.pull') / 100)
-  splitLines.build(track, splits)
+  splitLines.build(track, splits, hillsAt)
   lapTimer.setGates(track, splits)
   const onRollOuts = splits.filter((at) => rollOuts.includes(at)).length
-  for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
+  for (const cone of cones) {
+    cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
+    cone.position.y = groundAt(cone.position.x, cone.position.z)
+  }
   trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m\njumps ${jumps.length} (room for ${jumpRoom(spots, need)})
 kicker face ${kickers.face.toFixed(1)} m, back ${kickers.back.toFixed(1)} m
 splits ${splits.length} (${onRollOuts} on roll-outs)`
@@ -168,7 +179,7 @@ layOutTrack()
 showTrack()
 store.onChange((id) => {
   if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info' || id === 'jump.spots' || id === 'split.lines') showTrack()
-  else if (id.startsWith('track.') || id.startsWith('jump.') || id.startsWith('split.')) layOutTrack()
+  else if (['track.', 'jump.', 'split.', 'terrain.'].some((tab) => id.startsWith(tab))) layOutTrack()
 })
 
 const bike = new BikeModel()
@@ -176,7 +187,8 @@ scene.add(bike.root)
 const ride = new Ride()
 /** Back to the start of the track, standing still. */
 const toStart = () => {
-  Object.assign(ride, { ...track.start(), y: 0, vy: 0, speed: 0, airborne: false, crash: null, airYaw: 0 })
+  const start = track.start()
+  Object.assign(ride, { ...start, y: groundAt(start.x, start.z), vy: 0, speed: 0, airborne: false, crash: null, airYaw: 0 })
   lapTimer.reset()
 }
 toStart()

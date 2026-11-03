@@ -4,12 +4,14 @@ import { packedDirt, TILE } from './trackView'
 
 /** How far above the ground they're drawn, so their bottom edges don't flicker into the track's strip. */
 const LIFT = 0.01
+/** Metres between the grid's points along a kicker. */
+const STEP = 0.5
 /** How light each side is drawn: the face lightest, the back darkest. */
 const FACE = 1.15
 const SIDE = 0.85
 const BACK = 0.7
 
-/** The kickers on the ground: packed dirt like the track, each a wedge of four flat faces. */
+/** The kickers on the ground: packed dirt like the track, each a wedge: a face, a back and two steep sides. */
 export class KickerView {
   private readonly mesh: THREE.Mesh
 
@@ -22,47 +24,44 @@ export class KickerView {
   }
 
   /**
-   * Builds `kickers` in place of the last ones. Flat on flat ground for now:
-   * on a ground that dips or curves, the faces would need cutting finer to
-   * follow it (their height already adds on top of it).
+   * Builds `kickers` on the ground `baseAt` gives, in place of the last ones.
+   * Each is cut into a fine grid of little faces, lifted off the ground
+   * there by the kicker's height, so it sits on slopes and tilts as well.
    */
-  build(kickers: Kickers): void {
-    const { height } = kickers.shape
-    const { face, back, side, lip: half } = kickers
-    const wide = half + side
+  build(kickers: Kickers, baseAt: (x: number, z: number) => number): void {
+    const { face, back, side, lip } = kickers
+    const wide = lip + side
+    // along, from the face's foot to the back's: every half metre, and right at the lip
+    const along = steps(-face, 0, STEP).concat(steps(0, back, STEP).slice(1))
+    // across: the sides' feet, the lip's ends, and every metre between
+    const across = [-wide, -wide + side / 2, ...steps(-lip, lip, 1), wide - side / 2, wide]
     const positions: number[] = []
     const uvs: number[] = []
     const colors: number[] = []
     for (const k of kickers.list) {
-      // a corner, `along` metres from the lip the way you ride and `across` to the left
-      const corner = (along: number, across: number, up: number) => ({
-        x: k.x + k.dx * along + k.dz * across,
-        y: up + LIFT,
-        z: k.z + k.dz * along - k.dx * across,
-        u: (across + wide) / TILE,
-        v: along / TILE,
-      })
-      const lipLeft = corner(0, half, height)
-      const lipRight = corner(0, -half, height)
-      const frontLeft = corner(-face, wide, 0)
-      const frontRight = corner(-face, -wide, 0)
-      const backLeft = corner(back, wide, 0)
-      const backRight = corner(back, -wide, 0)
-      // each side shaded its own, so the shape reads from the saddle (the sun lights them all much the same)
-      const triangles = [
-        [FACE, lipLeft, lipRight, frontRight], [FACE, lipLeft, frontRight, frontLeft],
-        [BACK, lipLeft, backLeft, backRight], [BACK, lipLeft, backRight, lipRight],
-        [SIDE, lipLeft, frontLeft, backLeft],
-        [SIDE, lipRight, backRight, frontRight],
-      ] as const
-      for (const [shade, a, ...rest] of triangles) {
-        let [b, c] = rest
-        // every face slopes up, so wind each one to face up
-        if ((b.z - a.z) * (c.x - a.x) - (b.x - a.x) * (c.z - a.z) < 0) [b, c] = [c, b]
-        for (const p of [a, b, c]) {
-          positions.push(p.x, p.y, p.z)
-          uvs.push(p.u, p.v)
-          colors.push(shade, shade, shade)
+      // a point `a` metres from the lip the way you ride and `c` to the left
+      const point = (a: number, c: number) => {
+        const x = k.x + k.dx * a + k.dz * c
+        const z = k.z + k.dz * a - k.dx * c
+        return { x, y: baseAt(x, z) + kickers.heightAt(x, z) + LIFT, z, u: (c + wide) / TILE, v: a / TILE }
+      }
+      const grid = along.map((a) => across.map((c) => point(a, c)))
+      for (let i = 0; i + 1 < along.length; i++) {
+        for (let j = 0; j + 1 < across.length; j++) {
+          const [p, q, r, t] = [grid[i][j], grid[i][j + 1], grid[i + 1][j], grid[i + 1][j + 1]]
+          // shaded by which part it's on, so the shape reads from the saddle
+          const mid = (along[i] + along[i + 1]) / 2
+          const out = Math.abs((across[j] + across[j + 1]) / 2) > lip
+          const shade = out ? SIDE : mid < 0 ? FACE : BACK
+          for (let [a, b, c] of [[p, q, r], [q, t, r]]) {
+            // every face slopes up, so wind each one to face up
+            if ((b.z - a.z) * (c.x - a.x) - (b.x - a.x) * (c.z - a.z) < 0) [b, c] = [c, b]
+            for (const v of [a, b, c]) {
+              positions.push(v.x, v.y, v.z)
+              uvs.push(v.u, v.v)
+              colors.push(shade, shade, shade)
+            }
+          }
         }
       }
     }
@@ -74,4 +73,10 @@ export class KickerView {
     this.mesh.geometry.dispose()
     this.mesh.geometry = geometry
   }
+}
+
+/** From `from` to `to` in steps of about `step`, both ends included. */
+function steps(from: number, to: number, step: number): number[] {
+  const count = Math.max(1, Math.ceil((to - from) / step))
+  return Array.from({ length: count + 1 }, (_, i) => from + ((to - from) * i) / count)
 }

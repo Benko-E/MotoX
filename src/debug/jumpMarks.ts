@@ -11,6 +11,8 @@ const ROLL_OUT = 0x3aa8ff
 const SPARE = 0xffffff
 /** How far above the ground they're drawn: over the track's strip and the grid. */
 const LIFT = 0.04
+/** How many pieces each tile is cut into each way, so it lies over the ground's ups and downs. */
+const CUTS = 9
 
 /**
  * Debug: the placed jumps, their squares painted in: the first is the
@@ -29,11 +31,11 @@ export class JumpMarks {
     this.group.visible = on
   }
 
-  /** Paints `jumps` and the rest of `spots` on `layout`'s grid, in place of the last ones. */
-  build(layout: Layout, spots: JumpSpot[], jumps: Jump[]): void {
+  /** Paints `jumps` and the rest of `spots` on `layout`'s grid, on the ground `heightAt` gives, in place of the last ones. */
+  build(layout: Layout, spots: JumpSpot[], jumps: Jump[], heightAt: (x: number, z: number) => number): void {
     for (const child of [...this.group.children]) {
       this.group.remove(child)
-      if (child instanceof THREE.InstancedMesh) {
+      if (child instanceof THREE.Mesh) {
         child.geometry.dispose()
         ;(child.material as THREE.Material).dispose()
       }
@@ -43,25 +45,43 @@ export class JumpMarks {
     )
     const taken = new Set(placed.map((p) => p.i))
     const spare = spots.flatMap(({ at }) => at.filter((i) => !taken.has(i)).map((i) => ({ i, color: SPARE })))
-    this.paint(layout, placed, 0.55)
-    this.paint(layout, spare, 0.15)
+    this.paint(layout, placed, 0.55, heightAt)
+    this.paint(layout, spare, 0.15, heightAt)
   }
 
-  /** One tile per square, each its own colour. */
-  private paint(layout: Layout, squares: { i: number; color: number }[], opacity: number): void {
+  /** One tile per square, each its own colour, laid over the ground's ups and downs. */
+  private paint(layout: Layout, squares: { i: number; color: number }[], opacity: number, heightAt: (x: number, z: number) => number): void {
     if (squares.length === 0) return
-    const size = layout.shape.square * 0.94
-    const tile = new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2)
-    const material = new THREE.MeshBasicMaterial({ transparent: true, opacity, depthWrite: false })
-    const tiles = new THREE.InstancedMesh(tile, material, squares.length)
-    tiles.renderOrder = 998
-    const place = new THREE.Matrix4()
+    const half = (layout.shape.square * 0.94) / 2
+    const positions: number[] = []
+    const colors: number[] = []
+    const index: number[] = []
     const color = new THREE.Color()
-    squares.forEach(({ i, color: c }, k) => {
+    for (const { i, color: c } of squares) {
       const { x, z } = squareCentre(layout, layout.squares[i])
-      tiles.setMatrixAt(k, place.makeTranslation(x, LIFT, z))
-      tiles.setColorAt(k, color.set(c))
-    })
+      color.set(c)
+      const first = positions.length / 3
+      for (let row = 0; row <= CUTS; row++) {
+        for (let col = 0; col <= CUTS; col++) {
+          const px = x - half + (2 * half * col) / CUTS
+          const pz = z - half + (2 * half * row) / CUTS
+          positions.push(px, heightAt(px, pz) + LIFT, pz)
+          colors.push(color.r, color.g, color.b)
+          if (row < CUTS && col < CUTS) {
+            const a = first + row * (CUTS + 1) + col
+            const b = a + CUTS + 1
+            index.push(a, b, a + 1, a + 1, b, b + 1)
+          }
+        }
+      }
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+    geometry.setIndex(index)
+    const material = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity, depthWrite: false })
+    const tiles = new THREE.Mesh(geometry, material)
+    tiles.renderOrder = 998
     this.group.add(tiles)
   }
 }
