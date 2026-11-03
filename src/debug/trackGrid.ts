@@ -46,16 +46,16 @@ export class TrackGrid {
         }
       }
     }
-    const { across, square } = layout.shape
-    const n = Math.round(across)
-    const edge = (n * square) / 2
+    const { square } = layout.shape
+    const wide = Math.round(layout.shape.wide)
+    const deep = Math.round(layout.shape.deep)
+    const edgeX = (wide * square) / 2
+    const edgeZ = (deep * square) / 2
 
     // the grid's lines
     const lines: number[] = []
-    for (let i = 0; i <= n; i++) {
-      const at = -edge + i * square
-      lines.push(at, ABOVE, -edge, at, ABOVE, edge, -edge, ABOVE, at, edge, ABOVE, at)
-    }
+    for (let i = 0; i <= wide; i++) lines.push(-edgeX + i * square, ABOVE, -edgeZ, -edgeX + i * square, ABOVE, edgeZ)
+    for (let i = 0; i <= deep; i++) lines.push(-edgeX, ABOVE, -edgeZ + i * square, edgeX, ABOVE, -edgeZ + i * square)
     const gridGeometry = new THREE.BufferGeometry()
     gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3))
     this.grid.add(new THREE.LineSegments(gridGeometry, new THREE.LineBasicMaterial({ color: this.gridColor, transparent: true, opacity: 0.5 })))

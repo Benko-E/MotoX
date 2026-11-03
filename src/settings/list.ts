@@ -351,19 +351,34 @@ export const SETTINGS: Setting[] = [
     note: 'Picks which loop you get. The same seed always lays out the same loop.',
   },
   {
-    kind: 'slider', id: 'track.across', name: 'Grid size', tab: 'Track', section: 'Layout',
-    min: 4, max: 30, step: 1, default: 10, unit: 'squares',
-    note: 'How many squares across the grid is, both ways. The loop stays inside it.',
+    kind: 'slider', id: 'track.wide', name: 'Grid width', tab: 'Track', section: 'Layout',
+    min: 6, max: 60, step: 1, default: 24, unit: 'squares',
+    note: 'How many squares wide the grid is (along x). The loop starts as a ring round it.',
+  },
+  {
+    kind: 'slider', id: 'track.deep', name: 'Grid depth', tab: 'Track', section: 'Layout',
+    min: 6, max: 60, step: 1, default: 12, unit: 'squares',
+    note: 'How many squares deep the grid is (along z).',
   },
   {
     kind: 'slider', id: 'track.square', name: 'Square size', tab: 'Track', section: 'Layout',
-    min: 10, max: 60, step: 1, default: 24, unit: 'm',
-    note: 'How big each square is. Two bits of track side by side are at least this far apart, middle to middle.',
+    min: 5, max: 60, step: 1, default: 16, unit: 'm',
+    note: 'How big each square is. Two bits of track side by side always have at least a square of grass between.',
   },
   {
-    kind: 'slider', id: 'track.length', name: 'Length', tab: 'Track', section: 'Layout',
-    min: 4, max: 200, step: 2, default: 30, unit: 'squares',
-    note: 'How many squares the loop runs through. The lap is roughly this times the square size. Stops early if the grid is full.',
+    kind: 'slider', id: 'track.bites', name: 'Bites', tab: 'Track', section: 'Layout',
+    min: 0, max: 300, step: 1, default: 14, unit: '',
+    note: 'How many times a straight bit of the ring gets pushed in (or out) a square. 0 is a plain ring.',
+  },
+  {
+    kind: 'slider', id: 'track.deepen', name: 'Deep bites', tab: 'Track', section: 'Layout',
+    min: 0, max: 100, step: 1, default: 70, unit: '%',
+    note: 'The chance each push carries on pushing the last bit further in. High makes a few deep bites, low lots of shallow wobbles.',
+  },
+  {
+    kind: 'slider', id: 'track.widest', name: 'Widest bite', tab: 'Track', section: 'Layout',
+    min: 3, max: 20, step: 1, default: 8, unit: 'squares',
+    note: 'How wide a pushed bit can be. Each one is between 3 and this.',
   },
   {
     kind: 'line', id: 'track.grid', name: 'Grid', tab: 'Track', section: 'Debug lines',

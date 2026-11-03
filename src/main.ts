@@ -108,9 +108,12 @@ const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track
 const layOutTrack = () => {
   trackGrid.build(layOut({
     seed: store.get('track.seed'),
-    across: store.get('track.across'),
+    wide: store.get('track.wide'),
+    deep: store.get('track.deep'),
     square: store.get('track.square'),
-    length: store.get('track.length'),
+    bites: store.get('track.bites'),
+    deepen: store.get('track.deepen') / 100,
+    widest: store.get('track.widest'),
   }))
 }
 const showTrack = () => {
