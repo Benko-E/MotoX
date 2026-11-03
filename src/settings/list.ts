@@ -42,7 +42,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'bike.grip', name: 'Grip', tab: 'Bike', section: 'Steering',
-    min: 0.3, max: 8, step: 0.1, default: 3, unit: 'g',
+    min: 0.3, max: 8, step: 0.1, default: 2, unit: 'g',
     note: 'How hard the tyres can push sideways. Sets how wide you turn at speed: the faster, the wider. Real tyres on dirt manage about 1.',
   },
   {
@@ -347,7 +347,7 @@ export const SETTINGS: Setting[] = [
   // Track
   {
     kind: 'slider', id: 'track.seed', name: 'Seed', tab: 'Track', section: 'Layout',
-    min: 1, max: 1000, step: 1, default: 1, unit: '',
+    min: 1, max: 1000, step: 1, default: 2, unit: '',
     note: 'Picks which loop you get. The same seed always lays out the same loop.',
   },
   {
@@ -382,7 +382,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'track.width', name: 'Track width', tab: 'Track', section: 'Track',
-    min: 3, max: 30, step: 0.5, default: 8, unit: 'm',
+    min: 3, max: 30, step: 0.5, default: 12, unit: 'm',
     note: 'How wide the packed dirt is, edge to edge.',
   },
   {
@@ -392,12 +392,12 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'track.rounding', name: 'Corner rounding', tab: 'Track', section: 'Track',
-    min: 0, max: 100, step: 1, default: 80, unit: '%',
+    min: 0, max: 100, step: 1, default: 100, unit: '%',
     note: 'How much the grid’s square corners get rounded off. 0 turns sharp at every square’s middle; more makes wider, flowing corners (and a slightly shorter lap).',
   },
   {
     kind: 'slider', id: 'track.relax', name: 'Relax', tab: 'Track', section: 'Track',
-    min: 0, max: 500, step: 10, default: 0, unit: 'passes',
+    min: 0, max: 500, step: 10, default: 160, unit: 'passes',
     note: 'The last step of all, after the jumps: smooths the whole line, softening kinks. Straights stay straight; corners pull in a little. Each pass reaches about a metre further, so it takes a lot of them to smooth a big bend.',
   },
   {
