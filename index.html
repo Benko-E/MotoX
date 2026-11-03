@@ -25,7 +25,8 @@
         text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
         pointer-events: none;
       }
-      #turn {
+      #turn,
+      #trackInfo {
         position: fixed;
         bottom: 18px;
         left: 18px;
@@ -37,7 +38,12 @@
         white-space: pre;
         pointer-events: none;
       }
-      #turn[hidden] {
+      #trackInfo {
+        top: 18px;
+        bottom: auto;
+      }
+      #turn[hidden],
+      #trackInfo[hidden] {
         display: none;
       }
       #airtime {
@@ -125,6 +131,7 @@
     <div id="app"></div>
     <div id="hud"></div>
     <div id="turn" hidden></div>
+    <div id="trackInfo" hidden></div>
     <div id="airtime" hidden></div>
     <div id="view" hidden></div>
     <div id="help">

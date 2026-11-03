@@ -3,6 +3,7 @@ import { Line2 } from 'three/addons/lines/Line2.js'
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import { squareCentre, type Layout } from '../track/layout'
+import type { Track } from '../track/track'
 
 const LINE_WIDTH = 4
 /** How far above the ground it's drawn, so it doesn't flicker into the dirt. */
@@ -12,19 +13,22 @@ const START_COLOR = 0x2ee66b
 
 /**
  * Debug: the track's layout from above. The grid's squares, the squares
- * the loop runs through filled in (the first one green), and the loop
- * itself, a line through their middles in riding order.
+ * the loop runs through filled in (the first one green), the loop itself,
+ * a line through their middles in riding order, and the smooth spline the
+ * track actually follows, with its tightest corner marked.
  */
 export class TrackGrid {
   private readonly grid = new THREE.Group()
   private readonly path = new THREE.Group()
+  private readonly centre = new THREE.Group()
 
   constructor(
     scene: THREE.Scene,
     private readonly gridColor: number,
     private readonly pathColor: number,
+    private readonly centreColor: number,
   ) {
-    scene.add(this.grid, this.path)
+    scene.add(this.grid, this.path, this.centre)
   }
 
   set showGrid(on: boolean) {
@@ -35,9 +39,13 @@ export class TrackGrid {
     this.path.visible = on
   }
 
-  /** Draws `layout` again, in place of the last one. */
-  build(layout: Layout): void {
-    for (const group of [this.grid, this.path]) {
+  set showCentre(on: boolean) {
+    this.centre.visible = on
+  }
+
+  /** Draws `layout` and the `track` through it again, in place of the last ones. */
+  build(layout: Layout, track: Track): void {
+    for (const group of [this.grid, this.path, this.centre]) {
       for (const child of [...group.children]) {
         group.remove(child)
         if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments || child instanceof Line2) {
@@ -83,5 +91,25 @@ export class TrackGrid {
     const line = new Line2(new LineGeometry().setPositions(points), material)
     line.renderOrder = 999
     this.path.add(line)
+
+    // the spline the track follows, and a ring round its tightest corner
+    const spline = [...track.samples, track.samples[0]].flatMap((s) => [s.x, ABOVE * 3, s.z])
+    const centre = new Line2(new LineGeometry().setPositions(spline), new LineMaterial({ color: this.centreColor, linewidth: LINE_WIDTH, depthTest: false }))
+    centre.renderOrder = 999
+    this.centre.add(centre)
+    const { radius, at } = track.tightest
+    if (Number.isFinite(radius)) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(radius - 0.3, radius + 0.3, 64).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: this.centreColor, depthTest: false, transparent: true, opacity: 0.6 }),
+      )
+      // its middle is off to the inside of the corner
+      const s = track.samples[at]
+      const before = track.samples[(at - 3 + track.samples.length) % track.samples.length]
+      const inside = Math.sign(before.tx * s.tz - before.tz * s.tx) || 1
+      ring.position.set(s.x - s.tz * radius * inside, ABOVE * 3, s.z + s.tx * radius * inside)
+      ring.renderOrder = 999
+      this.centre.add(ring)
+    }
   }
 }

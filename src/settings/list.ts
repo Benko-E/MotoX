@@ -381,14 +381,39 @@ export const SETTINGS: Setting[] = [
     note: 'How wide a pushed bit can be. Each one is between 3 and this.',
   },
   {
+    kind: 'slider', id: 'track.width', name: 'Track width', tab: 'Track', section: 'Track',
+    min: 3, max: 30, step: 0.5, default: 8, unit: 'm',
+    note: 'How wide the packed dirt is, edge to edge.',
+  },
+  {
+    kind: 'slider', id: 'track.wobble', name: 'Wobble', tab: 'Track', section: 'Track',
+    min: 0, max: 45, step: 1, default: 25, unit: '%',
+    note: 'How far each point of the track gets nudged off its square’s middle, as a share of the square. 0 runs dead straight through the middles. Neighbouring points lean the same way, so it sways rather than jitters.',
+  },
+  {
+    kind: 'slider', id: 'track.rounding', name: 'Corner rounding', tab: 'Track', section: 'Track',
+    min: 0, max: 100, step: 1, default: 75, unit: '%',
+    note: 'How much the grid’s square corners get rounded off. 0 turns sharp at every square’s middle; more makes wider, flowing corners (and a slightly shorter lap).',
+  },
+  {
     kind: 'line', id: 'track.grid', name: 'Grid', tab: 'Track', section: 'Debug lines',
-    default: true, color: 0xffffff,
+    default: false, color: 0xffffff,
     note: 'The grid’s squares on the ground, the ones the loop runs through filled in (the first one green). Best seen from above: fly up in Free roam (C).',
   },
   {
     kind: 'line', id: 'track.path', name: 'Loop', tab: 'Track', section: 'Debug lines',
-    default: true, color: 0xff3bd4,
+    default: false, color: 0xff3bd4,
     note: 'The loop through the squares’ middles, in riding order.',
+  },
+  {
+    kind: 'line', id: 'track.centre', name: 'Spline', tab: 'Track', section: 'Debug lines',
+    default: false, color: 0x3ad6ff,
+    note: 'The smooth line the track follows, down its middle, with a ring round its tightest corner.',
+  },
+  {
+    kind: 'line', id: 'track.info', name: 'Track readout', tab: 'Track', section: 'Debug lines',
+    default: false,
+    note: 'Top left: how long a lap is, and the tightest corner’s radius.',
   },
 
   // Temporary: things here for trying out, not to stay

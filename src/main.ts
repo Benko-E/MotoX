@@ -13,6 +13,8 @@ import { SettingsStore } from './settings/store'
 import { buildMenu } from './ui/buildMenu'
 import { Ramp, type RampShape } from './world/ramp'
 import { layOut } from './track/layout'
+import { Track } from './track/track'
+import { TrackView } from './track/trackView'
 
 /** Seconds the bike takes to lean over into a turn, and back up. */
 const LEAN_TIME = 0.15
@@ -102,11 +104,16 @@ store.onChange((id) => {
 })
 const groundAt = (x: number, z: number) => ramp.heightAt(x, z)
 
-// The track's layout, laid out from the Track tab's seed. Only debug lines for now.
+// The track: laid out on a grid from the Track tab's seed, a spline drawn
+// through it, and a strip of packed dirt along that. Flat for now.
 const lineColor = (id: string) => SETTINGS.find((s): s is LineSetting => s.id === id)!.color!
-const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track.path'))
+const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track.path'), lineColor('track.centre'))
+const trackView = new TrackView(scene, renderer.capabilities.getMaxAnisotropy())
+const trackInfo = document.getElementById('trackInfo')!
+const cones: THREE.Mesh[] = []
+let track: Track
 const layOutTrack = () => {
-  trackGrid.build(layOut({
+  const layout = layOut({
     seed: store.get('track.seed'),
     wide: store.get('track.wide'),
     deep: store.get('track.deep'),
@@ -114,18 +121,19 @@ const layOutTrack = () => {
     bites: store.get('track.bites'),
     deepen: store.get('track.deepen') / 100,
     widest: store.get('track.widest'),
-  }))
+  })
+  track = new Track(layout, { width: store.get('track.width'), wobble: store.get('track.wobble') / 100, rounding: store.get('track.rounding') / 100 })
+  trackGrid.build(layout, track)
+  trackView.build(track)
+  for (const cone of cones) cone.visible = track.distanceTo(cone.position.x, cone.position.z) > track.shape.width / 2 + 2
+  trackInfo.textContent = `lap ${Math.round(track.length)} m\ntightest corner ${track.tightest.radius.toFixed(1)} m`
 }
 const showTrack = () => {
   trackGrid.showGrid = store.isOn('track.grid')
   trackGrid.showPath = store.isOn('track.path')
+  trackGrid.showCentre = store.isOn('track.centre')
+  trackInfo.hidden = !store.isOn('track.info')
 }
-layOutTrack()
-showTrack()
-store.onChange((id) => {
-  if (id === 'track.grid' || id === 'track.path') showTrack()
-  else if (id.startsWith('track.')) layOutTrack()
-})
 
 // Cones scattered about, something to ride round (none in the ramp's lane).
 const cone = new THREE.ConeGeometry(0.25, 0.7, 12).translate(0, 0.35, 0)
@@ -138,11 +146,21 @@ for (let i = 0; i < 120; i++) {
   if (Math.abs(mesh.position.x) < 12 && mesh.position.z < 0) continue
   mesh.castShadow = true
   scene.add(mesh)
+  cones.push(mesh)
 }
+layOutTrack()
+showTrack()
+store.onChange((id) => {
+  if (id === 'track.grid' || id === 'track.path' || id === 'track.centre' || id === 'track.info') showTrack()
+  else if (id.startsWith('track.')) layOutTrack()
+})
 
 const bike = new BikeModel()
 scene.add(bike.root)
 const ride = new Ride()
+/** Back to the start of the track, standing still. */
+const toStart = () => Object.assign(ride, { ...track.start(), y: 0, vy: 0, speed: 0, airborne: false })
+toStart()
 const lines = new RideLines(scene, SETTINGS, store)
 const riderMotion = new RiderMotion({
   get sitBelow() { return store.get('rider.sitBelow') },
@@ -212,7 +230,7 @@ const setKey = (event: KeyboardEvent, down: boolean) => {
   if (key) input[key] = down
   if (key) event.preventDefault() // Space mustn't press a focused menu button
   if (down && key) document.getElementById('help')!.hidden = true
-  if (down && event.code === 'KeyR' && !rig.flying) Object.assign(ride, { x: 0, z: 0, y: 0, vy: 0, heading: 0, speed: 0, airborne: false })
+  if (down && event.code === 'KeyR' && !rig.flying) toStart()
 }
 addEventListener('keydown', (event) => setKey(event, true))
 addEventListener('keyup', (event) => setKey(event, false))
