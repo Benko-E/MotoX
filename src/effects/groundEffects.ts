@@ -16,6 +16,8 @@ export interface ScrubSettings {
 const SKID_FULL = 3
 /** The front tyre skids this much less than the rear under the brake. */
 const FRONT_SKID = 0.4
+/** Carving the ground builds up to full by this speed, km/h. */
+const CARVE_FROM = 30
 /** The front tyre scrubs this much less than the rear carving. */
 const FRONT_CARVE = 0.5
 /** The front tyre scrubs this much less than the rear powersliding. */
@@ -75,7 +77,7 @@ export class GroundEffects {
       // how hard this tyre scrubs: spinning up, skidding, carving
       const spin = i === 1 && input.throttle && ride.speed >= 0 ? clamp(1 - kmh / Math.max(this.scrub.wheelspinUntil, 1e-6)) : 0
       const skid = input.brake && ride.speed > 0 ? Math.min(ride.speed / SKID_FULL, 1) * (i === 0 ? FRONT_SKID : 1) : 0
-      const carve = ride.limit === 'grip' ? Math.abs(ride.steering) * this.scrub.carving * (i === 0 ? FRONT_CARVE : 1) : 0
+      const carve = ride.limit === 'turning' ? Math.abs(ride.steering) * Math.min(kmh / CARVE_FROM, 1) * this.scrub.carving * (i === 0 ? FRONT_CARVE : 1) : 0
       const slide = ride.sliding * Math.abs(ride.steering) * (i === 0 ? FRONT_SLIDE : 1)
       const amount = Math.min(spin + skid + carve + slide, 1)
       if (i === 1) this.rearWheelspin += (spin * WHEELSPIN_SURFACE * dt) / WHEEL_RADIUS

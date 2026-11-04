@@ -326,27 +326,26 @@ renderer.setAnimationLoop(() => {
     zeroToHundred: store.get('bike.zeroToHundred'),
     coastToStop: store.get('bike.coastToStop'),
     brakeToStop: store.get('bike.brakeToStop'),
-    frontWheelLock: store.get('bike.frontWheelLock'),
-    grip: store.get('bike.grip'),
+    reverseSpeed: store.get('bike.reverseSpeed'),
+    slowCircle: store.get('steer.slowCircle'),
+    fastCircle: store.get('steer.fastCircle'),
+    circleBlend: store.get('steer.blend') / 100,
+    steerTime: store.get('steer.time'),
     slopePull: store.get('bike.slopePull') / 100,
     slideAngle: store.get('slide.angle'),
     kickOut: store.get('slide.kickOut'),
-    hookUp: store.get('slide.hookUp'),
     slideCircle: store.get('slide.tighterTurn') / 100,
     slideScrub: store.get('slide.scrub'),
-    slideMinSpeed: store.get('slide.minSpeed'),
     liftTime: store.get('wheelie.liftTime'),
-    dropTime: store.get('wheelie.dropTime'),
     wheelieAccel: store.get('wheelie.accel') / 100,
-    wheelieTurn: store.get('wheelie.turnCircle'),
+    wheelieSteer: store.get('wheelie.steering') / 100,
     wheelieHold: store.get('wheelie.holdAbove'),
     wheelieAngle: store.get('wheelie.angle'),
     sideLimit: store.get('crash.sideways'),
     sideMinSpeed: store.get('crash.minSpeed'),
     noseTailLimit: store.get('crash.noseTail'),
-    lipSpin: store.get('air.lipSpin'),
+    airSpinRate: store.get('air.spinRate'),
     airTurn: store.get('air.turn'),
-    airSpinUp: store.get('air.spinUp'),
     airSpinStop: store.get('air.spinStop'),
     tiltRate: store.get('air.tilt'),
     getUp: store.get('crash.getUp'),
@@ -356,9 +355,9 @@ renderer.setAnimationLoop(() => {
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)
   // the short way round, so landing a flip doesn't unwind it
   pitch += Math.atan2(Math.sin(ride.pitch - pitch), Math.cos(ride.pitch - pitch)) * (1 - Math.exp(-dt / PITCH_TIME))
-  // Lean into turns, more the harder the tyres are pushing sideways: all
-  // the way to Max lean when they're at their grip.
-  const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / (store.get('bike.grip') * 9.81)
+  // Lean into turns, more the harder it's turning (sideways g): all the
+  // way to Max lean at 1 g, so tight fast turns lean most.
+  const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / 9.81
   const turnLean = Math.sign(ride.turnRate) * Math.min(sideways, 1) * store.get('bike.maxLean') * DEG
   // up on the rear wheel, A/D bank it over instead, as far as Bank says
   const bank = ride.steering * store.get('wheelie.bank') * DEG

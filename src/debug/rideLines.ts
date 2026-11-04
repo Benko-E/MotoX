@@ -71,7 +71,7 @@ export class RideLines {
     const length = ride.slowing * PER_SLOWING
     this.show('line.braking', this.from, this.dir.copy(forward).multiplyScalar(-going), length, length > 0.02)
 
-    // Steering: the way the rider turns the bars, while A or D is held (the wheel itself may turn less, where grip limits it).
+    // Steering: the way the rider turns the bars, while A or D is held.
     const wheelHeading = ride.heading + ride.bars * DEG
     this.dir.set(Math.sin(wheelHeading), 0, -Math.cos(wheelHeading))
     this.show('line.steering', frontWheel, this.dir, STEERING_LENGTH, ride.steer !== 0)
@@ -89,7 +89,7 @@ export class RideLines {
     this.readout.hidden = !this.store.isOn('line.turnReadout')
     if (!this.readout.hidden) {
       this.readout.textContent = turning
-        ? [`turn radius ${ride.turnRadius.toFixed(1)} m`, `${Math.abs(ride.turnRate).toFixed(0)}°/s`, `limited by ${ride.limit}`, ...(ride.sliding > 0 ? [`sliding ${Math.abs(ride.slideYaw / (Math.PI / 180)).toFixed(0)}°`] : [])].join('\n')
+        ? [`turn radius ${ride.turnRadius.toFixed(1)} m`, `${Math.abs(ride.turnRate).toFixed(0)}°/s`, ride.limit ?? '', ...(ride.sliding > 0 ? [`sliding ${Math.abs(ride.slideYaw / (Math.PI / 180)).toFixed(0)}°`] : [])].join('\n')
         : 'going straight'
     }
   }

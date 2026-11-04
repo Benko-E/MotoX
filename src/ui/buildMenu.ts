@@ -3,7 +3,6 @@ import type { Setting } from '../settings/types'
 import './menu.css'
 import { copyText } from './clipboard'
 import { LineRow } from './lineRow'
-import { Section } from './section'
 import { SliderRow } from './sliderRow'
 import { Tabs } from './tabs'
 import { MenuWindow } from './window'
@@ -13,7 +12,8 @@ const MENU_KEY = 'Backquote'
 
 /**
  * Builds the debug menu from the settings list: one tab per name in `tabs`,
- * one section per distinct section name within a tab, rows in list order.
+ * and inside each a row of smaller tabs, one per distinct section name
+ * within it, rows in list order. Both remember which was picked last.
  * ` shows and hides it.
  */
 export function buildMenu(settings: Setting[], tabs: readonly string[], store: SettingsStore, storage: Storage | null): MenuWindow {
@@ -36,19 +36,15 @@ export function buildMenu(settings: Setting[], tabs: readonly string[], store: S
   })
   menu.addTitleButton('Reset all', () => store.resetAll())
 
-  const tabSet = new Tabs(tabs)
+  // a tab per name, and inside each a smaller tab per section, in list order
+  const tabSet = new Tabs(tabs, { storage, key: 'motox3.menu.tab' })
   menu.add(tabSet)
-
-  const sections = new Map<string, Section>()
-  for (const s of settings) {
-    const key = `${s.tab}/${s.section}`
-    let section = sections.get(key)
-    if (!section) {
-      section = new Section(s.section)
-      tabSet.page(s.tab).add(section)
-      sections.set(key, section)
-    }
-    section.add(s.kind === 'slider' ? new SliderRow(s, store) : new LineRow(s, store))
+  for (const tab of tabs) {
+    const inTab = settings.filter((s) => s.tab === tab)
+    const sections = [...new Set(inTab.map((s) => s.section))]
+    const sectionTabs = new Tabs(sections, { storage, key: `motox3.menu.tab.${tab}` }, true)
+    tabSet.page(tab).add(sectionTabs)
+    for (const s of inTab) sectionTabs.page(s.section).add(s.kind === 'slider' ? new SliderRow(s, store) : new LineRow(s, store))
   }
 
   document.addEventListener('keydown', (e) => {

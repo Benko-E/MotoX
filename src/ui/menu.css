@@ -1,6 +1,6 @@
 .menu-window {
   position: fixed;
-  width: 420px;
+  width: 440px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
@@ -72,15 +72,23 @@
 }
 .menu-page[hidden] { display: none; }
 
-.menu-section-title {
-  width: 100%;
-  text-align: left;
-  padding: 4px 8px;
-  font-weight: 600;
+/* Tabs inside a tab: a smaller row that wraps, the page under it padded by the outer page. */
+.menu-subtabs .menu-tabbar {
+  flex-wrap: wrap;
+  padding: 0 0 6px;
+  gap: 3px;
+  border-bottom: none;
 }
-.menu-section-title::before { content: '▾ '; }
-.menu-section.collapsed .menu-section-title::before { content: '▸ '; }
-.menu-section-body { padding: 6px 2px; }
+.menu-subtabs .menu-tabbar button {
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+.menu-subtabs .menu-tabbar button.selected { background: rgba(80, 160, 255, 0.35); color: #fff; }
+.menu-subtabs > .menu-page { padding: 4px 0 0; overflow: visible; }
 
 .menu-row {
   display: grid;
