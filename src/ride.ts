@@ -8,11 +8,12 @@ import { WHEELBASE } from './bike/bikeModel'
  * widening to the Fast one at top speed, Blend setting how. A/D swing the
  * steering over in Steering speed, and back when let go.
  *
- * Powerslides (Space and steer, like a handbrake): the rear swings out so
- * the bike points into the turn while it carries on along its line, the
- * turn tightens to Slide turn circle's share, and it loses Speed scrub
- * every second (the engine doesn't push while it slides). Let go of Space
- * or A/D and the rear hooks back up.
+ * Powerslides (Space, both wheels down, like a handbrake): steering, the
+ * rear swings out so the bike points into the turn while it carries on
+ * along its line, and the turn tightens to Slide turn circle's share. It
+ * loses Speed scrub every second, and the engine doesn't push while it
+ * slides: W just spins the rear wheel. Let go of Space and the rear hooks
+ * back up.
  *
  * Wheelies (lean back with the down arrow, and W): the front lifts and stays
  * up; let go of W and it stays up above Hold above. Up, the steering only
@@ -208,11 +209,12 @@ export class Ride {
     // Wheelie: leaning back with W lifts the front; it stays up while he
     // leans back, with W or fast enough. In the air it stays as it left the ground.
     const up = !this.airborne && input.leanBack && this.speed > 0 && (input.throttle || (this.wheelie > 0 && this.speed >= tune.wheelieHold * KMH))
-    // Powerslide: Space while steering, rolling forward on the ground (not
-    // holding a wheelie; one dropping doesn't wait for the front to land, it
-    // comes down as fast as the rear kicks out). The rear swings out toward
-    // the steering's share of the slide angle.
-    const wantSlide = input.slide && !this.airborne && !up && this.steer !== 0 && this.speed > 0
+    // Powerslide: Space with both wheels on the ground, that's all (a
+    // wheelie dropping doesn't wait for the front to land, it comes down as
+    // fast as the rear kicks out). The rear swings out toward the
+    // steering's share of the slide angle: straight on, it just spins (or
+    // skids) the rear wheel, and from a stop W can't drive the bike away.
+    const wantSlide = input.slide && !this.airborne && !up
     if (!this.airborne) {
       const easing = wantSlide ? Math.min(tune.liftTime, tune.kickOut) : tune.liftTime
       this.wheelie += ((up ? 1 : 0) - this.wheelie) * (1 - Math.exp(-dt / Math.max(easing, 1e-6)))

@@ -93,7 +93,7 @@ export const SETTINGS: Setting[] = [
   {
     kind: 'slider', id: 'slide.angle', name: 'Slide angle', tab: 'Bike', section: 'Powerslide',
     min: 0, max: 70, step: 1, default: 50, unit: '°',
-    note: 'Hold Space and steer: how far the rear swings out, so you slide round side-on. Let go of Space or A/D and it hooks back up.',
+    note: 'Hold Space with both wheels down to powerslide; steer and the rear swings out this far, so you slide round side-on. Let go of Space and it hooks back up. W in a slide just spins the rear wheel.',
   },
   {
     kind: 'slider', id: 'slide.kickOut', name: 'Kick-out time', tab: 'Bike', section: 'Powerslide',

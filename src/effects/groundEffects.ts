@@ -20,6 +20,8 @@ const FRONT_SKID = 0.4
 const CARVE_FROM = 30
 /** The front tyre scrubs this much less than the rear carving. */
 const FRONT_CARVE = 0.5
+/** Sliding straight on without W (the rear skidding), it scrubs this much of a full slide. */
+const SLIDE_SKID = 0.5
 /** The front tyre scrubs this much less than the rear powersliding. */
 const FRONT_SLIDE = 0.4
 /** Spinning up in the dirt flat out, the rear tyre's surface runs this much faster than the ground, m/s. */
@@ -78,7 +80,8 @@ export class GroundEffects {
       const spin = i === 1 && input.throttle && ride.speed >= 0 ? clamp(1 - kmh / Math.max(this.scrub.wheelspinUntil, 1e-6)) : 0
       const skid = input.brake && ride.speed > 0 ? Math.min(ride.speed / SKID_FULL, 1) * (i === 0 ? FRONT_SKID : 1) : 0
       const carve = ride.limit === 'turning' ? Math.abs(ride.steering) * Math.min(kmh / CARVE_FROM, 1) * this.scrub.carving * (i === 0 ? FRONT_CARVE : 1) : 0
-      const slide = ride.sliding * Math.abs(ride.steering) * (i === 0 ? FRONT_SLIDE : 1)
+      // sliding throws dirt steered or not: most with W spinning the rear wheel, some just skidding
+      const slide = ride.sliding * Math.max(Math.abs(ride.steering), input.throttle ? 1 : SLIDE_SKID) * (i === 0 ? FRONT_SLIDE : 1)
       const amount = Math.min(spin + skid + carve + slide, 1)
       if (i === 1) this.rearWheelspin += (spin * WHEELSPIN_SURFACE * dt) / WHEEL_RADIUS
       this.tracks.touch(i, at, this.normal, amount)
