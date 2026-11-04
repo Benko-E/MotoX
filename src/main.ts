@@ -350,6 +350,7 @@ renderer.setAnimationLoop(() => {
     tiltRate: store.get('air.tilt'),
     getUp: store.get('crash.getUp'),
     travel: store.get('bike.travel'),
+    stick: store.get('bike.stick'),
   }
   const wasAirborne = ride.airborne
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)

@@ -12,7 +12,7 @@ export const SETTINGS: Setting[] = [
   // Bike: everything here changes how the bike rides, unless its note says "Looks only"
   {
     kind: 'slider', id: 'bike.topSpeed', name: 'Top speed', tab: 'Bike', section: 'Speed',
-    min: 20, max: 160, step: 1, default: 110, unit: 'km/h',
+    min: 20, max: 160, step: 1, default: 140, unit: 'km/h',
     note: 'The fastest W takes you. Faster than this (down a hill), it slows back down to it.',
   },
   {
@@ -62,13 +62,18 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'bike.maxLean', name: 'Max lean', tab: 'Bike', section: 'Steering',
-    min: 0, max: 60, step: 1, default: 35, unit: '°',
+    min: 0, max: 60, step: 1, default: 33, unit: '°',
     note: 'Looks only. How far the bike leans into a turn: all the way at 1 g sideways, so tight, fast turns lean the most and gentle or slow ones less.',
   },
   {
     kind: 'slider', id: 'bike.travel', name: 'Suspension travel', tab: 'Bike', section: 'Handling',
     min: 0, max: 1, step: 0.05, default: 0.25, unit: 'm',
     note: 'Where the ground drops away (over a crest, off a lip), the suspension stretches this far to keep the wheels on it before the bike leaves the ground. More soaks up bigger bumps; kickers still launch you.',
+  },
+  {
+    kind: 'slider', id: 'bike.stick', name: 'Ground stick', tab: 'Bike', section: 'Handling',
+    min: 1, max: 10, step: 0.5, default: 4, unit: '×',
+    note: 'On the ground the bike is held down this many times as hard as gravity, so it follows hill crests instead of flying off them at speed. 1 is real gravity. Kicker lips still launch you: they drop away too sharply.',
   },
   {
     kind: 'slider', id: 'air.tilt', name: 'Air tilt', tab: 'Bike', section: 'Handling',
@@ -92,7 +97,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'slide.angle', name: 'Slide angle', tab: 'Bike', section: 'Powerslide',
-    min: 0, max: 70, step: 1, default: 50, unit: '°',
+    min: 0, max: 70, step: 1, default: 70, unit: '°',
     note: 'Hold Space with both wheels down to powerslide; steer and the rear swings out this far, so you slide round side-on. Let go of Space and it hooks back up. W in a slide just spins the rear wheel.',
   },
   {
@@ -107,7 +112,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'slide.scrub', name: 'Speed scrub', tab: 'Bike', section: 'Powerslide',
-    min: 0, max: 80, step: 1, default: 25, unit: 'km/h/s',
+    min: 0, max: 80, step: 1, default: 50, unit: 'km/h/s',
     note: 'Sliding loses this much speed every second, the same whatever the throttle is doing (the engine doesn’t push in a slide).',
   },
   {
@@ -260,7 +265,7 @@ export const SETTINGS: Setting[] = [
   // Camera
   {
     kind: 'slider', id: 'camera.fov', name: 'Field of view', tab: 'Camera', section: 'All views',
-    min: 30, max: 110, step: 1, default: 65, unit: '°',
+    min: 30, max: 110, step: 1, default: 90, unit: '°',
     note: 'How wide the view is. Wider feels faster but stretches the edges. C switches views.',
   },
   {
@@ -270,45 +275,45 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'camera.speedPull', name: 'Pull back with speed', tab: 'Camera', section: 'All views',
-    min: 0, max: 50, step: 1, default: 0, unit: '%',
+    min: 0, max: 50, step: 1, default: 30, unit: '%',
     note: 'How much further back the views behind the bike sit per 100 km/h, so speed feels faster.',
   },
   {
     kind: 'slider', id: 'camera.back', name: 'Distance', tab: 'Camera', section: 'Chase',
-    min: 1, max: 12, step: 0.1, default: 12, unit: 'm',
+    min: 1, max: 12, step: 0.1, default: 4.7, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.up', name: 'Height', tab: 'Camera', section: 'Chase',
-    min: 0.3, max: 6, step: 0.1, default: 5, unit: 'm',
+    min: 0.3, max: 6, step: 0.1, default: 5.5, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.look', name: 'Looks at', tab: 'Camera', section: 'Chase',
-    min: -1, max: 3, step: 0.05, default: 0.5, unit: 'm',
+    min: -1, max: 3, step: 0.05, default: 1.15, unit: 'm',
     note: 'How high above the bike the camera aims.',
   },
   {
     kind: 'slider', id: 'camera.close.back', name: 'Distance', tab: 'Camera', section: 'Close',
-    min: 1, max: 12, step: 0.1, default: 3.4, unit: 'm',
+    min: 1, max: 12, step: 0.1, default: 1.9, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.close.up', name: 'Height', tab: 'Camera', section: 'Close',
-    min: 0.3, max: 6, step: 0.1, default: 3.5, unit: 'm',
+    min: 0.3, max: 6, step: 0.1, default: 3.2, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.close.look', name: 'Looks at', tab: 'Camera', section: 'Close',
-    min: -1, max: 3, step: 0.05, default: 2, unit: 'm',
+    min: -1, max: 3, step: 0.05, default: 1.25, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.high.back', name: 'Distance', tab: 'Camera', section: 'High',
-    min: 1, max: 40, step: 0.5, default: 20, unit: 'm',
+    min: 1, max: 40, step: 0.5, default: 11.5, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.high.up', name: 'Height', tab: 'Camera', section: 'High',
-    min: 1, max: 30, step: 0.5, default: 15.5, unit: 'm',
+    min: 1, max: 30, step: 0.5, default: 14.5, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.high.look', name: 'Looks at', tab: 'Camera', section: 'High',
-    min: -1, max: 3, step: 0.05, default: -0.3, unit: 'm',
+    min: -1, max: 3, step: 0.05, default: 1.85, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.helmet.fov', name: 'Field of view', tab: 'Camera', section: 'Helmet',
@@ -317,21 +322,21 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'camera.helmet.up', name: 'Eye height', tab: 'Camera', section: 'Helmet',
-    min: -0.3, max: 0.8, step: 0.01, default: 0.1, unit: 'm',
+    min: -0.3, max: 0.8, step: 0.01, default: 0.22, unit: 'm',
     note: 'Above the rider’s head (he crouches and stands, and the camera goes with him).',
   },
   {
     kind: 'slider', id: 'camera.helmet.back', name: 'Eye back', tab: 'Camera', section: 'Helmet',
-    min: -0.3, max: 1.5, step: 0.01, default: 0.25, unit: 'm',
+    min: -0.3, max: 1.5, step: 0.01, default: 0.47, unit: 'm',
     note: 'Behind his head (negative is in front). His helmet, chest and upper arms are hidden in this view, so the bars and his hands show.',
   },
   {
     kind: 'slider', id: 'camera.helmet.down', name: 'Look down', tab: 'Camera', section: 'Helmet',
-    min: -10, max: 45, step: 1, default: 15, unit: '°',
+    min: -10, max: 45, step: 1, default: 33, unit: '°',
   },
   {
     kind: 'slider', id: 'camera.helmet.lean', name: 'Lean with the bike', tab: 'Camera', section: 'Helmet',
-    min: 0, max: 100, step: 5, default: 50, unit: '%',
+    min: 0, max: 100, step: 5, default: 70, unit: '%',
     note: '100 tips the horizon all the way with the bike, 0 keeps it level.',
   },
   {
@@ -454,7 +459,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'terrain.height', name: 'Height', tab: 'Terrain', section: 'Hills',
-    min: 0, max: 50, step: 0.5, default: 2.5, unit: 'm',
+    min: 0, max: 50, step: 0.5, default: 15, unit: 'm',
     note: 'How far up or down the ground rolls at most. 0 is flat.',
   },
   {
