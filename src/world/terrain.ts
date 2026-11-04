@@ -149,10 +149,38 @@ export class Terrain {
     for (let i = 0; i < n * n; i++) {
       const k = at[i]
       if (k < 0) continue
-      const out = nearest[i] - half
+      // Then exactly: onto the stretch of the middle either side of that
+      // sample, its floor and lean blended along it. Taking the one sample's
+      // floor alone leaves a little step every sample on a climb: a
+      // staircase of ridges that hops the bike at speed (prototype 1 had it too).
+      const x = coord(i % n)
+      const z = coord(Math.floor(i / n))
+      const s = samples[k]
+      let dist = nearest[i]
+      let base = floor[k]
+      let lean = leaning[k]
+      let side = left[i]
+      for (const other of [(k + count - 1) % count, (k + 1) % count]) {
+        const o = samples[other]
+        const sx = o.x - s.x
+        const sz = o.z - s.z
+        const long = Math.hypot(sx, sz) || 1
+        const t = Math.min(Math.max(((x - s.x) * sx + (z - s.z) * sz) / (long * long), 0), 1)
+        const px = x - (s.x + sx * t)
+        const pz = z - (s.z + sz * t)
+        const d = Math.hypot(px, pz)
+        if (d >= dist) continue
+        dist = d
+        base = floor[k] + (floor[other] - floor[k]) * t
+        lean = leaning[k] + (leaning[other] - leaning[k]) * t
+        // left of the stretch, the way the track runs (other may be behind k)
+        const way = other === (k + 1) % count ? 1 : -1
+        side = (way * (px * sz - pz * sx)) / long
+      }
+      const out = dist - half
       const weight = out <= 0 ? 1 : carve.banks > 0 ? 1 - smoothstep(out / carve.banks) : 0
       if (weight <= 0) continue
-      const level = floor[k] + leaning[k] * left[i]
+      const level = base + lean * side
       this.heights[i] += (level - this.heights[i]) * weight
     }
   }
