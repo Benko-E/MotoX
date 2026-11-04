@@ -353,8 +353,21 @@ renderer.setAnimationLoop(() => {
   }
   const wasAirborne = ride.airborne
   ride.step(input, tune, dt, WHEEL_RADIUS, groundAt)
+  // On the ground, drawn along the way the body points (sliding, that's off
+  // the way it's going), tipped to the ground under its two wheels and
+  // sitting at their height, so a slide across a hill keeps both on it.
+  let pitchTo = ride.pitch
+  let sit = 0
+  if (!ride.airborne && !ride.crash) {
+    const ax = (Math.sin(ride.bodyHeading) * WHEELBASE) / 2
+    const az = (-Math.cos(ride.bodyHeading) * WHEELBASE) / 2
+    const front = groundAt(ride.bodyX + ax, ride.bodyZ + az)
+    const rear = groundAt(ride.bodyX - ax, ride.bodyZ - az)
+    pitchTo = Math.atan2(front - rear, WHEELBASE)
+    sit = (front + rear) / 2 - groundAt(ride.x, ride.z)
+  }
   // the short way round, so landing a flip doesn't unwind it
-  pitch += Math.atan2(Math.sin(ride.pitch - pitch), Math.cos(ride.pitch - pitch)) * (1 - Math.exp(-dt / PITCH_TIME))
+  pitch += Math.atan2(Math.sin(pitchTo - pitch), Math.cos(pitchTo - pitch)) * (1 - Math.exp(-dt / PITCH_TIME))
   // Lean into turns, more the harder it's turning (sideways g): all the
   // way to Max lean at 1 g, so tight fast turns lean most.
   const sideways = Math.abs(ride.speed * ride.turnRate * DEG) / 9.81
@@ -371,7 +384,7 @@ renderer.setAnimationLoop(() => {
   // the wheelie pivots about the rear axle, so the rear tyre stays on the ground
   const axleLifted = axleLift.copy(REAR_AXLE).applyEuler(bike.root.rotation)
   const axleDown = axleRest.copy(REAR_AXLE).applyEuler(restTilt.set(pitch, -ride.bodyHeading, -lean, 'YZX'))
-  bike.root.position.set(ride.bodyX, ride.y, ride.bodyZ).add(axleDown).sub(axleLifted)
+  bike.root.position.set(ride.bodyX, ride.y + sit, ride.bodyZ).add(axleDown).sub(axleLifted)
   if (ride.crash) fallOver(ride.crash)
   effects.update(ride, input, dt)
   riderMotion.update(ride, dt)
