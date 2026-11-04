@@ -37,17 +37,17 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'bike.frontWheelLock', name: 'Front wheel lock', tab: 'Bike', section: 'Steering',
-    min: 10, max: 80, step: 1, default: 60, unit: '°',
+    min: 10, max: 80, step: 1, default: 80, unit: '°',
     note: 'How far the front wheel turns either way, holding A or D. Sets the tightest turn, at low speed: 45° turns in a 1.5 m circle. A real dirt bike turns about 40 to 45.',
   },
   {
     kind: 'slider', id: 'bike.grip', name: 'Grip', tab: 'Bike', section: 'Steering',
-    min: 0.3, max: 8, step: 0.1, default: 1.5, unit: 'g',
+    min: 0.3, max: 8, step: 0.1, default: 1, unit: 'g',
     note: 'How hard the tyres can push sideways. Sets how wide you turn at speed: the faster, the wider. Real tyres on dirt manage about 1.',
   },
   {
     kind: 'slider', id: 'slide.angle', name: 'Slide angle', tab: 'Bike', section: 'Powerslide',
-    min: 0, max: 70, step: 1, default: 40, unit: '°',
+    min: 0, max: 70, step: 1, default: 50, unit: '°',
     note: 'Hold Space and steer: how far the rear swings out at full steering, so you slide round side-on.',
   },
   {
@@ -100,7 +100,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'wheelie.turnCircle', name: 'Turn circle', tab: 'Bike', section: 'Wheelie',
-    min: 5, max: 100, step: 1, default: 40, unit: 'm',
+    min: 5, max: 100, step: 1, default: 98, unit: 'm',
     note: 'The front wheel can\u2019t steer in the air: A/D bank the bike and it turns, no tighter than this.',
   },
   {
@@ -180,7 +180,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'line', id: 'line.turnCircle', name: 'Turning circle', tab: 'Bike', section: 'Debug lines',
-    default: false, color: 0xffd23a,
+    default: true, color: 0xffd23a,
     note: 'On the ground, the circle the bike is riding round while it turns.',
   },
   {
@@ -268,7 +268,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'camera.lag', name: 'Swing lag', tab: 'Camera', section: 'All views',
-    min: 0, max: 1.5, step: 0.01, default: 0.25, unit: 's',
+    min: 0, max: 1.5, step: 0.01, default: 0.15, unit: 's',
     note: 'How long the views behind the bike take to swing round behind it after a turn. 0 is locked on.',
   },
   {
@@ -299,7 +299,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'camera.close.look', name: 'Looks at', tab: 'Camera', section: 'Close camera',
-    min: -1, max: 3, step: 0.05, default: 1.5, unit: 'm',
+    min: -1, max: 3, step: 0.05, default: 2, unit: 'm',
   },
   {
     kind: 'slider', id: 'camera.high.back', name: 'Distance', tab: 'Camera', section: 'High camera',
@@ -397,7 +397,7 @@ export const SETTINGS: Setting[] = [
   // Track
   {
     kind: 'slider', id: 'track.seed', name: 'Seed', tab: 'Track', section: 'Layout',
-    min: 1, max: 1000, step: 1, default: 3, unit: '',
+    min: 1, max: 1000, step: 1, default: 8, unit: '',
     note: 'Picks which loop you get. The same seed always lays out the same loop.',
   },
   {
@@ -452,37 +452,37 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'terrain.seed', name: 'Seed', tab: 'Terrain', section: 'Hills',
-    min: 1, max: 1000, step: 1, default: 1, unit: '',
+    min: 1, max: 1000, step: 1, default: 8, unit: '',
     note: 'Picks which hills you get. The same seed always makes the same hills, whatever the track does.',
   },
   {
     kind: 'slider', id: 'terrain.height', name: 'Height', tab: 'Terrain', section: 'Hills',
-    min: 0, max: 50, step: 0.5, default: 2, unit: 'm',
+    min: 0, max: 50, step: 0.5, default: 2.5, unit: 'm',
     note: 'How far up or down the ground rolls at most. 0 is flat.',
   },
   {
     kind: 'slider', id: 'terrain.width', name: 'Width', tab: 'Terrain', section: 'Hills',
-    min: 10, max: 1000, step: 10, default: 100, unit: 'm',
+    min: 10, max: 1000, step: 10, default: 80, unit: 'm',
     note: 'How far apart the big swells are, from one rise to the next.',
   },
   {
     kind: 'slider', id: 'terrain.detail', name: 'Detail', tab: 'Terrain', section: 'Hills',
-    min: 0, max: 100, step: 5, default: 30, unit: '%',
+    min: 0, max: 100, step: 5, default: 5, unit: '%',
     note: 'How much the smaller bumps add on top of the big swells. 0 is smooth rolling swells only.',
   },
   {
     kind: 'slider', id: 'terrain.smoothing', name: 'Smoothing', tab: 'Terrain', section: 'Track in the hills',
-    min: 0, max: 100, step: 1, default: 18, unit: 'm',
+    min: 0, max: 100, step: 1, default: 33, unit: 'm',
     note: 'The track rises and falls with the hills, its ups and downs evened out over this far. 0 follows every bump; more makes long, gentle rolls.',
   },
   {
     kind: 'slider', id: 'terrain.camber', name: 'Camber', tab: 'Terrain', section: 'Track in the hills',
-    min: 0, max: 100, step: 5, default: 50, unit: '%',
+    min: 0, max: 100, step: 5, default: 80, unit: '%',
     note: 'How much of the hillside’s sideways tilt the track keeps. 0 is flat across, like a road dug into the hill; 100 leans with the ground underneath.',
   },
   {
     kind: 'slider', id: 'terrain.banks', name: 'Banks', tab: 'Terrain', section: 'Track in the hills',
-    min: 0, max: 40, step: 1, default: 10, unit: 'm',
+    min: 0, max: 40, step: 1, default: 8, unit: 'm',
     note: 'Past the track’s edges, the ground blends back into the hills over this far. 0 is a hard step at the edge.',
   },
   {
@@ -542,7 +542,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'line', id: 'jump.spots', name: 'Jump spots', tab: 'Track', section: 'Debug lines',
-    default: true,
+    default: false,
     note: 'The placed jumps, square by square: run-up yellow, face orange, flight red, roll-out blue. The track runs dead straight through the yellow, orange and blue. Every other square a jump would fit is faint white.',
   },
   {
