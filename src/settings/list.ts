@@ -42,7 +42,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     kind: 'slider', id: 'steer.slowCircle', name: 'Slow turn circle', tab: 'Bike', section: 'Steering',
-    min: 1, max: 50, step: 0.5, default: 7, unit: 'm',
+    min: 1, max: 50, step: 0.5, default: 2, unit: 'm',
     note: 'Holding A or D, the radius of the circle you ride round, up to 30 km/h.',
   },
   {
@@ -69,11 +69,6 @@ export const SETTINGS: Setting[] = [
     kind: 'slider', id: 'bike.travel', name: 'Suspension travel', tab: 'Bike', section: 'Handling',
     min: 0, max: 1, step: 0.05, default: 0.25, unit: 'm',
     note: 'Where the ground drops away (over a crest, off a lip), the suspension stretches this far to keep the wheels on it before the bike leaves the ground. More soaks up bigger bumps; kickers still launch you.',
-  },
-  {
-    kind: 'slider', id: 'bike.stick', name: 'Ground stick', tab: 'Bike', section: 'Handling',
-    min: 1, max: 10, step: 0.5, default: 4, unit: '×',
-    note: 'On the ground the bike is held down this many times as hard as gravity, so it follows hill crests instead of flying off them at speed. 1 is real gravity. Kicker lips still launch you: they drop away too sharply.',
   },
   {
     kind: 'slider', id: 'air.tilt', name: 'Air tilt', tab: 'Bike', section: 'Handling',

@@ -20,11 +20,10 @@ import { WHEELBASE } from './bike/bikeModel'
  * turns Wheelie steering's share as tight. No powerslides on one wheel.
  *
  * Up and down: on the ground the bike follows it, gravity pulling it back
- * down slopes (Slope pull), feeling the slope from wheel to wheel. It's
- * held down Ground stick times as hard as gravity, so it follows hill
- * crests at speed. Where the ground drops away, the suspension stretches as
- * far as its travel to keep the wheels on it; past that (off a kicker's
- * sharp lip) the bike leaves the ground. In the air: no throttle or brakes. It holds the angle it left the
+ * down slopes (Slope pull), feeling the slope from wheel to wheel. Where the
+ * ground drops away, the suspension stretches as far as its travel to keep
+ * the wheels on it; past that (off a kicker's lip) the bike leaves the
+ * ground. In the air: no throttle or brakes. It holds the angle it left the
  * lip at unless the arrows tilt it: all the way round is a flip. Holding
  * A/D as it leaves the lip, it spins that way at Spin rate for as long as
  * the key stays held; let go and the spin dies away over Spin stop, and
@@ -95,8 +94,6 @@ export interface Tuning {
   getUp: number
   /** How far the suspension stretches to keep the wheels on the ground as it drops away, metres. */
   travel: number
-  /** On the ground, it's pulled down this many times as hard as gravity, so it follows crests at speed. */
-  stick: number
 }
 
 /** Which way the bike went down: over to its left or right, over the front, or looped out over the back. */
@@ -301,13 +298,12 @@ export class Ride {
     this.spin += (this.speed * dt) / radius
     this.pitch = Math.atan(slope)
 
-    // Left to itself, gravity (times Ground stick, holding it down over
-    // crests) would carry the bike to `free`. The ground pushes it up if
-    // it's higher; if it's lower, the suspension stretches to keep the
-    // wheels on it, as far as its travel, and past that (off a lip, or a
-    // crest too sharp for the stick) the bike leaves the ground.
+    // Left to itself, gravity would carry the bike to `free`. The ground
+    // pushes it up if it's higher; if it's lower, the suspension stretches
+    // to keep the wheels on it, as far as its travel, and past that (off a
+    // lip) the bike leaves the ground.
     const height = ground(this.x, this.z)
-    const vy = this.vy - G * tune.stick * dt
+    const vy = this.vy - G * dt
     const free = this.y + vy * dt
     if (free <= height) {
       // (no time passed, the first frame, say: nothing to rise at)
