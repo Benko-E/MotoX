@@ -26,7 +26,8 @@
         pointer-events: none;
       }
       #turn,
-      #trackInfo {
+      #trackInfo,
+      #position {
         position: fixed;
         bottom: 18px;
         left: 18px;
@@ -42,8 +43,13 @@
         top: 18px;
         bottom: auto;
       }
+      #position {
+        left: 50%;
+        transform: translateX(-50%);
+      }
       #turn[hidden],
-      #trackInfo[hidden] {
+      #trackInfo[hidden],
+      #position[hidden] {
         display: none;
       }
       #airtime {
@@ -173,6 +179,7 @@
     <div id="hud"></div>
     <div id="turn" hidden></div>
     <div id="trackInfo" hidden></div>
+    <div id="position" hidden></div>
     <div id="airtime" hidden></div>
     <div id="lap"></div>
     <div id="lapBest" hidden></div>

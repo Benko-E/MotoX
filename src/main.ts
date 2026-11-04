@@ -102,6 +102,7 @@ const trackGrid = new TrackGrid(scene, lineColor('track.grid'), lineColor('track
 const trackView = new TrackView(dirtMaterial, renderer.capabilities.getMaxAnisotropy())
 const kickerView = new KickerView(scene, renderer.capabilities.getMaxAnisotropy())
 const trackInfo = document.getElementById('trackInfo')!
+const positionInfo = document.getElementById('position')!
 const jumpMarks = new JumpMarks(scene)
 const splitLines = new SplitLines(scene, lineColor('split.lines'))
 const terrainLines = new TerrainLines(scene, lineColor('terrain.poles'), lineColor('terrain.contours'))
@@ -390,6 +391,15 @@ renderer.setAnimationLoop(() => {
   riderMotion.update(ride, dt)
   bike.update(ride.wheelAngle, ride.spin, effects.rearWheelspin, riderMotion)
   lines.update(ride)
+  positionInfo.hidden = !store.isOn('track.position')
+  if (!positionInfo.hidden) {
+    const at = track.nearest(ride.x, ride.z)
+    const s = track.samples[at]
+    // how far right of the track's middle, facing the way it runs
+    const off = (ride.x - s.x) * -s.tz + (ride.z - s.z) * s.tx
+    const side = Math.abs(off) < 0.5 ? 'on the middle' : `${Math.abs(off).toFixed(1)} m ${off > 0 ? 'right' : 'left'} of the middle`
+    positionInfo.textContent = `track spot ${at}, ${side}   (x ${ride.x.toFixed(0)}, z ${ride.z.toFixed(0)})`
+  }
 
   rig.update(ride, bike, dt)
   sinceSwitch += dt

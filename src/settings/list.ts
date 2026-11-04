@@ -558,6 +558,11 @@ export const SETTINGS: Setting[] = [
     note: 'The smooth line the track follows, down its middle, with a ring round its tightest corner.',
   },
   {
+    kind: 'line', id: 'track.position', name: 'Position', tab: 'Track', section: 'Debug',
+    default: true,
+    note: 'Bottom middle: where the bike is. The track spot is how many metres round the lap from the spline’s start (the number Claude can find), and how far off the middle you are.',
+  },
+  {
     kind: 'line', id: 'track.info', name: 'Track readout', tab: 'Track', section: 'Debug',
     default: false,
     note: 'Top left: how long a lap is, the tightest corner’s radius, how many jumps there are room for, and how many splits landed on roll-outs.',
